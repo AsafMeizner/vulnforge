@@ -1,0 +1,70 @@
+{
+  "name": "vulnforge",
+  "version": "0.1.0",
+  "description": "AI-powered security research platform — find, triage, and fix vulnerabilities",
+  "type": "module",
+  "main": "electron/main.ts",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"tsx watch server/index.ts\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:client": "vite",
+    "seed": "tsx seed.ts",
+    "build": "vite build",
+    "start": "node dist/server/index.js",
+    "electron:dev": "concurrently \"vite\" \"tsx watch server/index.ts\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "vite build && electron-builder"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "cors": "^2.8.5",
+    "ws": "^8.18.0",
+    "sql.js": "^1.11.0",
+    "zod": "^3.23.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "openai": "^4.77.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.0",
+    "@types/ws": "^8.5.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.0",
+    "concurrently": "^9.0.0",
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0",
+    "postcss": "^8.4.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "wait-on": "^8.0.0"
+  },
+  "build": {
+    "appId": "com.vulnforge.app",
+    "productName": "VulnForge",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "server/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

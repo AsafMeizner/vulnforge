@@ -1,0 +1,536 @@
+import crypto from 'crypto';
+import { EventEmitter } from 'events';
+import {
+  createPipelineRun,
+  updatePipelineRun,
+  getPipelineRun,
+  getProjectById,
+  updateProject,
+  createProject,
+  getScanFindings,
+  type PipelineRun,
+} from '../db.js';
+import { broadcastProgress } from '../ws.js';
+import {
+  validateRepoUrl,
+  repoNameFromUrl,
+  cloneRepo,
+  detectProjectMeta,
+  extractDependencies,
+  type ProjectMeta,
+} from './git.js';
+import { selectToolsForProject } from './tool-selector.js';
+import { runSmartFilter } from './smart-filter.js';
+import { runAIVerification } from './ai-verify.js';
+import { analyzeRecentCommits, type GitAnalysis } from './git-analyzer.js';
+import { generateAttackSurface, type AttackSurface } from './attack-surface.js';
+import { huntCVEVariants, type CVEVariant } from './cve-hunter.js';
+import { auditConfigs, type ConfigFinding } from './config-auditor.js';
+import { filterUnreachableDeps } from './dep-reachability.js';
+import { detectChains, type VulnChain } from './chain-detector.js';
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+export interface PipelineOptions {
+  url?: string;           // Git URL to clone
+  path?: string;          // Local directory path
+  project_id?: number;    // Existing project ID
+  branch?: string;
+  depth?: number;
+  toolOverrides?: string[];  // Override auto-selected tools
+}
+
+type PipelineStage = 'cloning' | 'analyzing' | 'scanning' | 'filtering' | 'verifying' | 'ready';
+
+const STAGES: PipelineStage[] = ['cloning', 'analyzing', 'scanning', 'filtering', 'verifying', 'ready'];
+
+// ── Active Pipeline Tracking ───────────────────────────────────────────────
+
+const activePipelines = new Map<string, { cancel: () => void }>();
+
+// ── Pipeline Runner ────────────────────────────────────────────────────────
+
+/**
+ * Runs the full autonomous pipeline:
+ * Clone → Analyze → Scan → Filter → Verify → Ready for Review
+ */
+export async function runPipeline(opts: PipelineOptions): Promise<string> {
+  const pipelineId = `pipe-${crypto.randomBytes(6).toString('hex')}`;
+  let cancelled = false;
+
+  // Resolve or create project
+  let projectId: number;
+  let projectPath: string;
+
+  if (opts.project_id) {
+    const existing = getProjectById(opts.project_id);
+    if (!existing) throw new Error(`Project ${opts.project_id} not found`);
+    projectId = existing.id!;
+    projectPath = existing.path || '';
+  } else if (opts.url) {
+    if (!validateRepoUrl(opts.url)) throw new Error('Invalid git repository URL');
+    const name = repoNameFromUrl(opts.url);
+    projectId = createProject({ name, repo_url: opts.url, branch: opts.branch || null, language: 'detecting...' } as any);
+    projectPath = ''; // Will be set after clone
+  } else if (opts.path) {
+    const name = opts.path.split(/[/\\]/).pop() || 'local-project';
+    projectId = createProject({ name, path: opts.path, language: 'detecting...' } as any);
+    projectPath = opts.path;
+  } else {
+    throw new Error('Must provide url, path, or project_id');
+  }
+
+  // Create pipeline run record
+  createPipelineRun({
+    id: pipelineId,
+    project_id: projectId,
+    status: 'pending',
+    current_stage: '',
+    progress: 0,
+    scan_job_ids: '[]',
+    findings_total: 0,
+    findings_after_filter: 0,
+    findings_after_verify: 0,
+    config: JSON.stringify(opts),
+    started_at: new Date().toISOString(),
+  });
+
+  // Register cancellation
+  activePipelines.set(pipelineId, {
+    cancel: () => { cancelled = true; },
+  });
+
+  // Run pipeline async
+  runPipelineAsync(pipelineId, projectId, projectPath, opts, () => cancelled).catch(err => {
+    console.error(`[Pipeline ${pipelineId}] Fatal error:`, err);
+    updatePipelineRun(pipelineId, {
+      status: 'failed',
+      error: err.message,
+      completed_at: new Date().toISOString(),
+    });
+    broadcastProgress('pipeline', pipelineId, {
+      step: 'Pipeline failed',
+      detail: err.message,
+      progress: 0,
+      status: 'error',
+    });
+  }).finally(() => {
+    activePipelines.delete(pipelineId);
+  });
+
+  return pipelineId;
+}
+
+async function runPipelineAsync(
+  pipelineId: string,
+  projectId: number,
+  projectPath: string,
+  opts: PipelineOptions,
+  isCancelled: () => boolean,
+): Promise<void> {
+
+  const emit = (stage: string, detail: string, progress: number, status: 'running' | 'complete' | 'error' = 'running') => {
+    broadcastProgress('pipeline', pipelineId, { step: stage, detail, progress, status });
+  };
+
+  // ── Stage 1: Clone (if URL provided) ──────────────────────────────────
+  if (opts.url && !projectPath) {
+    updatePipelineRun(pipelineId, { status: 'cloning', current_stage: 'cloning', progress: 5 });
+    emit('Cloning repository', `git clone ${opts.url}`, 5);
+
+    try {
+      updateProject(projectId, { clone_status: 'cloning' } as any);
+      const result = await cloneRepo(opts.url, { branch: opts.branch, depth: opts.depth || 1 });
+      projectPath = result.localPath;
+
+      updateProject(projectId, {
+        path: result.localPath,
+        branch: result.branch,
+        clone_status: 'ready',
+        commit_hash: result.commitHash,
+      } as any);
+      emit('Clone complete', `Cloned to ${result.localPath}`, 15);
+    } catch (err: any) {
+      updateProject(projectId, { clone_status: 'failed', clone_error: err.message } as any);
+      throw new Error(`Clone failed: ${err.message}`);
+    }
+  }
+
+  if (isCancelled()) return abortPipeline(pipelineId, 'Cancelled by user');
+  if (!projectPath) throw new Error('No project path available');
+
+  // ── Stage 2: Analyze ──────────────────────────────────────────────────
+  updatePipelineRun(pipelineId, { status: 'scanning', current_stage: 'analyzing', progress: 18 });
+  emit('Analyzing project', 'Detecting languages, build systems, and dependencies', 18);
+
+  const meta = detectProjectMeta(projectPath);
+  const deps = extractDependencies(projectPath);
+
+  updateProject(projectId, {
+    language: meta.primaryLanguage,
+    build_system: JSON.stringify(meta.buildSystems),
+    dependencies: JSON.stringify(deps),
+    languages: JSON.stringify(meta.languages),
+  } as any);
+
+  emit('Analysis complete',
+    `${meta.languages.join(', ')} | ${meta.buildSystems.join(', ') || 'no build system'} | ${deps.reduce((s, d) => s + d.packages.length, 0)} deps`,
+    20);
+
+  if (isCancelled()) return abortPipeline(pipelineId, 'Cancelled by user');
+
+  // ── Stage 2b: Git History Analysis ──────────────────────────────────
+  emit('Git analysis', 'Analyzing commit history for security-relevant changes', 21);
+  let gitAnalysis: GitAnalysis | null = null;
+  try {
+    gitAnalysis = await analyzeRecentCommits(projectPath, 200);
+    if (gitAnalysis.security_commits.length > 0) {
+      emit('Git analysis', `Found ${gitAnalysis.security_commits.length} security-relevant commits, ${gitAnalysis.hot_files.length} hot files`, 22);
+    }
+  } catch (err: any) {
+    emit('Git analysis', `Skipped: ${err.message}`, 22);
+  }
+
+  // ── Stage 2c: Attack Surface Mapping ────────────────────────────────
+  emit('Attack surface', 'Mapping entry points and trust boundaries', 23);
+  let attackSurface: AttackSurface | null = null;
+  try {
+    attackSurface = generateAttackSurface(projectPath, meta);
+    emit('Attack surface',
+      `${attackSurface.total_entry_points} entry points: ${Object.entries(attackSurface.exposure_summary).map(([k, v]) => `${v} ${k}`).join(', ')}`,
+      24);
+  } catch (err: any) {
+    emit('Attack surface', `Skipped: ${err.message}`, 24);
+  }
+
+  if (isCancelled()) return abortPipeline(pipelineId, 'Cancelled by user');
+
+  // ── Stage 3: Select & Run Tools ───────────────────────────────────────
+  const selection = opts.toolOverrides
+    ? { tools: opts.toolOverrides, plugins: [], reason: 'Manual tool override' }
+    : selectToolsForProject(meta);
+
+  emit('Starting scans',
+    `${selection.tools.length} tools + ${selection.plugins.length} plugins selected: ${selection.reason}`,
+    25);
+
+  // Import scan queue dynamically to avoid circular deps
+  const { scanQueue } = await import('../scanner/queue.js');
+
+  // Enqueue all tools — enqueue(projectId, projectPath, toolNames[], autoTriage)
+  const scanJobIds: string[] = [];
+  for (const toolName of selection.tools) {
+    try {
+      const jobs = scanQueue.enqueue(projectId, projectPath, [toolName], false);
+      for (const j of jobs) scanJobIds.push(j.id);
+    } catch (err: any) {
+      console.warn(`[Pipeline] Failed to enqueue tool ${toolName}:`, err.message);
+    }
+  }
+
+  updatePipelineRun(pipelineId, {
+    scan_job_ids: JSON.stringify(scanJobIds),
+    current_stage: 'scanning',
+    progress: 30,
+  });
+
+  // Run plugins in parallel (fire-and-forget style like existing plugin runs)
+  for (const pluginConfig of selection.plugins) {
+    try {
+      const { getIntegration } = await import('../plugins/integrations/index.js');
+      const integration = getIntegration(pluginConfig.pluginName);
+      if (integration) {
+        // Run plugin async, don't block the pipeline
+        integration.run(projectPath, pluginConfig.options || {}).then(async (result: any) => {
+          if (result && result.findings) {
+            const db = await import('../db.js');
+            for (const f of result.findings) {
+              db.createScanFinding({
+                project_id: projectId,
+                pipeline_id: pipelineId,
+                title: f.title || f.rule_id || 'Plugin finding',
+                severity: f.severity || 'Medium',
+                file: f.file || '',
+                line_start: f.line,
+                description: f.message || f.description || '',
+                tool_name: pluginConfig.pluginName,
+                confidence: 'Medium',
+                status: 'pending',
+              } as any);
+            }
+          }
+        }).catch(err => {
+          console.warn(`[Pipeline] Plugin ${pluginConfig.pluginName} failed:`, err.message);
+        });
+      }
+    } catch (err: any) {
+      console.warn(`[Pipeline] Plugin ${pluginConfig.pluginName} not available:`, err.message);
+    }
+  }
+
+  // Run CVE variant hunting in parallel with scans
+  emit('CVE variant hunt', 'Searching for known CVE patterns...', 32);
+  try {
+    const cveVariants = huntCVEVariants(projectPath, meta);
+    if (cveVariants.length > 0) {
+      const { createScanFinding } = await import('../db.js');
+      for (const v of cveVariants) {
+        createScanFinding({
+          project_id: projectId,
+          pipeline_id: pipelineId,
+          title: `[CVE Variant] ${v.cve_name}: ${v.pattern_type} in ${v.file}`,
+          severity: v.severity as any,
+          cwe: v.cwe,
+          file: v.file,
+          line_start: v.line,
+          description: `${v.evidence}\n\nBased on pattern: ${v.cve_id}`,
+          tool_name: 'cve_variant_hunter',
+          confidence: v.confidence === 'high' ? 'High' : 'Medium',
+          status: 'pending',
+          code_snippet: v.match,
+        } as any);
+      }
+      emit('CVE variant hunt', `Found ${cveVariants.length} potential CVE variants`, 34);
+    } else {
+      emit('CVE variant hunt', 'No CVE variant patterns matched', 34);
+    }
+  } catch (err: any) {
+    emit('CVE variant hunt', `Skipped: ${err.message}`, 34);
+  }
+
+  // Run config audit in parallel
+  emit('Config audit', 'Scanning configuration files for security issues...', 34);
+  try {
+    const configFindings = auditConfigs(projectPath);
+    if (configFindings.length > 0) {
+      const { createScanFinding } = await import('../db.js');
+      for (const cf of configFindings) {
+        createScanFinding({
+          project_id: projectId,
+          pipeline_id: pipelineId,
+          title: `[Config] ${cf.title}`,
+          severity: cf.severity as any,
+          file: cf.file,
+          line_start: cf.line,
+          description: `${cf.description}\n\nFix: ${cf.fix}`,
+          tool_name: 'config_auditor',
+          confidence: 'High',
+          status: 'pending',
+          code_snippet: cf.match,
+        } as any);
+      }
+      emit('Config audit', `Found ${configFindings.length} configuration issues`, 35);
+    } else {
+      emit('Config audit', 'No configuration issues found', 35);
+    }
+  } catch (err: any) {
+    emit('Config audit', `Skipped: ${err.message}`, 35);
+  }
+
+  // Wait for all scan jobs to complete
+  emit('Running scans', `Waiting for ${scanJobIds.length} tool scans to complete...`, 36);
+
+  await waitForScansComplete(scanQueue, pipelineId, scanJobIds, emit, isCancelled);
+
+  if (isCancelled()) return abortPipeline(pipelineId, 'Cancelled by user');
+
+  // Count raw findings
+  const rawFindings = getScanFindings({ pipeline_id: pipelineId });
+  const rawCount = rawFindings.length;
+  updatePipelineRun(pipelineId, { findings_total: rawCount, progress: 52 });
+  emit('Scans complete', `${rawCount} raw findings from all tools + CVE hunt + config audit`, 52);
+
+  // ── Stage 4: Smart FP Filtering ───────────────────────────────────────
+  updatePipelineRun(pipelineId, { current_stage: 'filtering', progress: 55 });
+  emit('Filtering false positives', '5-tier filtering: regex → dedup → AI → dep reachability → chain detection', 55);
+
+  const filterResult = await runSmartFilter(pipelineId, projectPath);
+
+  // ── Stage 4b: Dependency Reachability ─────────────────────────────────
+  emit('Dep reachability', 'Checking if vulnerable dependencies are actually called...', 62);
+  try {
+    const pendingAfterFilter = getScanFindings({ pipeline_id: pipelineId, status: 'pending' });
+    const depResult = filterUnreachableDeps(pendingAfterFilter, projectPath);
+    if (depResult.rejected.length > 0) {
+      const { updateScanFinding } = await import('../db.js');
+      for (const r of depResult.rejected) {
+        if (r.finding.id) {
+          updateScanFinding(r.finding.id, {
+            status: 'auto_rejected',
+            rejection_reason: r.reason,
+            ai_filter_reason: `Dep reachability: ${r.reason}`,
+          });
+        }
+      }
+      emit('Dep reachability', `Filtered ${depResult.rejected.length} unreachable dependency findings`, 65);
+    }
+  } catch (err: any) {
+    emit('Dep reachability', `Skipped: ${err.message}`, 65);
+  }
+
+  // ── Stage 4c: Vulnerability Chain Detection ───────────────────────────
+  emit('Chain detection', 'Looking for exploitable vulnerability chains...', 66);
+  let chains: VulnChain[] = [];
+  try {
+    const pendingForChains = getScanFindings({ pipeline_id: pipelineId, status: 'pending' });
+    chains = detectChains(pendingForChains);
+    if (chains.length > 0) {
+      emit('Chain detection', `Found ${chains.length} vulnerability chains`, 68);
+      // Boost severity of chained findings
+      const { updateScanFinding } = await import('../db.js');
+      for (const chain of chains) {
+        for (const fId of chain.finding_ids) {
+          updateScanFinding(fId, {
+            description: `[CHAIN: ${chain.chain_type}] ${chain.exploitation_path}\n\n` + (getScanFindings({}).find(f => f.id === fId)?.description || ''),
+          } as any);
+        }
+      }
+    } else {
+      emit('Chain detection', 'No exploitable chains found', 68);
+    }
+  } catch (err: any) {
+    emit('Chain detection', `Skipped: ${err.message}`, 68);
+  }
+
+  const afterAllFilters = getScanFindings({ pipeline_id: pipelineId, status: 'pending' }).length;
+  updatePipelineRun(pipelineId, {
+    findings_after_filter: afterAllFilters,
+    progress: 72,
+  });
+  emit('Filtering complete',
+    `${rawCount} → ${afterAllFilters} findings (regex + dedup + AI + dep reachability) | ${chains.length} chains detected`,
+    72);
+
+  if (isCancelled()) return abortPipeline(pipelineId, 'Cancelled by user');
+
+  // ── Stage 5: AI Verification & Enrichment (with deep context) ─────────
+  const pendingFindings = getScanFindings({ pipeline_id: pipelineId, status: 'pending' });
+
+  if (pendingFindings.length > 0) {
+    updatePipelineRun(pipelineId, { current_stage: 'verifying', progress: 75 });
+    emit('AI verification',
+      `Deep-verifying ${pendingFindings.length} findings (multi-file context, git blame, data flow, ${chains.length} chains)...`, 75);
+
+    const verifyResult = await runAIVerification(pipelineId, projectPath, (completed, total) => {
+      const progress = 75 + Math.round((completed / total) * 20);
+      emit('AI verification', `Verified ${completed}/${total} findings`, progress);
+    });
+
+    updatePipelineRun(pipelineId, {
+      findings_after_verify: verifyResult.verified,
+      progress: 95,
+    });
+    emit('Verification complete',
+      `${verifyResult.verified} verified, ${verifyResult.rejected} rejected by AI`,
+      95);
+  } else {
+    updatePipelineRun(pipelineId, { findings_after_verify: 0, progress: 95 });
+    emit('No findings to verify', 'All findings were filtered out', 95);
+  }
+
+  // ── Stage 6: Ready for Review ─────────────────────────────────────────
+  const finalCount = getScanFindings({ pipeline_id: pipelineId, status: 'pending' }).length;
+
+  updatePipelineRun(pipelineId, {
+    status: 'ready',
+    current_stage: 'ready',
+    progress: 100,
+    findings_after_verify: finalCount,
+    completed_at: new Date().toISOString(),
+  });
+
+  emit('Pipeline complete',
+    `${finalCount} findings ready for review (from ${rawCount} raw findings)`,
+    100, 'complete');
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function abortPipeline(pipelineId: string, reason: string): void {
+  updatePipelineRun(pipelineId, {
+    status: 'cancelled',
+    error: reason,
+    completed_at: new Date().toISOString(),
+  });
+  broadcastProgress('pipeline', pipelineId, {
+    step: 'Cancelled',
+    detail: reason,
+    progress: 0,
+    status: 'error',
+  });
+}
+
+/** Wait for all scan jobs in a pipeline to finish. */
+async function waitForScansComplete(
+  scanQueue: any,
+  pipelineId: string,
+  jobIds: string[],
+  emit: (stage: string, detail: string, progress: number) => void,
+  isCancelled: () => boolean,
+): Promise<void> {
+  if (jobIds.length === 0) return;
+
+  return new Promise<void>((resolve) => {
+    let completed = 0;
+    const total = jobIds.length;
+    const jobSet = new Set(jobIds);
+
+    const onComplete = (data: any) => {
+      if (data.pipelineId === pipelineId || jobSet.has(data.jobId || data.id)) {
+        completed++;
+        const progress = 35 + Math.round((completed / total) * 20);
+        emit('Running scans', `${completed}/${total} tools complete`, progress);
+
+        if (completed >= total) {
+          scanQueue.removeListener('job:complete', onComplete);
+          scanQueue.removeListener('job:error', onError);
+          resolve();
+        }
+      }
+    };
+
+    const onError = (data: any) => {
+      if (data.pipelineId === pipelineId || jobSet.has(data.jobId || data.id)) {
+        completed++;
+        if (completed >= total) {
+          scanQueue.removeListener('job:complete', onComplete);
+          scanQueue.removeListener('job:error', onError);
+          resolve();
+        }
+      }
+    };
+
+    // Also listen for queue:drain as fallback
+    const onDrain = () => {
+      // Give plugins a moment to finish writing findings
+      setTimeout(() => {
+        scanQueue.removeListener('job:complete', onComplete);
+        scanQueue.removeListener('job:error', onError);
+        scanQueue.removeListener('queue:drain', onDrain);
+        resolve();
+      }, 2000);
+    };
+
+    scanQueue.on('job:complete', onComplete);
+    scanQueue.on('job:error', onError);
+    scanQueue.on('queue:drain', onDrain);
+
+    // Safety timeout: 10 minutes max for all scans
+    setTimeout(() => {
+      scanQueue.removeListener('job:complete', onComplete);
+      scanQueue.removeListener('job:error', onError);
+      scanQueue.removeListener('queue:drain', onDrain);
+      resolve();
+    }, 600_000);
+  });
+}
+
+/** Cancel a running pipeline. */
+export function cancelPipeline(pipelineId: string): boolean {
+  const active = activePipelines.get(pipelineId);
+  if (active) {
+    active.cancel();
+    return true;
+  }
+  return false;
+}

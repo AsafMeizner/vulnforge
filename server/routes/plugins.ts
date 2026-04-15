@@ -1,0 +1,234 @@
+import { Router, Request, Response } from 'express';
+import { pluginManager } from '../plugins/manager.js';
+import { PLUGIN_CATALOG } from '../plugins/registry.js';
+import { createVulnerability } from '../db.js';
+
+const router = Router();
+
+// -- GET /api/plugins ---------------------------------------------------------
+// Returns installed plugins merged with the static catalog.
+
+router.get('/', (_req: Request, res: Response) => {
+  try {
+    const { installed, catalog } = pluginManager.listPlugins();
+    const installedNames = new Set(
+      installed.map((p) => p.name.toLowerCase()).filter(Boolean)
+    );
+    const catalogWithStatus = catalog.map((entry) => ({
+      ...entry,
+      installed: installedNames.has(entry.name.toLowerCase()),
+    }));
+    res.json({
+      data: { installed, catalog: catalogWithStatus },
+      total_installed: installed.length,
+      total_catalog: catalog.length,
+    });
+  } catch (err: any) {
+    console.error('[GET /plugins] error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -- GET /api/plugins/catalog/all ---------------------------------------------
+
+router.get('/catalog/all', (_req: Request, res: Response) => {
+  res.json({ data: PLUGIN_CATALOG, total: PLUGIN_CATALOG.length });
+});
+
+// -- GET /api/plugins/:id -----------------------------------------------------
+
+router.get('/:id', (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
+    const plugin = pluginManager.getPlugin(id);
+    if (!plugin) { res.status(404).json({ error: `Plugin ${id} not found` }); return; }
+    res.json(plugin);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -- GET /api/plugins/:id/status ----------------------------------------------
+// Returns live status (idle/installing/running/error/ready) + requirements check.
+
+router.get('/:id/status', async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
+    const plugin = pluginManager.getPlugin(id);
+    if (!plugin) { res.status(404).json({ error: `Plugin ${id} not found` }); return; }
+
+    const [runtimeStatus, reqCheck] = await Promise.all([
+      pluginManager.getPluginStatus(id),
+      pluginManager.checkRequirements(plugin),
+    ]);
+
+    res.json({
+      ...runtimeStatus,
+      requirements: reqCheck,
+      plugin: { id: plugin.id, name: plugin.name, version: plugin.version },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -- GET /api/plugins/:id/modules ---------------------------------------------
+// Returns available modules/probes/templates for the plugin.
+
+router.get('/:id/modules', (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
+    const plugin = pluginManager.getPlugin(id);
+    if (!plugin) { res.status(404).json({ error: `Plugin ${id} not found` }); return; }
+
+    const modules = pluginManager.getPluginModules(plugin.name);
+    res.json({ plugin: plugin.name, modules, total: modules.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -- POST /api/plugins/install ------------------------------------------------
+// Body: { name?: string; source_url?: string; catalog_name?: string }
+
+router.post('/install', async (req: Request, res: Response) => {
+  try {
+    const { name, source_url, catalog_name } = req.body as {
+      name?: string;
+      source_url?: string;
+      catalog_name?: string;
+    };
+
+    const identifier = name ?? source_url ?? catalog_name;
+    if (!identifier) {
+      res.status(400).json({ error: 'name, source_url, or catalog_name is required' });
+      return;
+    }
+
+    const plugin = await pluginManager.installPlugin(identifier);
+    res.status(201).json(plugin);
+  } catch (err: any) {
+    console.error('[POST /plugins/install] error:', err);
+    // Check if it's a missing requirements error and include install commands
+    const missingMatch = err.message?.match(/Missing requirements for "(.+?)": (.+)/);
+    if (missingMatch) {
+      const missing = missingMatch[2].split(', ').map((s: string) => s.trim());
+      const isWin = process.platform === 'win32';
+      const installCommands: Record<string, string> = {};
+      const CMDS: Record<string, string> = {
+        'go':      isWin ? 'winget install GoLang.Go' : 'brew install go || sudo apt install golang-go',
+        'gh':      isWin ? 'winget install GitHub.cli' : 'brew install gh || sudo apt install gh',
+        'python3': isWin ? 'winget install Python.Python.3.12' : 'brew install python3',
+        'pip':     isWin ? 'python -m ensurepip --upgrade' : 'python3 -m ensurepip --upgrade',
+        'git':     isWin ? 'winget install Git.Git' : 'brew install git',
+        'docker':  isWin ? 'winget install Docker.DockerDesktop' : 'brew install --cask docker',
+      };
+      for (const m of missing) installCommands[m] = CMDS[m] ?? `Install "${m}" manually`;
+      res.status(422).json({
+        error: err.message,
+        missingDeps: missing,
+        installCommands,
+      });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+// -- POST /api/plugins/install-dep --------------------------------------------
+// Install a missing system dependency (go, gh, etc.)
+
+router.post('/install-dep', async (req: Request, res: Response) => {
+  try {
+    const { dependency } = req.body as { dependency?: string };
+    if (!dependency) { res.status(400).json({ error: 'dependency name is required' }); return; }
+    const result = await pluginManager.installDependency(dependency);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -- DELETE /api/plugins/:id --------------------------------------------------
+
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
+    if (!pluginManager.getPlugin(id)) {
+      res.status(404).json({ error: `Plugin ${id} not found` });
+      return;
+    }
+    await pluginManager.uninstallPlugin(id);
+    res.status(204).send();
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -- POST /api/plugins/:id/run ------------------------------------------------
+// Body: { target: string; options?: Record<string, any>; project_id?: number }
+//
+// Runs the plugin and persists each finding as a vulnerability record.
+
+router.post('/:id/run', async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
+
+    const { target, options, project_id } = req.body as {
+      target?: string;
+      options?: Record<string, any>;
+      project_id?: number;
+    };
+    if (!target) { res.status(400).json({ error: 'target is required' }); return; }
+
+    const plugin = pluginManager.getPlugin(id);
+    if (!plugin) { res.status(404).json({ error: `Plugin ${id} not found` }); return; }
+
+    // Acknowledge immediately; run asynchronously
+    res.status(202).json({
+      message: `Plugin "${plugin.name}" started against "${target}"`,
+      pluginId: id,
+      target,
+    });
+
+    setImmediate(async () => {
+      try {
+        const { output, findings } = await pluginManager.runPlugin(id, target, options);
+        console.log(
+          `[PluginRun] id=${id} completed. output=${output.length}b findings=${findings.length}`
+        );
+
+        // Persist findings as vulnerability records
+        for (const finding of findings) {
+          try {
+            createVulnerability({
+              project_id: project_id ?? undefined,
+              title: finding.title,
+              severity: finding.severity,
+              description: finding.description,
+              file: finding.file ?? undefined,
+              code_snippet: finding.code_snippet ?? undefined,
+              tool_name: plugin.name,
+              method: 'plugin',
+              status: 'Open',
+            });
+          } catch (insertErr) {
+            console.error('[PluginRun] Failed to insert finding:', insertErr);
+          }
+        }
+      } catch (runErr: any) {
+        console.error(`[PluginRun] id=${id} failed:`, runErr.message);
+      }
+    });
+  } catch (err: any) {
+    console.error(`[POST /plugins/${req.params.id}/run] error:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;

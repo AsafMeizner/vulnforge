@@ -1,0 +1,43 @@
+{
+  "name": "vulnforge",
+  "version": "1.0.0",
+  "description": "VulnForge — AI-powered vulnerability research platform. Hunt, scan, triage, and report security vulnerabilities.",
+  "skills": [
+    {
+      "name": "hunt",
+      "path": "skills/hunt.md",
+      "description": "Start an autonomous vulnerability hunt on a Git repo URL, local path, or existing project. Clones, scans with 48+ tools, filters false positives, AI-verifies, and stages findings for review."
+    },
+    {
+      "name": "scan",
+      "path": "skills/scan.md",
+      "description": "Run specific security analysis tools on a project. Select tools by vulnerability class (memory, crypto, network, etc.) or run full scan."
+    },
+    {
+      "name": "triage",
+      "path": "skills/triage.md",
+      "description": "Triage and verify vulnerability findings. AI-powered severity assessment, exploitability analysis, and fix suggestions."
+    },
+    {
+      "name": "review",
+      "path": "skills/review.md",
+      "description": "Review staged scan findings. Accept verified vulnerabilities into the findings database, reject false positives."
+    },
+    {
+      "name": "report",
+      "path": "skills/report.md",
+      "description": "Generate vulnerability disclosure reports — email notifications, security advisories, or brief summaries."
+    },
+    {
+      "name": "status",
+      "path": "skills/status.md",
+      "description": "Check VulnForge status — dashboard stats, active pipelines, recent findings, configured AI providers."
+    }
+  ],
+  "mcp": {
+    "vulnforge": {
+      "type": "sse",
+      "url": "http://localhost:3001/mcp"
+    }
+  }
+}

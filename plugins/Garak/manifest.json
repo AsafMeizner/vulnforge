@@ -1,0 +1,12 @@
+{
+  "name": "Garak",
+  "version": "latest",
+  "type": "scanner",
+  "description": "LLM vulnerability scanner — red-teaming for language models",
+  "install_command": "pip install garak",
+  "run_command": "garak --model_type {model} --probes all -o {output}",
+  "parse_output": "json",
+  "requires": [
+    "python3"
+  ]
+}

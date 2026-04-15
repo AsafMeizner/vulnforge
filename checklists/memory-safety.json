@@ -1,0 +1,133 @@
+{
+  "name": "Memory Safety Checklist",
+  "source_url": "https://cwe.mitre.org/data/definitions/memory.html",
+  "category": "memory-safety",
+  "items": [
+    {
+      "category": "integer",
+      "title": "Integer overflow in allocation",
+      "description": "Multiplication or addition of attacker-controlled values used as arguments to malloc/realloc without overflow checks. On 32-bit or with uint64→size_t truncation this can yield undersized buffers. See CWE-190.",
+      "severity": "Critical",
+      "tool_names": "integer_overflow_scanner,cross_arch_truncation"
+    },
+    {
+      "category": "integer",
+      "title": "Signed/unsigned integer confusion",
+      "description": "Signed integers used where unsigned values are expected (or vice-versa), leading to unexpected comparison results, negative array indices, or wrap-around allocation sizes. See CWE-195, CWE-196.",
+      "severity": "High",
+      "tool_names": "signed_unsigned_checker,integer_overflow_scanner"
+    },
+    {
+      "category": "integer",
+      "title": "Cross-architecture size_t truncation",
+      "description": "uint64_t values narrowed to size_t or int on 32-bit builds, silently truncating high bits. Typically manifests in archive/parser code that reads 64-bit length fields. See CWE-681.",
+      "severity": "Critical",
+      "tool_names": "cross_arch_truncation"
+    },
+    {
+      "category": "heap",
+      "title": "Use-after-free (UAF)",
+      "description": "Memory is freed but a dangling pointer is later dereferenced, allowing heap metadata corruption or type confusion. See CWE-416.",
+      "severity": "Critical",
+      "tool_names": "uaf_detector,realloc_dangling_scanner"
+    },
+    {
+      "category": "heap",
+      "title": "Double free",
+      "description": "The same heap block is passed to free() more than once, corrupting allocator metadata and potentially leading to arbitrary write primitives. See CWE-415.",
+      "severity": "Critical",
+      "tool_names": "uaf_detector,error_path_divergence"
+    },
+    {
+      "category": "heap",
+      "title": "Use-after-realloc pointer invalidation",
+      "description": "A pointer to a heap block is cached before calling realloc(); on reallocation the block may move, leaving the old pointer dangling. See CWE-416.",
+      "severity": "High",
+      "tool_names": "realloc_dangling_scanner,uaf_detector"
+    },
+    {
+      "category": "heap",
+      "title": "Heap buffer overflow (write)",
+      "description": "Writing past the end of a heap allocation, overwriting adjacent metadata or object fields. Often caused by off-by-one errors or missing length checks in copy loops. See CWE-122.",
+      "severity": "Critical",
+      "tool_names": "integer_overflow_scanner,dangerous_patterns"
+    },
+    {
+      "category": "stack",
+      "title": "Stack buffer overflow",
+      "description": "Writing beyond the bounds of a stack-allocated buffer, overwriting return addresses or saved registers. Classic in functions using strcpy, sprintf without bounds checking. See CWE-121.",
+      "severity": "Critical",
+      "tool_names": "dangerous_patterns,stack_clash_vla_scanner"
+    },
+    {
+      "category": "stack",
+      "title": "Stack clash / large VLA exhaustion",
+      "description": "Variable-length arrays (VLAs) or large stack allocations can collide with the heap on systems without guard pages, enabling control flow hijack. See CWE-1325.",
+      "severity": "High",
+      "tool_names": "stack_clash_vla_scanner"
+    },
+    {
+      "category": "memory",
+      "title": "Uninitialized memory read",
+      "description": "Reading from memory before it has been initialized can leak sensitive data or allow control of program state. Common in structs with padding or conditionally initialized fields. See CWE-457.",
+      "severity": "Medium",
+      "tool_names": "dangerous_patterns"
+    },
+    {
+      "category": "memory",
+      "title": "Out-of-bounds read",
+      "description": "Reading past the end of a buffer leaks adjacent memory, which can be used to defeat ASLR or exfiltrate sensitive data. See CWE-125.",
+      "severity": "High",
+      "tool_names": "integer_overflow_scanner,cross_arch_truncation,dangerous_patterns"
+    },
+    {
+      "category": "format",
+      "title": "Format string injection",
+      "description": "User-controlled strings passed directly to printf-family functions allow arbitrary read/write through format specifiers. See CWE-134.",
+      "severity": "Critical",
+      "tool_names": "dangerous_patterns"
+    },
+    {
+      "category": "concurrency",
+      "title": "Signal handler async-signal-unsafe calls",
+      "description": "Signal handlers that call non-reentrant functions (malloc, printf, exit, non-async-signal-safe syscalls) can corrupt program state when interrupted at the wrong time. Classic regreSSHion-class issue. See CWE-479.",
+      "severity": "High",
+      "tool_names": "signal_safety_checker"
+    },
+    {
+      "category": "concurrency",
+      "title": "Data race / lock ordering violation",
+      "description": "Shared data accessed from multiple threads without synchronization, or locks acquired in inconsistent order leading to deadlock or TOCTOU races. See CWE-362, CWE-833.",
+      "severity": "High",
+      "tool_names": "signal_safety_checker"
+    },
+    {
+      "category": "error-paths",
+      "title": "Inconsistent cleanup on error paths",
+      "description": "Resources (memory, file descriptors, locks) allocated before an error condition are not freed in all error exit paths, leading to leaks, UAF, or double-free. See CWE-401, CWE-772.",
+      "severity": "Medium",
+      "tool_names": "error_path_divergence,uaf_detector"
+    },
+    {
+      "category": "null",
+      "title": "Unchecked malloc/realloc return",
+      "description": "On allocation failure, malloc returns NULL. Dereferencing the result without checking leads to a null pointer dereference crash. On 64-bit systems the OS guard page prevents exploitation but can still cause DoS. See CWE-476.",
+      "severity": "Medium",
+      "tool_names": "integer_overflow_scanner,dangerous_patterns"
+    },
+    {
+      "category": "parser",
+      "title": "Parser complexity / deeply nested input",
+      "description": "Recursive parsers without depth limits can be forced into deep recursion by crafted input, causing stack exhaustion. See CWE-674.",
+      "severity": "High",
+      "tool_names": "parser_complexity_scorer,recursive_bomb_scanner"
+    },
+    {
+      "category": "deserialization",
+      "title": "Bytecode / binary format validation bypass",
+      "description": "VM or bytecode engines that skip operand validation when loading pre-compiled data, enabling OOB register/constant-pool access or arbitrary jump targets. Proven high-probability pattern for IoT/embedded VMs.",
+      "severity": "Critical",
+      "tool_names": "deserialization_trust_scanner"
+    }
+  ]
+}

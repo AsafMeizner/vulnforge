@@ -1,0 +1,315 @@
+{
+  "name": "Az0x7 Vulnerability Checklist",
+  "source_url": "https://github.com/Az0x7/vulnerability-Checklist",
+  "category": "web-security",
+  "items": [
+    {
+      "category": "Authentication",
+      "title": "Default / weak credentials",
+      "description": "Application ships with default usernames and passwords that are rarely changed in production environments.",
+      "severity": "High",
+      "tool_names": "preauth_tracer,dangerous_patterns"
+    },
+    {
+      "category": "Authentication",
+      "title": "Brute-force / credential stuffing not rate-limited",
+      "description": "Login endpoint allows unlimited attempts without lockout, CAPTCHA, or IP throttling.",
+      "severity": "High",
+      "tool_names": "preauth_tracer"
+    },
+    {
+      "category": "Authentication",
+      "title": "Timing oracle in credential comparison",
+      "description": "Password or token comparison uses non-constant-time comparison, leaking secret length or value through response timing.",
+      "severity": "Medium",
+      "tool_names": "timing_oracle_scanner,crypto_misuse_scanner"
+    },
+    {
+      "category": "Authentication",
+      "title": "JWT algorithm confusion (none / RS256→HS256)",
+      "description": "Server accepts JWTs signed with 'none' algorithm or allows algorithm switching from asymmetric to symmetric, enabling token forgery.",
+      "severity": "Critical",
+      "tool_names": "crypto_misuse_scanner,dangerous_patterns"
+    },
+    {
+      "category": "Authentication",
+      "title": "Password reset token predictability",
+      "description": "Password reset tokens are generated with weak RNG or are time-based and guessable, allowing account takeover.",
+      "severity": "High",
+      "tool_names": "crypto_misuse_scanner,timing_oracle_scanner"
+    },
+    {
+      "category": "Authentication",
+      "title": "OAuth / OIDC state parameter missing or reused",
+      "description": "OAuth flow does not use or validate the state parameter, enabling CSRF attacks against the authorization callback.",
+      "severity": "High",
+      "tool_names": "preauth_tracer,dangerous_patterns"
+    },
+    {
+      "category": "Authorization",
+      "title": "Horizontal privilege escalation (IDOR)",
+      "description": "Direct object references (user IDs, document IDs) are not validated against the authenticated user's ownership, allowing access to other users' resources.",
+      "severity": "High",
+      "tool_names": "preauth_tracer,taint_flow_analyzer"
+    },
+    {
+      "category": "Authorization",
+      "title": "Vertical privilege escalation",
+      "description": "Lower-privileged users can access higher-privileged functionality by manipulating role parameters, path traversal, or parameter tampering.",
+      "severity": "Critical",
+      "tool_names": "preauth_tracer,dangerous_patterns"
+    },
+    {
+      "category": "Authorization",
+      "title": "Missing function-level access control",
+      "description": "Administrative or sensitive API endpoints rely only on UI hiding rather than server-side authorization checks.",
+      "severity": "High",
+      "tool_names": "preauth_tracer"
+    },
+    {
+      "category": "Authorization",
+      "title": "Mass assignment / parameter binding",
+      "description": "Auto-binding of request parameters to model objects allows setting privileged fields (e.g., role, admin, price) not intended to be user-settable.",
+      "severity": "High",
+      "tool_names": "taint_flow_analyzer,dangerous_patterns"
+    },
+    {
+      "category": "Session Management",
+      "title": "Session fixation",
+      "description": "Session ID is not regenerated after successful login, allowing an attacker who set a known session ID to hijack the authenticated session.",
+      "severity": "High",
+      "tool_names": "preauth_tracer"
+    },
+    {
+      "category": "Session Management",
+      "title": "Session token in URL",
+      "description": "Session tokens are passed in URL query parameters, leaking them via Referer headers, browser history, and server logs.",
+      "severity": "Medium",
+      "tool_names": "dangerous_patterns"
+    },
+    {
+      "category": "Session Management",
+      "title": "Insecure session cookie flags",
+      "description": "Session cookies missing Secure, HttpOnly, or SameSite=Strict attributes, enabling theft via XSS or CSRF.",
+      "severity": "Medium",
+      "tool_names": "dangerous_patterns"
+    },
+    {
+      "category": "Session Management",
+      "title": "Insufficient session expiry",
+      "description": "Sessions remain valid indefinitely or for unreasonably long periods after logout or inactivity.",
+      "severity": "Medium",
+      "tool_names": "preauth_tracer"
+    },
+    {
+      "category": "Input Validation",
+      "title": "SQL injection",
+      "description": "User input is concatenated directly into SQL queries without parameterization or sufficient escaping, enabling arbitrary query manipulation.",
+      "severity": "Critical",
+      "tool_names": "taint_flow_analyzer,dangerous_patterns,parser_complexity_scorer"
+    },
+    {
+      "category": "Input Validation",
+      "title": "Command injection",
+      "description": "User input is passed unsanitized to OS command execution functions (system, exec, popen), allowing arbitrary command execution.",
+      "severity": "Critical",
+      "tool_names": "dangerous_patterns,taint_flow_analyzer"
+    },
+    {
+      "category": "Input Validation",
+      "title": "Cross-site scripting (XSS)",
+      "description": "User-controlled input is reflected in HTML responses without proper encoding, allowing injection of malicious scripts.",
+      "severity": "High",
+      "tool_names": "taint_flow_analyzer,dangerous_patterns"
+    },
+    {
+      "category": "Input Validation",
+      "title": "Path traversal",
+      "description": "File path parameters accept '../' sequences allowing access to files outside the intended directory, potentially exposing sensitive system files.",
+      "severity": "High",
+      "tool_names": "dangerous_patterns,taint_flow_analyzer"
+    },
+    {
+      "category": "Input Validation",
+      "title": "XML / HTML entity injection (XXE)",
+      "description": "XML parser processes external entity declarations from untrusted input, allowing SSRF, local file read, or DoS via billion-laughs.",
+      "severity": "High",
+      "tool_names": "parser_complexity_scorer,recursive_bomb_scanner,dangerous_patterns"
+    },
+    {
+      "category": "Input Validation",
+      "title": "ReDoS — catastrophic backtracking",
+      "description": "Regular expressions applied to user input exhibit catastrophic backtracking behaviour, allowing DoS by crafting strings that trigger exponential evaluation time.",
+      "severity": "Medium",
+      "tool_names": "parser_complexity_scorer,recursive_bomb_scanner"
+    },
+    {
+      "category": "Input Validation",
+      "title": "Integer overflow in parser",
+      "description": "Attacker-controlled length/size fields from protocol or file parsers are used in arithmetic without overflow checks, yielding undersized allocations.",
+      "severity": "Critical",
+      "tool_names": "integer_overflow_scanner,cross_arch_truncation,parser_complexity_scorer"
+    },
+    {
+      "category": "Cryptography",
+      "title": "Hardcoded symmetric keys or secrets",
+      "description": "Encryption keys, API tokens, or passwords are embedded in source code or compiled binaries, allowing extraction.",
+      "severity": "Critical",
+      "tool_names": "crypto_misuse_scanner,dangerous_patterns"
+    },
+    {
+      "category": "Cryptography",
+      "title": "Weak or broken hash algorithm",
+      "description": "MD5 or SHA-1 used for password hashing or integrity checks; susceptible to collision attacks and rainbow-table lookup.",
+      "severity": "High",
+      "tool_names": "crypto_misuse_scanner"
+    },
+    {
+      "category": "Cryptography",
+      "title": "Insecure random number generation",
+      "description": "Cryptographic operations (key generation, token creation, IV selection) use non-cryptographic RNG (rand(), Math.random()), producing predictable output.",
+      "severity": "High",
+      "tool_names": "crypto_misuse_scanner"
+    },
+    {
+      "category": "Cryptography",
+      "title": "CBC padding oracle",
+      "description": "Symmetric decryption error messages or timing differences reveal whether padding is valid, enabling plaintext recovery without the key.",
+      "severity": "High",
+      "tool_names": "timing_oracle_scanner,crypto_misuse_scanner"
+    },
+    {
+      "category": "Cryptography",
+      "title": "Certificate validation disabled or incomplete",
+      "description": "TLS certificate hostname or chain validation is bypassed in client code, enabling man-in-the-middle attacks.",
+      "severity": "High",
+      "tool_names": "crypto_misuse_scanner,dangerous_patterns"
+    },
+    {
+      "category": "Error Handling",
+      "title": "Stack traces / verbose errors in production",
+      "description": "Detailed error messages, stack traces, or internal paths are returned to clients, aiding attackers in reconnaissance.",
+      "severity": "Low",
+      "tool_names": "dangerous_patterns"
+    },
+    {
+      "category": "Error Handling",
+      "title": "Resource leak on error paths",
+      "description": "Memory, file descriptors, or database connections are allocated before error conditions and not released in all exit paths, causing resource exhaustion or UAF.",
+      "severity": "Medium",
+      "tool_names": "error_path_divergence,uaf_detector"
+    },
+    {
+      "category": "Error Handling",
+      "title": "Unchecked error return codes",
+      "description": "Return values from security-sensitive functions (crypto operations, memory allocation, I/O) are ignored, allowing the program to continue in an invalid state.",
+      "severity": "Medium",
+      "tool_names": "error_path_divergence,dangerous_patterns"
+    },
+    {
+      "category": "File Upload",
+      "title": "Unrestricted file upload",
+      "description": "File upload functionality does not validate file type or content, allowing upload of server-executable scripts (PHP, JSP, ASPX).",
+      "severity": "Critical",
+      "tool_names": "taint_flow_analyzer,dangerous_patterns"
+    },
+    {
+      "category": "File Upload",
+      "title": "Path traversal in upload filename",
+      "description": "The upload filename is used directly in a filesystem path without sanitization, allowing upload to arbitrary server directories.",
+      "severity": "High",
+      "tool_names": "dangerous_patterns,taint_flow_analyzer"
+    },
+    {
+      "category": "File Upload",
+      "title": "Archive bomb (zip/tar bomb)",
+      "description": "Uploaded archive files are extracted without checking decompressed size, enabling denial-of-service by exhausting disk or memory.",
+      "severity": "Medium",
+      "tool_names": "recursive_bomb_scanner,parser_complexity_scorer"
+    },
+    {
+      "category": "API Security",
+      "title": "Broken object-level authorization (BOLA)",
+      "description": "API endpoints expose object identifiers in request parameters without verifying that the caller has permission to access that specific object.",
+      "severity": "High",
+      "tool_names": "preauth_tracer,taint_flow_analyzer"
+    },
+    {
+      "category": "API Security",
+      "title": "Excessive data exposure",
+      "description": "API returns more data than the client UI displays; clients rely on presentation layer for filtering, leaking sensitive fields.",
+      "severity": "Medium",
+      "tool_names": "taint_flow_analyzer"
+    },
+    {
+      "category": "API Security",
+      "title": "Lack of resource and rate limiting",
+      "description": "API endpoints do not enforce request rate limits, allowing resource exhaustion attacks or mass enumeration.",
+      "severity": "Medium",
+      "tool_names": "preauth_tracer"
+    },
+    {
+      "category": "API Security",
+      "title": "GraphQL introspection enabled in production",
+      "description": "GraphQL schema introspection is not disabled, allowing full enumeration of the API surface by unauthenticated clients.",
+      "severity": "Low",
+      "tool_names": "preauth_tracer,dangerous_patterns"
+    },
+    {
+      "category": "API Security",
+      "title": "HTTP request smuggling (CL.TE / TE.CL)",
+      "description": "Inconsistent parsing of Content-Length and Transfer-Encoding headers between front-end proxy and back-end server allows request splitting and cache poisoning.",
+      "severity": "Critical",
+      "tool_names": "protocol_smuggling_scanner"
+    },
+    {
+      "category": "SSRF",
+      "title": "Server-side request forgery via URL parameter",
+      "description": "The server fetches a URL supplied by the user without allowlist validation, enabling internal network scanning, cloud metadata access, or further pivoting.",
+      "severity": "High",
+      "tool_names": "taint_flow_analyzer,dangerous_patterns,preauth_tracer"
+    },
+    {
+      "category": "SSRF",
+      "title": "DNS rebinding via SSRF",
+      "description": "SSRF validation checks the hostname at request time but not at connection time, allowing DNS rebinding to bypass IP-based blocklists.",
+      "severity": "High",
+      "tool_names": "taint_flow_analyzer"
+    },
+    {
+      "category": "XXE",
+      "title": "XML external entity injection",
+      "description": "XML parser allows DOCTYPE declarations with SYSTEM entity references, enabling local file read, SSRF, or billion-laughs DoS.",
+      "severity": "High",
+      "tool_names": "parser_complexity_scorer,recursive_bomb_scanner,dangerous_patterns"
+    },
+    {
+      "category": "XXE",
+      "title": "XInclude injection",
+      "description": "If DOCTYPE is disabled but xi:include processing is enabled, attackers can still trigger file inclusion attacks.",
+      "severity": "Medium",
+      "tool_names": "parser_complexity_scorer,dangerous_patterns"
+    },
+    {
+      "category": "Supply Chain",
+      "title": "Suspicious maintainer activity (XZ-pattern)",
+      "description": "Recent mass-commit from new contributor with unconventional build system changes — potential supply chain backdoor insertion.",
+      "severity": "Critical",
+      "tool_names": "supply_chain_scanner"
+    },
+    {
+      "category": "Supply Chain",
+      "title": "Dependency confusion / typosquatting",
+      "description": "Internal package names that could be registered on public registries, or package names close to popular ones, enabling malicious package substitution.",
+      "severity": "High",
+      "tool_names": "supply_chain_scanner"
+    },
+    {
+      "category": "Supply Chain",
+      "title": "Build system executing downloaded code",
+      "description": "Build scripts (CMakeLists, Makefile, configure) fetch and execute remote scripts during the build process without checksum verification.",
+      "severity": "High",
+      "tool_names": "supply_chain_scanner,dangerous_patterns"
+    }
+  ]
+}

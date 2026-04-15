@@ -1,0 +1,12 @@
+{
+  "name": "Safety",
+  "version": "latest",
+  "type": "scanner",
+  "description": "Checks Python dependencies for known vulnerabilities",
+  "install_command": "pip install safety",
+  "run_command": "safety check --json -o {output}",
+  "parse_output": "json",
+  "requires": [
+    "python3"
+  ]
+}

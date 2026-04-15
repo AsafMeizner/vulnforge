@@ -1,0 +1,12 @@
+{
+  "name": "OSV-Scanner",
+  "version": "latest",
+  "type": "scanner",
+  "description": "Google's open source vulnerability scanner for dependencies",
+  "install_command": "go install github.com/google/osv-scanner/cmd/osv-scanner@latest",
+  "run_command": "osv-scanner --format json -r {target} > {output}",
+  "parse_output": "json",
+  "requires": [
+    "go"
+  ]
+}

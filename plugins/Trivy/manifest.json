@@ -1,0 +1,10 @@
+{
+  "name": "Trivy",
+  "version": "latest",
+  "type": "scanner",
+  "description": "Comprehensive vulnerability scanner for containers, repos, and cloud",
+  "install_command": "curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh",
+  "run_command": "trivy fs {target} --format json -o {output}",
+  "parse_output": "json",
+  "requires": []
+}

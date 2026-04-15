@@ -1,0 +1,12 @@
+{
+  "name": "Nuclei",
+  "version": "latest",
+  "type": "scanner",
+  "description": "Fast vulnerability scanner based on YAML templates",
+  "install_command": "go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest",
+  "run_command": "nuclei -u {target} -o {output}",
+  "parse_output": "text",
+  "requires": [
+    "go"
+  ]
+}

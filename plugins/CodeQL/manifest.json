@@ -1,0 +1,12 @@
+{
+  "name": "CodeQL",
+  "version": "latest",
+  "type": "scanner",
+  "description": "GitHub's semantic code analysis engine",
+  "install_command": "gh extension install github/codeql",
+  "run_command": "codeql database create {target}-db --language=cpp && codeql database analyze {target}-db --format=sarif -o {output}",
+  "parse_output": "json",
+  "requires": [
+    "gh"
+  ]
+}

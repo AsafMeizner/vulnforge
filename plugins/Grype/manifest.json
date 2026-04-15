@@ -1,0 +1,10 @@
+{
+  "name": "Grype",
+  "version": "latest",
+  "type": "scanner",
+  "description": "Vulnerability scanner for container images and filesystems",
+  "install_command": "curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh",
+  "run_command": "grype dir:{target} -o json --file {output}",
+  "parse_output": "json",
+  "requires": []
+}
