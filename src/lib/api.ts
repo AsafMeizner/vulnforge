@@ -881,3 +881,35 @@ export const getDisclosureAnalytics = () =>
     bounty_count: number;
     average_bounty_usd: number;
   }>('/disclosure/analytics/summary');
+
+// ─── Export + Audit (Themes 7+9) ──────────────────────────────────────────
+
+export interface AuditEntry {
+  id: number;
+  ts: string;
+  actor?: string;
+  action: string;
+  entity_type?: string;
+  entity_id?: string;
+  details?: string;
+}
+
+export const exportSarifUrl = (projectId?: number) =>
+  `/api/export/sarif${projectId ? `?project_id=${projectId}` : ''}`;
+
+export const exportCveJsonUrl = (vulnId: number) =>
+  `/api/export/cve/${vulnId}`;
+
+export const exportWorkspaceUrl = () =>
+  `/api/export/workspace`;
+
+export const getAuditLog = (params: {
+  entity_type?: string;
+  entity_id?: string;
+  action?: string;
+  limit?: number;
+} = {}) => {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+  return request<{ data: AuditEntry[]; total: number }>(`/export/audit?${qs.toString()}`);
+};

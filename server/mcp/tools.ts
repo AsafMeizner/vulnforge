@@ -2088,4 +2088,67 @@ export const mcpTools: MCPToolDef[] = [
       return { id, status: 'queued' };
     },
   },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // EXPORT + AUDIT TOOLS (Themes 7+9)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'export_sarif',
+    description: 'Export findings as SARIF 2.1.0 (compatible with GitHub Code Scanning, GitLab, Azure DevOps).',
+    inputSchema: {
+      type: 'object',
+      properties: { project_id: { type: 'number' } },
+    },
+    handler: async (args: any) => {
+      const { exportSarif } = await import('../pipeline/export/formats.js');
+      return exportSarif({ project_id: args.project_id });
+    },
+  },
+
+  {
+    name: 'export_cve_json',
+    description: 'Export a finding as CVE JSON 5.0 record (for submission to a CVE Numbering Authority).',
+    inputSchema: {
+      type: 'object',
+      properties: { vuln_id: { type: 'number' } },
+      required: ['vuln_id'],
+    },
+    handler: async (args: any) => {
+      const { getVulnerabilityById } = await import('../db.js');
+      const vuln = getVulnerabilityById(args.vuln_id);
+      if (!vuln) throw new Error(`Vulnerability ${args.vuln_id} not found`);
+      const { exportCveJson } = await import('../pipeline/export/formats.js');
+      return exportCveJson(vuln);
+    },
+  },
+
+  {
+    name: 'export_workspace',
+    description: 'Export the entire workspace as a JSON backup (projects, findings, notes, runtime jobs, disclosures, audit log).',
+    inputSchema: { type: 'object', properties: {} },
+    handler: async () => {
+      const { exportWorkspace } = await import('../pipeline/export/formats.js');
+      return await exportWorkspace();
+    },
+  },
+
+  {
+    name: 'get_audit_log',
+    description: 'Query the audit trail for entity changes and exports.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        entity_type: { type: 'string' },
+        entity_id: { type: 'string' },
+        action: { type: 'string' },
+        limit: { type: 'number' },
+      },
+    },
+    handler: async (args: any) => {
+      const { getAuditLog } = await import('../db.js');
+      const log = getAuditLog(args);
+      return { entries: log, total: log.length };
+    },
+  },
 ];

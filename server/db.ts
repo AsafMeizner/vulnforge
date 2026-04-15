@@ -648,6 +648,19 @@ function createTables(): void {
     )
   `);
 
+  // Collaboration & Compliance (Themes 7+9)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts TEXT DEFAULT (datetime('now')),
+      actor TEXT,
+      action TEXT NOT NULL,
+      entity_type TEXT,
+      entity_id TEXT,
+      details TEXT
+    )
+  `);
+
   migrateSchema();
   seedDefaultNotesProvider();
   persistDb();
@@ -1407,6 +1420,16 @@ export interface DisclosureEventRow {
   description?: string;
 }
 
+export interface AuditLogRow {
+  id?: number;
+  ts?: string;
+  actor?: string;
+  action: string;                  // create | update | delete | view | export | import
+  entity_type?: string;            // vulnerability | project | disclosure | note | ...
+  entity_id?: string;
+  details?: string;                // JSON
+}
+
 export function getDbRoutingRules(): RoutingRuleRow[] {
   return execQuery('SELECT * FROM routing_rules ORDER BY task, priority ASC') as unknown as RoutingRuleRow[];
 }
@@ -1950,6 +1973,36 @@ export function createDisclosureEvent(e: DisclosureEventRow): number {
     `INSERT INTO disclosure_events (disclosure_id, event_type, actor, description)
      VALUES (?, ?, ?, ?)`,
     [e.disclosure_id, e.event_type, e.actor || null, e.description || null]
+  );
+}
+
+// ── Audit Log CRUD ──────────────────────────────────────────────────────
+
+export function getAuditLog(filters: { entity_type?: string; entity_id?: string; action?: string; limit?: number } = {}): AuditLogRow[] {
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (filters.entity_type) { conds.push('entity_type = ?'); params.push(filters.entity_type); }
+  if (filters.entity_id) { conds.push('entity_id = ?'); params.push(filters.entity_id); }
+  if (filters.action) { conds.push('action = ?'); params.push(filters.action); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  const limit = filters.limit ? Number(filters.limit) : 200;
+  return execQuery(
+    `SELECT * FROM audit_log ${where} ORDER BY ts DESC LIMIT ${limit}`,
+    params
+  ) as unknown as AuditLogRow[];
+}
+
+export function logAudit(entry: AuditLogRow): void {
+  execRun(
+    `INSERT INTO audit_log (actor, action, entity_type, entity_id, details)
+     VALUES (?, ?, ?, ?, ?)`,
+    [
+      entry.actor || 'system',
+      entry.action,
+      entry.entity_type || null,
+      entry.entity_id || null,
+      entry.details || null,
+    ]
   );
 }
 

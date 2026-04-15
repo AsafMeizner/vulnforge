@@ -42,6 +42,9 @@ import aiInvestigateRouter from './routes/ai-investigate.js';
 // Disclosure & Bounty Ops (Theme 5)
 import disclosureRouter from './routes/disclosure.js';
 
+// Export + Audit (Themes 7+9)
+import exportRouter from './routes/export.js';
+
 // MCP
 import { setupMcpServer } from './mcp/index.js';
 
@@ -108,6 +111,7 @@ async function main(): Promise<void> {
   app.use('/api/exploits', exploitsRouter);
   app.use('/api/ai-investigate', aiInvestigateRouter);
   app.use('/api/disclosure', disclosureRouter);
+  app.use('/api/export', exportRouter);
 
   // Runtime executors init (after DB ready)
   try {

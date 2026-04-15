@@ -18,13 +18,14 @@ import History from '@/pages/History';
 import Exploits from '@/pages/Exploits';
 import Investigate from '@/pages/Investigate';
 import Disclosure from '@/pages/Disclosure';
+import Audit from '@/pages/Audit';
 import { QuickCapture } from '@/components/QuickCapture';
 import { CommandPalette, type Command } from '@/components/CommandPalette';
 import { ShortcutOverlay } from '@/components/ShortcutOverlay';
 
-type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history' | 'exploits' | 'investigate' | 'disclosure';
+type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history' | 'exploits' | 'investigate' | 'disclosure' | 'audit';
 
-const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses', 'runtime', 'history', 'exploits', 'investigate', 'disclosure']);
+const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses', 'runtime', 'history', 'exploits', 'investigate', 'disclosure', 'audit']);
 
 function hashToPage(hash: string): Page {
   const raw = hash.replace(/^#/, '') as Page;
@@ -136,6 +137,12 @@ const ICONS: Record<Page, React.ReactElement> = {
       <path d="M2 4l6 5 6-5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
     </svg>
   ),
+  audit: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="3" y="1.5" width="10" height="13" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+      <path d="M5.5 5h5M5.5 8h5M5.5 11h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
   settings: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4"/>
@@ -156,6 +163,7 @@ const navItems: NavItem[] = [
   { id: 'exploits',   label: 'Exploits'   },
   { id: 'investigate',label: 'Investigate'},
   { id: 'disclosure', label: 'Disclosure' },
+  { id: 'audit',      label: 'Audit'      },
   { id: 'history',    label: 'History'    },
   { id: 'scanner',    label: 'Scanner'    },
   { id: 'projects',   label: 'Projects'   },
@@ -415,6 +423,8 @@ function buildCommands(
     nav('runtime'),
     nav('exploits'),
     nav('investigate'),
+    nav('disclosure'),
+    nav('audit'),
     nav('history'),
     nav('scanner'),
     nav('projects'),
@@ -517,6 +527,9 @@ function PageContent({ page, searchQuery, navExtra, onNavigate }: PageContentPro
 
     case 'disclosure':
       return <Disclosure />;
+
+    case 'audit':
+      return <Audit />;
 
     case 'review': {
       const pipelineId =
