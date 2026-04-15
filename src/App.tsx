@@ -18,6 +18,8 @@ import History from '@/pages/History';
 import Exploits from '@/pages/Exploits';
 import Investigate from '@/pages/Investigate';
 import { QuickCapture } from '@/components/QuickCapture';
+import { CommandPalette, type Command } from '@/components/CommandPalette';
+import { ShortcutOverlay } from '@/components/ShortcutOverlay';
 
 type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history' | 'exploits' | 'investigate';
 
@@ -161,6 +163,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [navExtra, setNavExtra] = useState<unknown>(null);
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutOverlayOpen, setShortcutOverlayOpen] = useState(false);
 
   // ── Hash-based routing ─────────────────────────────────────────────────
 
@@ -212,6 +216,16 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault();
         setQuickCaptureOpen(true);
+      }
+      // Ctrl/Cmd+K -> command palette
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+      // ? -> shortcut overlay (only outside inputs)
+      if (e.key === '?' && !inInput && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        setShortcutOverlayOpen(true);
       }
     };
     window.addEventListener('keydown', handler);
@@ -354,8 +368,70 @@ export default function App() {
         open={quickCaptureOpen}
         onClose={() => setQuickCaptureOpen(false)}
       />
+
+      {/* Command palette — Ctrl/Cmd+K */}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        commands={buildCommands(setQuickCaptureOpen, setShortcutOverlayOpen, navigate)}
+      />
+
+      {/* Shortcut overlay — ? key */}
+      <ShortcutOverlay
+        open={shortcutOverlayOpen}
+        onClose={() => setShortcutOverlayOpen(false)}
+      />
     </ToastProvider>
   );
+}
+
+function buildCommands(
+  setQuickCaptureOpen: (v: boolean) => void,
+  setShortcutOverlayOpen: (v: boolean) => void,
+  navigate: (page: string, extra?: unknown) => void,
+): Command[] {
+  const nav = (page: Page): Command => ({
+    id: `nav-${page}`,
+    title: `Go to ${navItems.find(n => n.id === page)?.label || page}`,
+    category: 'Navigate',
+    action: () => navigate(page),
+  });
+
+  return [
+    // Navigation
+    nav('hunt'),
+    nav('dashboard'),
+    nav('findings'),
+    nav('hypotheses'),
+    nav('review'),
+    nav('runtime'),
+    nav('exploits'),
+    nav('investigate'),
+    nav('history'),
+    nav('scanner'),
+    nav('projects'),
+    nav('tools'),
+    nav('checklists'),
+    nav('ai'),
+    nav('plugins'),
+    nav('settings'),
+
+    // Actions
+    {
+      id: 'new-note',
+      title: 'Quick-capture note',
+      category: 'Actions',
+      shortcut: 'Ctrl+N',
+      action: () => setQuickCaptureOpen(true),
+    },
+    {
+      id: 'shortcuts',
+      title: 'Show keyboard shortcuts',
+      category: 'Help',
+      shortcut: '?',
+      action: () => setShortcutOverlayOpen(true),
+    },
+  ];
 }
 
 interface PageContentProps {
