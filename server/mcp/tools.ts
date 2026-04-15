@@ -25,6 +25,11 @@ import {
   updateNote,
   getSessionState,
   setSessionState,
+  getRuntimeJobs,
+  getRuntimeJobById,
+  getFuzzCrashes,
+  getFuzzCrashById,
+  updateFuzzCrash,
 } from '../db.js';
 import { streamTool } from '../scanner/runner.js';
 import { triageFinding } from '../ai/router.js';
@@ -1351,6 +1356,281 @@ export const mcpTools: MCPToolDef[] = [
         hypothesis: hypothesis || null,
         pending_count: pendingCount,
       };
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RUNTIME ANALYSIS TOOLS (Theme 3) — fuzzing, debugging, network
+  // ═══════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'start_runtime_job',
+    description: 'Start a runtime analysis job. Supports fuzzing (libfuzzer), debugging (gdb), packet capture (tcpdump), and port scanning (nmap).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['fuzz', 'debug', 'capture', 'portscan'], description: 'Job type' },
+        tool: { type: 'string', description: 'Tool name (libfuzzer, gdb, tcpdump, nmap)' },
+        config: { type: 'object', description: 'Tool-specific config' },
+        project_id: { type: 'number' },
+        finding_id: { type: 'number' },
+      },
+      required: ['type', 'tool', 'config'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: args.type,
+        tool: args.tool,
+        config: args.config || {},
+        projectId: args.project_id,
+        findingId: args.finding_id,
+      });
+      return { id, status: 'queued', type: args.type, tool: args.tool };
+    },
+  },
+
+  {
+    name: 'list_runtime_jobs',
+    description: 'List runtime analysis jobs with optional filters.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string' },
+        type: { type: 'string' },
+        project_id: { type: 'number' },
+        finding_id: { type: 'number' },
+        limit: { type: 'number' },
+      },
+    },
+    handler: async (args: any) => {
+      const jobs = getRuntimeJobs({
+        status: args.status,
+        type: args.type,
+        project_id: args.project_id,
+        finding_id: args.finding_id,
+        limit: args.limit || 50,
+      });
+      const parsed = jobs.map(j => ({
+        ...j,
+        config: j.config ? JSON.parse(j.config) : {},
+        stats: j.stats ? JSON.parse(j.stats) : {},
+      }));
+      return { jobs: parsed, total: jobs.length };
+    },
+  },
+
+  {
+    name: 'get_runtime_job',
+    description: 'Get a runtime job full status including config and parsed stats.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const job = getRuntimeJobById(args.id);
+      if (!job) throw new Error(`Job ${args.id} not found`);
+      return {
+        ...job,
+        config: job.config ? JSON.parse(job.config) : {},
+        stats: job.stats ? JSON.parse(job.stats) : {},
+      };
+    },
+  },
+
+  {
+    name: 'stop_runtime_job',
+    description: 'Signal a running runtime job to stop.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const ok = await runtimeJobRunner.stop(args.id);
+      return { stopped: ok };
+    },
+  },
+
+  {
+    name: 'start_fuzz_campaign',
+    description: 'Start a libFuzzer campaign on a pre-compiled harness binary. Returns job ID immediately; use get_runtime_job to poll and list_crashes for crashes.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        harness_path: { type: 'string', description: 'Path to compiled libFuzzer binary' },
+        corpus_dir: { type: 'string' },
+        max_total_time: { type: 'number', description: 'Seconds' },
+        max_len: { type: 'number' },
+        project_id: { type: 'number' },
+        finding_id: { type: 'number' },
+      },
+      required: ['harness_path'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: 'fuzz', tool: 'libfuzzer',
+        config: {
+          harness_path: args.harness_path,
+          corpus_dir: args.corpus_dir,
+          max_total_time: args.max_total_time || 300,
+          max_len: args.max_len,
+        },
+        projectId: args.project_id,
+        findingId: args.finding_id,
+      });
+      return { id, status: 'queued' };
+    },
+  },
+
+  {
+    name: 'list_crashes',
+    description: 'List fuzz crashes, optionally filtered by job, stack hash, or linked finding.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        job_id: { type: 'string' },
+        stack_hash: { type: 'string' },
+        linked_finding_id: { type: 'number' },
+        limit: { type: 'number' },
+      },
+    },
+    handler: async (args: any) => {
+      const crashes = getFuzzCrashes({
+        job_id: args.job_id,
+        stack_hash: args.stack_hash,
+        linked_finding_id: args.linked_finding_id,
+      });
+      const limit = args.limit || 50;
+      const unique = new Set(crashes.map(c => c.stack_hash).filter(Boolean));
+      return {
+        crashes: crashes.slice(0, limit),
+        total: crashes.length,
+        unique_stack_hashes: unique.size,
+      };
+    },
+  },
+
+  {
+    name: 'link_crash_to_finding',
+    description: 'Associate a fuzz crash with a vulnerability finding.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        crash_id: { type: 'number' },
+        finding_id: { type: 'number' },
+      },
+      required: ['crash_id', 'finding_id'],
+    },
+    handler: async (args: any) => {
+      const crash = getFuzzCrashById(args.crash_id);
+      if (!crash) throw new Error(`Crash ${args.crash_id} not found`);
+      updateFuzzCrash(args.crash_id, { linked_finding_id: args.finding_id });
+      return getFuzzCrashById(args.crash_id);
+    },
+  },
+
+  {
+    name: 'start_packet_capture',
+    description: 'Start a packet capture on a network interface. Returns job ID; use stop_runtime_job to end it or wait for duration to elapse.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        interface: { type: 'string', description: 'eth0, lo, any, etc.' },
+        filter: { type: 'string', description: 'BPF filter expression like "port 443"' },
+        duration: { type: 'number', description: 'Seconds' },
+        max_packets: { type: 'number' },
+      },
+      required: ['interface'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: 'capture', tool: 'tcpdump',
+        config: {
+          interface: args.interface,
+          filter: args.filter,
+          duration: args.duration || 60,
+          max_packets: args.max_packets,
+        },
+      });
+      return { id, status: 'queued' };
+    },
+  },
+
+  {
+    name: 'start_port_scan',
+    description: 'Run an nmap port/service scan on a target. Returns job ID; poll get_runtime_job for results.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        target: { type: 'string', description: 'IP, hostname, CIDR, or range' },
+        ports: { type: 'string', description: 'e.g. "80,443" or "1-1000" or "-" for all' },
+        scan_type: { type: 'string', enum: ['syn', 'connect', 'udp', 'version', 'script'] },
+        timing: { type: 'number' },
+      },
+      required: ['target'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: 'portscan', tool: 'nmap',
+        config: {
+          target: args.target,
+          ports: args.ports,
+          scan_type: args.scan_type || 'version',
+          timing: args.timing || 3,
+        },
+      });
+      return { id, status: 'queued' };
+    },
+  },
+
+  {
+    name: 'debug_with_breakpoint',
+    description: 'Run a binary under gdb with a breakpoint. Useful for validating findings by triggering suspicious lines and inspecting state.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        binary_path: { type: 'string' },
+        breakpoint: { type: 'string', description: 'file:line or function name' },
+        args: { type: 'array', items: { type: 'string' } },
+        check_expr: { type: 'string' },
+        timeout: { type: 'number' },
+      },
+      required: ['binary_path', 'breakpoint'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: 'debug', tool: 'gdb',
+        config: {
+          binary_path: args.binary_path,
+          breakpoint: args.breakpoint,
+          args: args.args,
+          check_expr: args.check_expr,
+          timeout: args.timeout || 60,
+        },
+      });
+
+      // Poll until completion (up to timeout + 10s buffer)
+      const deadline = Date.now() + (args.timeout || 60) * 1000 + 10000;
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 1000));
+        const job = getRuntimeJobById(id);
+        if (job && (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled')) {
+          return {
+            id,
+            status: job.status,
+            stats: job.stats ? JSON.parse(job.stats) : {},
+            error: job.error,
+          };
+        }
+      }
+      return { id, status: 'timeout', stats: {} };
     },
   },
 ];

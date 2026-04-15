@@ -508,3 +508,84 @@ export const deleteSessionState = (
     method: 'DELETE',
   });
 };
+
+// ─── Runtime Analysis (Theme 3) ────────────────────────────────────────────
+
+export interface RuntimeJob {
+  id: string;
+  project_id?: number;
+  finding_id?: number;
+  type: string;
+  tool: string;
+  status: string;
+  config?: any;
+  stats?: any;
+  output_dir?: string;
+  error?: string;
+  started_at: string;
+  completed_at?: string;
+}
+
+export interface FuzzCrash {
+  id: number;
+  job_id: string;
+  stack_hash?: string;
+  input_path: string;
+  input_size?: number;
+  signal?: string;
+  stack_trace?: string;
+  exploitability: string;
+  minimized: number;
+  linked_finding_id?: number;
+  discovered_at: string;
+}
+
+export const listRuntimeJobs = (params: {
+  status?: string;
+  type?: string;
+  project_id?: number;
+  finding_id?: number;
+  limit?: number;
+}) => {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+  return request<{ data: RuntimeJob[]; total: number }>(`/runtime?${qs.toString()}`);
+};
+
+export const getRuntimeJob = (id: string) => request<RuntimeJob>(`/runtime/${id}`);
+
+export const startRuntimeJob = (body: {
+  type: string;
+  tool: string;
+  config: any;
+  project_id?: number;
+  finding_id?: number;
+}) =>
+  request<{ id: string; status: string }>('/runtime', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const stopRuntimeJob = (id: string) =>
+  request<{ stopped: boolean }>(`/runtime/${id}/stop`, { method: 'POST' });
+
+export const deleteRuntimeJob = (id: string) =>
+  request<{ deleted: boolean }>(`/runtime/${id}`, { method: 'DELETE' });
+
+export const getRuntimeJobOutput = (id: string, tail = 100) =>
+  fetch(`/api/runtime/${id}/output?tail=${tail}`).then(r => r.text());
+
+export const listCrashes = (jobId: string) =>
+  request<{ data: FuzzCrash[]; total: number }>(`/runtime/${jobId}/crashes`);
+
+export const linkCrashToFinding = (crashId: number, findingId: number) =>
+  request<FuzzCrash>(`/runtime/crashes/${crashId}/link`, {
+    method: 'POST',
+    body: JSON.stringify({ finding_id: findingId }),
+  });
+
+export const generateHarness = (signature: string, language: string) =>
+  request<{ harness_code: string; notes: string[] }>('/runtime/harness-gen', {
+    method: 'POST',
+    body: JSON.stringify({ function_signature: signature, language }),
+  });

@@ -466,6 +466,58 @@ function createTables(): void {
     )
   `);
 
+  // Runtime Analysis (Theme 3) tables
+  db.run(`
+    CREATE TABLE IF NOT EXISTS runtime_jobs (
+      id TEXT PRIMARY KEY,
+      project_id INTEGER,
+      finding_id INTEGER,
+      type TEXT NOT NULL,
+      tool TEXT NOT NULL,
+      status TEXT DEFAULT 'queued',
+      config TEXT DEFAULT '{}',
+      output_dir TEXT,
+      stats TEXT DEFAULT '{}',
+      error TEXT,
+      started_at TEXT DEFAULT (datetime('now')),
+      completed_at TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id),
+      FOREIGN KEY (finding_id) REFERENCES vulnerabilities(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS fuzz_crashes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL,
+      stack_hash TEXT,
+      input_path TEXT NOT NULL,
+      input_size INTEGER,
+      signal TEXT,
+      stack_trace TEXT,
+      exploitability TEXT DEFAULT 'unknown',
+      minimized INTEGER DEFAULT 0,
+      linked_finding_id INTEGER,
+      discovered_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (job_id) REFERENCES runtime_jobs(id),
+      FOREIGN KEY (linked_finding_id) REFERENCES vulnerabilities(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS captures (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL,
+      pcap_path TEXT NOT NULL,
+      packet_count INTEGER DEFAULT 0,
+      bytes INTEGER DEFAULT 0,
+      filter TEXT,
+      start_time TEXT,
+      end_time TEXT,
+      FOREIGN KEY (job_id) REFERENCES runtime_jobs(id)
+    )
+  `);
+
   migrateSchema();
   seedDefaultNotesProvider();
   persistDb();
@@ -1072,6 +1124,48 @@ export interface SessionStateRow {
   updated_at?: string;
 }
 
+// ── Runtime Analysis (Theme 3) types ──────────────────────────────────────
+
+export interface RuntimeJobRow {
+  id: string;
+  project_id?: number;
+  finding_id?: number;
+  type: string;               // fuzz | debug | capture | portscan | mitm
+  tool: string;               // libfuzzer | afl | gdb | tcpdump | tshark | nmap
+  status?: string;            // queued | running | paused | completed | failed | cancelled
+  config?: string;            // JSON
+  output_dir?: string;
+  stats?: string;             // JSON
+  error?: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
+export interface FuzzCrashRow {
+  id?: number;
+  job_id: string;
+  stack_hash?: string;
+  input_path: string;
+  input_size?: number;
+  signal?: string;
+  stack_trace?: string;
+  exploitability?: string;    // high | medium | low | unknown
+  minimized?: number;         // 0 or 1
+  linked_finding_id?: number;
+  discovered_at?: string;
+}
+
+export interface CaptureRow {
+  id?: number;
+  job_id: string;
+  pcap_path: string;
+  packet_count?: number;
+  bytes?: number;
+  filter?: string;
+  start_time?: string;
+  end_time?: string;
+}
+
 export function getDbRoutingRules(): RoutingRuleRow[] {
   return execQuery('SELECT * FROM routing_rules ORDER BY task, priority ASC') as unknown as RoutingRuleRow[];
 }
@@ -1233,6 +1327,139 @@ export function setSessionState(scope: string, scope_id: number | null, key: str
       [scope, scope_id, key, value]
     );
   }
+  persistDb();
+}
+
+// ── Runtime Jobs CRUD ─────────────────────────────────────────────────────
+
+export interface RuntimeJobFilters {
+  status?: string;
+  type?: string;
+  project_id?: number;
+  finding_id?: number;
+  limit?: number;
+}
+
+export function getRuntimeJobs(filters: RuntimeJobFilters = {}): RuntimeJobRow[] {
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (filters.status) { conds.push('status = ?'); params.push(filters.status); }
+  if (filters.type) { conds.push('type = ?'); params.push(filters.type); }
+  if (filters.project_id !== undefined) { conds.push('project_id = ?'); params.push(filters.project_id); }
+  if (filters.finding_id !== undefined) { conds.push('finding_id = ?'); params.push(filters.finding_id); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  const limit = filters.limit ? `LIMIT ${Number(filters.limit)}` : 'LIMIT 100';
+  return execQuery(
+    `SELECT * FROM runtime_jobs ${where} ORDER BY started_at DESC ${limit}`,
+    params
+  ) as unknown as RuntimeJobRow[];
+}
+
+export function getRuntimeJobById(id: string): RuntimeJobRow | null {
+  const rows = execQuery('SELECT * FROM runtime_jobs WHERE id = ?', [id]);
+  return rows[0] as RuntimeJobRow || null;
+}
+
+export function createRuntimeJob(j: RuntimeJobRow): string {
+  db.run(
+    `INSERT INTO runtime_jobs (id, project_id, finding_id, type, tool, status, config, output_dir, stats)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      j.id, j.project_id ?? null, j.finding_id ?? null,
+      j.type, j.tool, j.status || 'queued',
+      j.config || '{}', j.output_dir || null, j.stats || '{}',
+    ]
+  );
+  persistDb();
+  return j.id;
+}
+
+export function updateRuntimeJob(id: string, updates: Partial<RuntimeJobRow>): void {
+  const exclude = ['id', 'started_at'];
+  const fields = Object.keys(updates).filter(k => !exclude.includes(k));
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(`UPDATE runtime_jobs SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
+}
+
+export function deleteRuntimeJob(id: string): void {
+  db.run('DELETE FROM fuzz_crashes WHERE job_id = ?', [id]);
+  db.run('DELETE FROM captures WHERE job_id = ?', [id]);
+  db.run('DELETE FROM runtime_jobs WHERE id = ?', [id]);
+  persistDb();
+}
+
+// ── Fuzz Crashes CRUD ─────────────────────────────────────────────────────
+
+export function getFuzzCrashes(filters: { job_id?: string; stack_hash?: string; linked_finding_id?: number } = {}): FuzzCrashRow[] {
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (filters.job_id) { conds.push('job_id = ?'); params.push(filters.job_id); }
+  if (filters.stack_hash) { conds.push('stack_hash = ?'); params.push(filters.stack_hash); }
+  if (filters.linked_finding_id !== undefined) { conds.push('linked_finding_id = ?'); params.push(filters.linked_finding_id); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  return execQuery(
+    `SELECT * FROM fuzz_crashes ${where} ORDER BY discovered_at DESC`,
+    params
+  ) as unknown as FuzzCrashRow[];
+}
+
+export function getFuzzCrashById(id: number): FuzzCrashRow | null {
+  const rows = execQuery('SELECT * FROM fuzz_crashes WHERE id = ?', [id]);
+  return rows[0] as FuzzCrashRow || null;
+}
+
+export function createFuzzCrash(c: FuzzCrashRow): number {
+  return execRun(
+    `INSERT INTO fuzz_crashes (job_id, stack_hash, input_path, input_size, signal, stack_trace, exploitability, minimized, linked_finding_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      c.job_id, c.stack_hash || null, c.input_path,
+      c.input_size ?? null, c.signal || null, c.stack_trace || null,
+      c.exploitability || 'unknown', c.minimized ?? 0, c.linked_finding_id ?? null,
+    ]
+  );
+}
+
+export function updateFuzzCrash(id: number, updates: Partial<FuzzCrashRow>): void {
+  const exclude = ['id', 'discovered_at'];
+  const fields = Object.keys(updates).filter(k => !exclude.includes(k));
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(`UPDATE fuzz_crashes SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
+}
+
+// ── Captures CRUD ─────────────────────────────────────────────────────────
+
+export function getCaptures(filters: { job_id?: string } = {}): CaptureRow[] {
+  if (filters.job_id) {
+    return execQuery('SELECT * FROM captures WHERE job_id = ? ORDER BY start_time DESC', [filters.job_id]) as unknown as CaptureRow[];
+  }
+  return execQuery('SELECT * FROM captures ORDER BY start_time DESC LIMIT 50') as unknown as CaptureRow[];
+}
+
+export function createCapture(c: CaptureRow): number {
+  return execRun(
+    `INSERT INTO captures (job_id, pcap_path, packet_count, bytes, filter, start_time, end_time)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      c.job_id, c.pcap_path,
+      c.packet_count ?? 0, c.bytes ?? 0,
+      c.filter || null, c.start_time || null, c.end_time || null,
+    ]
+  );
+}
+
+export function updateCapture(id: number, updates: Partial<CaptureRow>): void {
+  const fields = Object.keys(updates).filter(k => k !== 'id');
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(`UPDATE captures SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
 }
 

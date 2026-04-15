@@ -27,6 +27,9 @@ import pipelineRouter from './routes/pipeline.js';
 import notesRouter from './routes/notes.js';
 import sessionRouter from './routes/session.js';
 
+// Runtime Analysis (Theme 3)
+import runtimeRouter from './routes/runtime.js';
+
 // MCP
 import { setupMcpServer } from './mcp/index.js';
 
@@ -88,6 +91,16 @@ async function main(): Promise<void> {
   app.use('/api/pipeline', pipelineRouter);
   app.use('/api/notes', notesRouter);
   app.use('/api/session', sessionRouter);
+  app.use('/api/runtime', runtimeRouter);
+
+  // Runtime executors init (after DB ready)
+  try {
+    const { runtimeJobRunner } = await import('./pipeline/runtime/job-runner.js');
+    await runtimeJobRunner.registerAllExecutors();
+    console.log('[Runtime] Job runner ready');
+  } catch (err: any) {
+    console.warn('[Runtime] Failed to init runner:', err.message);
+  }
 
   // AI chat endpoint
   app.post('/api/ai/chat', async (req, res) => {
