@@ -17,13 +17,14 @@ import Runtime from '@/pages/Runtime';
 import History from '@/pages/History';
 import Exploits from '@/pages/Exploits';
 import Investigate from '@/pages/Investigate';
+import Disclosure from '@/pages/Disclosure';
 import { QuickCapture } from '@/components/QuickCapture';
 import { CommandPalette, type Command } from '@/components/CommandPalette';
 import { ShortcutOverlay } from '@/components/ShortcutOverlay';
 
-type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history' | 'exploits' | 'investigate';
+type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history' | 'exploits' | 'investigate' | 'disclosure';
 
-const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses', 'runtime', 'history', 'exploits', 'investigate']);
+const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses', 'runtime', 'history', 'exploits', 'investigate', 'disclosure']);
 
 function hashToPage(hash: string): Page {
   const raw = hash.replace(/^#/, '') as Page;
@@ -129,6 +130,12 @@ const ICONS: Record<Page, React.ReactElement> = {
       <circle cx="7" cy="7" r="1" fill="currentColor"/>
     </svg>
   ),
+  disclosure: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 3h12v10H2z" stroke="currentColor" strokeWidth="1.3"/>
+      <path d="M2 4l6 5 6-5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+    </svg>
+  ),
   settings: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4"/>
@@ -148,6 +155,7 @@ const navItems: NavItem[] = [
   { id: 'runtime',    label: 'Runtime'    },
   { id: 'exploits',   label: 'Exploits'   },
   { id: 'investigate',label: 'Investigate'},
+  { id: 'disclosure', label: 'Disclosure' },
   { id: 'history',    label: 'History'    },
   { id: 'scanner',    label: 'Scanner'    },
   { id: 'projects',   label: 'Projects'   },
@@ -506,6 +514,9 @@ function PageContent({ page, searchQuery, navExtra, onNavigate }: PageContentPro
 
     case 'investigate':
       return <Investigate />;
+
+    case 'disclosure':
+      return <Disclosure />;
 
     case 'review': {
       const pipelineId =

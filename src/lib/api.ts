@@ -795,3 +795,89 @@ export const generateHypotheses = (project_id: number) =>
     method: 'POST',
     body: JSON.stringify({ project_id }),
   });
+
+// ─── Disclosure & Bounty Ops (Theme 5) ─────────────────────────────────────
+
+export interface Vendor {
+  id: number;
+  name: string;
+  security_email?: string;
+  disclosure_policy_url?: string;
+  platform?: string;
+  typical_response_days?: number;
+  preferred_format?: string;
+  notes?: string;
+  created_at?: string;
+}
+
+export interface Disclosure {
+  id: number;
+  finding_id?: number;
+  vendor_id?: number;
+  title: string;
+  status: string;
+  submission_date?: string;
+  sla_days?: number;
+  response_date?: string;
+  patch_date?: string;
+  public_date?: string;
+  cve_id?: string;
+  tracking_id?: string;
+  bounty_amount?: number;
+  bounty_currency?: string;
+  bounty_paid_date?: string;
+  notes?: string;
+  sla_deadline?: string;
+  sla_days_remaining?: number;
+  sla_status?: 'on_track' | 'warning' | 'overdue' | 'n_a';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DisclosureEvent {
+  id: number;
+  disclosure_id: number;
+  event_type: string;
+  event_date: string;
+  actor?: string;
+  description?: string;
+}
+
+export const listVendors = () =>
+  request<{ data: Vendor[]; total: number }>('/disclosure/vendors');
+
+export const createVendor = (body: Partial<Vendor>) =>
+  request<Vendor>('/disclosure/vendors', { method: 'POST', body: JSON.stringify(body) });
+
+export const updateVendor = (id: number, body: Partial<Vendor>) =>
+  request<Vendor>(`/disclosure/vendors/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+
+export const deleteVendor = (id: number) =>
+  request<{ deleted: boolean }>(`/disclosure/vendors/${id}`, { method: 'DELETE' });
+
+export const listDisclosures = (params: { status?: string; vendor_id?: number; finding_id?: number } = {}) => {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+  return request<{ data: Disclosure[]; total: number }>(`/disclosure?${qs.toString()}`);
+};
+
+export const getDisclosure = (id: number) =>
+  request<Disclosure & { events: DisclosureEvent[]; vendor?: Vendor }>(`/disclosure/${id}`);
+
+export const createDisclosure = (body: Partial<Disclosure>) =>
+  request<Disclosure>('/disclosure', { method: 'POST', body: JSON.stringify(body) });
+
+export const updateDisclosure = (id: number, body: Partial<Disclosure> & { status_note?: string }) =>
+  request<Disclosure>(`/disclosure/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+
+export const deleteDisclosure = (id: number) =>
+  request<{ deleted: boolean }>(`/disclosure/${id}`, { method: 'DELETE' });
+
+export const getDisclosureAnalytics = () =>
+  request<{
+    total_disclosures: number;
+    by_status: Record<string, number>;
+    total_bounty_usd: number;
+    bounty_count: number;
+    average_bounty_usd: number;
+  }>('/disclosure/analytics/summary');

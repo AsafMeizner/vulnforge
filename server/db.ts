@@ -596,6 +596,58 @@ function createTables(): void {
     )
   `);
 
+  // Disclosure & Bounty Ops (Theme 5) tables
+  db.run(`
+    CREATE TABLE IF NOT EXISTS vendors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      security_email TEXT,
+      disclosure_policy_url TEXT,
+      platform TEXT,
+      typical_response_days INTEGER,
+      preferred_format TEXT,
+      notes TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS disclosures (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      finding_id INTEGER,
+      vendor_id INTEGER,
+      title TEXT NOT NULL,
+      status TEXT DEFAULT 'draft',
+      submission_date TEXT,
+      sla_days INTEGER DEFAULT 90,
+      response_date TEXT,
+      patch_date TEXT,
+      public_date TEXT,
+      cve_id TEXT,
+      tracking_id TEXT,
+      bounty_amount REAL,
+      bounty_currency TEXT DEFAULT 'USD',
+      bounty_paid_date TEXT,
+      notes TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (finding_id) REFERENCES vulnerabilities(id),
+      FOREIGN KEY (vendor_id) REFERENCES vendors(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS disclosure_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      disclosure_id INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      event_date TEXT DEFAULT (datetime('now')),
+      actor TEXT,
+      description TEXT,
+      FOREIGN KEY (disclosure_id) REFERENCES disclosures(id)
+    )
+  `);
+
   migrateSchema();
   seedDefaultNotesProvider();
   persistDb();
@@ -1311,6 +1363,50 @@ export interface ProofLadderRow {
   updated_at?: string;
 }
 
+// ── Disclosure & Bounty Ops (Theme 5) types ───────────────────────────────
+
+export interface VendorRow {
+  id?: number;
+  name: string;
+  security_email?: string;
+  disclosure_policy_url?: string;
+  platform?: string;              // 'hackerone' | 'bugcrowd' | 'intigriti' | 'direct'
+  typical_response_days?: number;
+  preferred_format?: string;      // 'email' | 'platform' | 'cve'
+  notes?: string;
+  created_at?: string;
+}
+
+export interface DisclosureRow {
+  id?: number;
+  finding_id?: number;
+  vendor_id?: number;
+  title: string;
+  status?: string;                // draft | submitted | acknowledged | fixed | resolved | public | cancelled
+  submission_date?: string;
+  sla_days?: number;
+  response_date?: string;
+  patch_date?: string;
+  public_date?: string;
+  cve_id?: string;
+  tracking_id?: string;
+  bounty_amount?: number;
+  bounty_currency?: string;
+  bounty_paid_date?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DisclosureEventRow {
+  id?: number;
+  disclosure_id: number;
+  event_type: string;              // submitted | acknowledged | fix_proposed | fix_deployed | cve_assigned | public_disclosure | bounty_paid
+  event_date?: string;
+  actor?: string;
+  description?: string;
+}
+
 export function getDbRoutingRules(): RoutingRuleRow[] {
   return execQuery('SELECT * FROM routing_rules ORDER BY task, priority ASC') as unknown as RoutingRuleRow[];
 }
@@ -1753,6 +1849,108 @@ export function setProofTier(finding_id: number, tier: string, notes?: string): 
 
 export function getAllProofLadders(): ProofLadderRow[] {
   return execQuery('SELECT * FROM proof_ladder ORDER BY updated_at DESC LIMIT 500') as unknown as ProofLadderRow[];
+}
+
+// ── Vendors CRUD ────────────────────────────────────────────────────────
+
+export function getVendors(): VendorRow[] {
+  return execQuery('SELECT * FROM vendors ORDER BY name') as unknown as VendorRow[];
+}
+
+export function getVendorById(id: number): VendorRow | null {
+  const rows = execQuery('SELECT * FROM vendors WHERE id = ?', [id]);
+  return rows[0] as VendorRow || null;
+}
+
+export function createVendor(v: VendorRow): number {
+  return execRun(
+    `INSERT INTO vendors (name, security_email, disclosure_policy_url, platform, typical_response_days, preferred_format, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [v.name, v.security_email || null, v.disclosure_policy_url || null, v.platform || null,
+     v.typical_response_days ?? null, v.preferred_format || null, v.notes || '']
+  );
+}
+
+export function updateVendor(id: number, updates: Partial<VendorRow>): void {
+  const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(`UPDATE vendors SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
+}
+
+export function deleteVendor(id: number): void {
+  db.run('DELETE FROM vendors WHERE id = ?', [id]);
+  persistDb();
+}
+
+// ── Disclosures CRUD ────────────────────────────────────────────────────
+
+export function getDisclosures(filters: { status?: string; vendor_id?: number; finding_id?: number } = {}): DisclosureRow[] {
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (filters.status) { conds.push('status = ?'); params.push(filters.status); }
+  if (filters.vendor_id !== undefined) { conds.push('vendor_id = ?'); params.push(filters.vendor_id); }
+  if (filters.finding_id !== undefined) { conds.push('finding_id = ?'); params.push(filters.finding_id); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  return execQuery(
+    `SELECT * FROM disclosures ${where} ORDER BY updated_at DESC LIMIT 200`,
+    params
+  ) as unknown as DisclosureRow[];
+}
+
+export function getDisclosureById(id: number): DisclosureRow | null {
+  const rows = execQuery('SELECT * FROM disclosures WHERE id = ?', [id]);
+  return rows[0] as DisclosureRow || null;
+}
+
+export function createDisclosure(d: DisclosureRow): number {
+  return execRun(
+    `INSERT INTO disclosures (finding_id, vendor_id, title, status, submission_date, sla_days, cve_id, tracking_id, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      d.finding_id ?? null, d.vendor_id ?? null, d.title,
+      d.status || 'draft', d.submission_date || null,
+      d.sla_days ?? 90, d.cve_id || null, d.tracking_id || null, d.notes || '',
+    ]
+  );
+}
+
+export function updateDisclosure(id: number, updates: Partial<DisclosureRow>): void {
+  const exclude = ['id', 'created_at'];
+  const fields = Object.keys(updates).filter(k => !exclude.includes(k));
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(
+    `UPDATE disclosures SET ${setClause}, updated_at = datetime('now') WHERE id = ?`,
+    [...values, id]
+  );
+  persistDb();
+}
+
+export function deleteDisclosure(id: number): void {
+  db.run('DELETE FROM disclosure_events WHERE disclosure_id = ?', [id]);
+  db.run('DELETE FROM disclosures WHERE id = ?', [id]);
+  persistDb();
+}
+
+// ── Disclosure Events CRUD ──────────────────────────────────────────────
+
+export function getDisclosureEvents(disclosure_id: number): DisclosureEventRow[] {
+  return execQuery(
+    'SELECT * FROM disclosure_events WHERE disclosure_id = ? ORDER BY event_date DESC',
+    [disclosure_id]
+  ) as unknown as DisclosureEventRow[];
+}
+
+export function createDisclosureEvent(e: DisclosureEventRow): number {
+  return execRun(
+    `INSERT INTO disclosure_events (disclosure_id, event_type, actor, description)
+     VALUES (?, ?, ?, ?)`,
+    [e.disclosure_id, e.event_type, e.actor || null, e.description || null]
+  );
 }
 
 export function deleteSessionState(scope: string, scope_id: number | null, key?: string): void {
