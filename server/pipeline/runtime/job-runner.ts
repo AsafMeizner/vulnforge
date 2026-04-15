@@ -56,6 +56,7 @@ export class RuntimeJobRunner {
       { path: './debuggers/gdb.js', exportName: 'GdbExecutor', label: 'gdb' },
       { path: './network/pcap.js', exportName: 'PcapExecutor', label: 'pcap' },
       { path: './network/nmap.js', exportName: 'NmapExecutor', label: 'nmap' },
+      { path: './git/bisect.js', exportName: 'GitBisectExecutor', label: 'git-bisect' },
     ];
 
     for (const mod of modules) {

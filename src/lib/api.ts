@@ -589,3 +589,75 @@ export const generateHarness = (signature: string, language: string) =>
     method: 'POST',
     body: JSON.stringify({ function_signature: signature, language }),
   });
+
+// ─── Historical Intelligence (Theme 4) ─────────────────────────────────────
+
+export interface CveIntel {
+  id: number;
+  cve_id: string;
+  published?: string;
+  modified?: string;
+  severity?: string;
+  cvss_score?: number;
+  description?: string;
+  affected_products?: string[];
+  cve_references?: string[];
+  synced_at?: string;
+}
+
+export interface CveProjectMatch {
+  id: number;
+  cve_id: string;
+  project_id: number;
+  match_reason?: string;
+  dependency_name?: string;
+  dependency_version?: string;
+  confidence?: number;
+  matched_at?: string;
+}
+
+export interface BisectResult {
+  id: number;
+  job_id: string;
+  first_bad_commit?: string;
+  first_bad_date?: string;
+  commit_message?: string;
+  diff?: string;
+  author?: string;
+  tests_run?: number;
+}
+
+export const listCveIntel = (params: { severity?: string; since?: string; limit?: number } = {}) => {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+  return request<{ data: CveIntel[]; total: number }>(`/history/cves?${qs.toString()}`);
+};
+
+export const getCve = (id: string) => request<CveIntel>(`/history/cves/${id}`);
+
+export const syncNvd = (days = 30) =>
+  request<{ fetch: { fetched: number; stored: number; errors: string[] }; matches: Record<string, number> }>('/history/cves/sync', {
+    method: 'POST',
+    body: JSON.stringify({ days }),
+  });
+
+export const listCveMatches = (params: { project_id?: number; cve_id?: string } = {}) => {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+  return request<{ data: CveProjectMatch[]; total: number }>(`/history/matches?${qs.toString()}`);
+};
+
+export const listBisectResults = (params: { job_id?: string } = {}) => {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+  return request<{ data: BisectResult[]; total: number }>(`/history/bisect?${qs.toString()}`);
+};
+
+export const analyzeCommit = (project_id: number, sha: string) =>
+  request<any>('/history/analyze-commit', {
+    method: 'POST',
+    body: JSON.stringify({ project_id, sha }),
+  });
+
+export const getProjectHistory = (id: number) =>
+  request<any>(`/history/project/${id}`);

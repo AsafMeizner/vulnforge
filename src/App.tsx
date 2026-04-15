@@ -14,11 +14,12 @@ import Hunt from '@/pages/Hunt';
 import ReviewQueue from '@/pages/ReviewQueue';
 import HypothesisBoard from '@/pages/HypothesisBoard';
 import Runtime from '@/pages/Runtime';
+import History from '@/pages/History';
 import { QuickCapture } from '@/components/QuickCapture';
 
-type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime';
+type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history';
 
-const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses', 'runtime']);
+const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses', 'runtime', 'history']);
 
 function hashToPage(hash: string): Page {
   const raw = hash.replace(/^#/, '') as Page;
@@ -105,6 +106,12 @@ const ICONS: Record<Page, React.ReactElement> = {
       <path d="M4 6l2 2-2 2M7.5 10h4.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
+  history: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3"/>
+      <path d="M8 4.5V8l2.5 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+    </svg>
+  ),
   settings: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4"/>
@@ -122,6 +129,7 @@ const navItems: NavItem[] = [
   { id: 'hypotheses', label: 'Hypotheses' },
   { id: 'review',     label: 'Review'     },
   { id: 'runtime',    label: 'Runtime'    },
+  { id: 'history',    label: 'History'    },
   { id: 'scanner',    label: 'Scanner'    },
   { id: 'projects',   label: 'Projects'   },
   { id: 'tools',      label: 'Tools'      },
@@ -396,6 +404,9 @@ function PageContent({ page, searchQuery, navExtra, onNavigate }: PageContentPro
 
     case 'runtime':
       return <Runtime />;
+
+    case 'history':
+      return <History />;
 
     case 'review': {
       const pipelineId =

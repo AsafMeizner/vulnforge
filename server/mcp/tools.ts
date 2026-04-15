@@ -30,6 +30,10 @@ import {
   getFuzzCrashes,
   getFuzzCrashById,
   updateFuzzCrash,
+  getCveIntel,
+  getCveIntelById,
+  getCveProjectMatches,
+  getBisectResults,
 } from '../db.js';
 import { streamTool } from '../scanner/runner.js';
 import { triageFinding } from '../ai/router.js';
@@ -1631,6 +1635,137 @@ export const mcpTools: MCPToolDef[] = [
         }
       }
       return { id, status: 'timeout', stats: {} };
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // HISTORICAL INTELLIGENCE TOOLS (Theme 4) — CVE intel, bisect, patch analysis
+  // ═══════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'sync_nvd',
+    description: 'Fetch recent CVEs from the NVD API and cross-reference them against imported project dependencies.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'Number of days back to fetch (default 30)' },
+      },
+    },
+    handler: async (args: any) => {
+      const { fullSync } = await import('../pipeline/history/nvd-sync.js');
+      return await fullSync(args.days || 30);
+    },
+  },
+
+  {
+    name: 'list_cve_intel',
+    description: 'List CVEs from local NVD intelligence cache. Filter by severity or date.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        severity: { type: 'string', enum: ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'] },
+        since: { type: 'string', description: 'ISO date' },
+        limit: { type: 'number' },
+      },
+    },
+    handler: async (args: any) => {
+      const cves = getCveIntel({ severity: args.severity, since: args.since, limit: args.limit || 50 });
+      return { cves, total: cves.length };
+    },
+  },
+
+  {
+    name: 'get_cve',
+    description: 'Get details for a specific CVE from the local intelligence cache.',
+    inputSchema: {
+      type: 'object',
+      properties: { cve_id: { type: 'string' } },
+      required: ['cve_id'],
+    },
+    handler: async (args: any) => {
+      const cve = getCveIntelById(args.cve_id);
+      if (!cve) throw new Error(`CVE ${args.cve_id} not in local cache. Run sync_nvd first.`);
+      return {
+        ...cve,
+        affected_products: (() => { try { return JSON.parse(cve.affected_products || '[]'); } catch { return []; } })(),
+        cve_references: (() => { try { return JSON.parse(cve.cve_references || '[]'); } catch { return []; } })(),
+      };
+    },
+  },
+
+  {
+    name: 'get_project_cve_matches',
+    description: 'Get CVEs matched against a project via its dependencies.',
+    inputSchema: {
+      type: 'object',
+      properties: { project_id: { type: 'number' } },
+      required: ['project_id'],
+    },
+    handler: async (args: any) => {
+      const matches = getCveProjectMatches({ project_id: args.project_id });
+      return { matches, total: matches.length };
+    },
+  },
+
+  {
+    name: 'start_bisect',
+    description: 'Start a git bisect job to find the commit that introduced a bug. Provide a known-good commit, a known-bad commit, and a test command that exits 0 for good and non-zero for bad.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'number' },
+        good_ref: { type: 'string', description: 'Known-good commit/tag (e.g. "v1.0.0")' },
+        bad_ref: { type: 'string', description: 'Known-bad commit/tag (e.g. "HEAD")' },
+        test_command: { type: 'string', description: 'Shell command; exit 0 = good, non-zero = bad' },
+      },
+      required: ['project_id', 'good_ref', 'bad_ref', 'test_command'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: 'bisect' as any,
+        tool: 'git',
+        config: {
+          project_id: args.project_id,
+          good_ref: args.good_ref,
+          bad_ref: args.bad_ref,
+          test_command: args.test_command,
+        },
+        projectId: args.project_id,
+      });
+      return { id, status: 'queued' };
+    },
+  },
+
+  {
+    name: 'analyze_patch',
+    description: 'Analyze a git commit to identify security-relevant changes and extract patterns for variant hunting.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'number' },
+        sha: { type: 'string', description: 'Commit SHA (or ref like "HEAD~1")' },
+      },
+      required: ['project_id', 'sha'],
+    },
+    handler: async (args: any) => {
+      const { getProjectById } = await import('../db.js');
+      const project = getProjectById(args.project_id);
+      if (!project?.path) throw new Error(`Project ${args.project_id} has no local path`);
+      const { analyzeCommit } = await import('../pipeline/history/patch-analyzer.js');
+      return await analyzeCommit(project.path, args.sha);
+    },
+  },
+
+  {
+    name: 'list_bisect_results',
+    description: 'List results from past git bisect jobs.',
+    inputSchema: {
+      type: 'object',
+      properties: { job_id: { type: 'string' } },
+    },
+    handler: async (args: any) => {
+      return { results: getBisectResults({ job_id: args.job_id }) };
     },
   },
 ];

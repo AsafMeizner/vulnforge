@@ -518,6 +518,49 @@ function createTables(): void {
     )
   `);
 
+  // Historical Intelligence (Theme 4) tables
+  db.run(`
+    CREATE TABLE IF NOT EXISTS bisect_results (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL,
+      first_bad_commit TEXT,
+      first_bad_date TEXT,
+      commit_message TEXT,
+      diff TEXT,
+      author TEXT,
+      tests_run INTEGER DEFAULT 0,
+      FOREIGN KEY (job_id) REFERENCES runtime_jobs(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS cve_intel (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cve_id TEXT NOT NULL UNIQUE,
+      published TEXT,
+      modified TEXT,
+      severity TEXT,
+      cvss_score REAL,
+      description TEXT,
+      affected_products TEXT,
+      cve_references TEXT,
+      synced_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS cve_project_matches (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cve_id TEXT NOT NULL,
+      project_id INTEGER NOT NULL,
+      match_reason TEXT,
+      dependency_name TEXT,
+      dependency_version TEXT,
+      confidence REAL,
+      matched_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   migrateSchema();
   seedDefaultNotesProvider();
   persistDb();
@@ -1166,6 +1209,43 @@ export interface CaptureRow {
   end_time?: string;
 }
 
+// ── Historical Intelligence (Theme 4) types ──────────────────────────────
+
+export interface BisectResultRow {
+  id?: number;
+  job_id: string;
+  first_bad_commit?: string;
+  first_bad_date?: string;
+  commit_message?: string;
+  diff?: string;
+  author?: string;
+  tests_run?: number;
+}
+
+export interface CveIntelRow {
+  id?: number;
+  cve_id: string;
+  published?: string;
+  modified?: string;
+  severity?: string;
+  cvss_score?: number;
+  description?: string;
+  affected_products?: string;  // JSON
+  cve_references?: string;     // JSON
+  synced_at?: string;
+}
+
+export interface CveProjectMatchRow {
+  id?: number;
+  cve_id: string;
+  project_id: number;
+  match_reason?: string;       // dependency | pattern | manual
+  dependency_name?: string;
+  dependency_version?: string;
+  confidence?: number;
+  matched_at?: string;
+}
+
 export function getDbRoutingRules(): RoutingRuleRow[] {
   return execQuery('SELECT * FROM routing_rules ORDER BY task, priority ASC') as unknown as RoutingRuleRow[];
 }
@@ -1461,6 +1541,80 @@ export function updateCapture(id: number, updates: Partial<CaptureRow>): void {
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE captures SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
+}
+
+// ── Bisect Results CRUD ─────────────────────────────────────────────────
+
+export function getBisectResults(filters: { job_id?: string } = {}): BisectResultRow[] {
+  if (filters.job_id) {
+    return execQuery('SELECT * FROM bisect_results WHERE job_id = ?', [filters.job_id]) as unknown as BisectResultRow[];
+  }
+  return execQuery('SELECT * FROM bisect_results ORDER BY id DESC LIMIT 50') as unknown as BisectResultRow[];
+}
+
+export function createBisectResult(b: BisectResultRow): number {
+  return execRun(
+    `INSERT INTO bisect_results (job_id, first_bad_commit, first_bad_date, commit_message, diff, author, tests_run)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [b.job_id, b.first_bad_commit || null, b.first_bad_date || null, b.commit_message || null, b.diff || null, b.author || null, b.tests_run ?? 0]
+  );
+}
+
+// ── CVE Intel CRUD ──────────────────────────────────────────────────────
+
+export function getCveIntel(filters: { severity?: string; since?: string; limit?: number } = {}): CveIntelRow[] {
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (filters.severity) { conds.push('severity = ?'); params.push(filters.severity); }
+  if (filters.since) { conds.push('published >= ?'); params.push(filters.since); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  const limit = filters.limit ? `LIMIT ${Number(filters.limit)}` : 'LIMIT 100';
+  return execQuery(`SELECT * FROM cve_intel ${where} ORDER BY published DESC ${limit}`, params) as unknown as CveIntelRow[];
+}
+
+export function getCveIntelById(cve_id: string): CveIntelRow | null {
+  const rows = execQuery('SELECT * FROM cve_intel WHERE cve_id = ?', [cve_id]);
+  return rows[0] as CveIntelRow || null;
+}
+
+export function upsertCveIntel(c: CveIntelRow): void {
+  const existing = getCveIntelById(c.cve_id);
+  if (existing) {
+    db.run(
+      `UPDATE cve_intel SET published = ?, modified = ?, severity = ?, cvss_score = ?,
+                            description = ?, affected_products = ?, cve_references = ?, synced_at = datetime('now')
+       WHERE cve_id = ?`,
+      [c.published || null, c.modified || null, c.severity || null, c.cvss_score ?? null,
+       c.description || null, c.affected_products || null, c.cve_references || null, c.cve_id]
+    );
+  } else {
+    db.run(
+      `INSERT INTO cve_intel (cve_id, published, modified, severity, cvss_score, description, affected_products, cve_references)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [c.cve_id, c.published || null, c.modified || null, c.severity || null, c.cvss_score ?? null,
+       c.description || null, c.affected_products || null, c.cve_references || null]
+    );
+  }
+  persistDb();
+}
+
+// ── CVE Project Matches CRUD ────────────────────────────────────────────
+
+export function getCveProjectMatches(filters: { project_id?: number; cve_id?: string } = {}): CveProjectMatchRow[] {
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (filters.project_id !== undefined) { conds.push('project_id = ?'); params.push(filters.project_id); }
+  if (filters.cve_id) { conds.push('cve_id = ?'); params.push(filters.cve_id); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  return execQuery(`SELECT * FROM cve_project_matches ${where} ORDER BY matched_at DESC`, params) as unknown as CveProjectMatchRow[];
+}
+
+export function createCveProjectMatch(m: CveProjectMatchRow): number {
+  return execRun(
+    `INSERT INTO cve_project_matches (cve_id, project_id, match_reason, dependency_name, dependency_version, confidence)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [m.cve_id, m.project_id, m.match_reason || null, m.dependency_name || null, m.dependency_version || null, m.confidence ?? null]
+  );
 }
 
 export function deleteSessionState(scope: string, scope_id: number | null, key?: string): void {
