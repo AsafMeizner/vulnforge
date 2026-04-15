@@ -5,7 +5,11 @@ import {
   startPipeline,
   startBatchPipeline,
   getPipelineStatus,
+  getPipelines,
   getProjects,
+  pausePipeline as apiPause,
+  resumePipeline as apiResume,
+  cancelPipeline as apiCancel,
   type PipelineRun,
   type Project,
 } from '@/lib/api';
@@ -41,13 +45,17 @@ export default function Hunt({ onNavigate }: HuntProps) {
   const [logs, setLogs] = useState<string[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<Set<number>>(new Set());
+  const [pausedHunts, setPausedHunts] = useState<PipelineRun[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Load existing projects for batch mode
+  // Load existing projects + paused hunts
   useEffect(() => {
     getProjects().then(setProjects).catch(() => {});
-  }, []);
+    getPipelines().then(res => {
+      setPausedHunts(res.data.filter(p => p.status === 'paused'));
+    }).catch(() => {});
+  }, [running]);
 
   // WebSocket connection for pipeline progress
   useEffect(() => {
@@ -174,10 +182,61 @@ export default function Hunt({ onNavigate }: HuntProps) {
     }
   };
 
+  const handlePausePipeline = async (pipelineId: string) => {
+    try {
+      await apiPause(pipelineId);
+      setPipelines(prev => prev.map(p =>
+        p.id === pipelineId ? { ...p, status: 'paused', stage: 'Paused' } : p
+      ));
+      toast('info', 'Pipeline paused — you can resume later from the Hunt page');
+    } catch (err: any) {
+      toast('error', `Pause failed: ${err.message}`);
+    }
+  };
+
+  const handleResumePipeline = async (pipelineId: string) => {
+    try {
+      await apiResume(pipelineId);
+      // Switch into running view, keep existing pipeline card
+      const paused = pausedHunts.find(p => p.id === pipelineId);
+      if (paused) {
+        setPipelines([{
+          id: pipelineId,
+          projectName: `Project #${paused.project_id}`,
+          status: 'running',
+          stage: paused.current_stage || 'resuming',
+          detail: 'Resuming from saved state...',
+          progress: paused.progress || 0,
+          findingsTotal: paused.findings_total,
+          findingsAfterFilter: paused.findings_after_filter,
+          findingsAfterVerify: paused.findings_after_verify,
+        }]);
+        setRunning(true);
+        setLogs([`Resumed pipeline ${pipelineId}`]);
+      }
+      toast('success', 'Pipeline resumed');
+    } catch (err: any) {
+      toast('error', `Resume failed: ${err.message}`);
+    }
+  };
+
+  const handleCancelPipeline = async (pipelineId: string) => {
+    if (!confirm('Cancel this hunt? All progress will be lost. Use Pause if you want to continue later.')) return;
+    try {
+      await apiCancel(pipelineId);
+      setPipelines(prev => prev.map(p =>
+        p.id === pipelineId ? { ...p, status: 'failed', stage: 'Cancelled' } : p
+      ));
+      toast('info', 'Pipeline cancelled');
+    } catch (err: any) {
+      toast('error', `Cancel failed: ${err.message}`);
+    }
+  };
+
   // ── Input State ───────────────────────────────────────────────────────
   if (!running) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '70vh' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, minHeight: '70vh', paddingTop: 40 }}>
         <div style={{
           width: '100%', maxWidth: 640, padding: 32,
           background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)',
@@ -291,6 +350,64 @@ export default function Hunt({ onNavigate }: HuntProps) {
             Start Hunt
           </button>
         </div>
+
+        {/* Paused Hunts — shown only if any paused hunts exist */}
+        {pausedHunts.length > 0 && (
+          <div style={{
+            width: '100%', maxWidth: 640, padding: 20,
+            background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--yellow)44',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>Paused Hunts</span>
+              <span style={{ fontSize: 11, color: 'var(--yellow)', background: 'var(--yellow)22', padding: '2px 8px', borderRadius: 10 }}>
+                {pausedHunts.length}
+              </span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--muted)' }}>
+                Resume anytime from where you left off
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {pausedHunts.map(p => {
+                const projectName = projects.find(pr => pr.id === p.project_id)?.name || `Project #${p.project_id}`;
+                return (
+                  <div key={p.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: 12, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: 'var(--text)', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {projectName}
+                      </div>
+                      <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 2 }}>
+                        Stage: {p.current_stage || 'unknown'} · {p.progress}% · {p.findings_total} raw, {p.findings_after_filter} filtered
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleResumePipeline(p.id)}
+                      style={{
+                        padding: '6px 14px', background: 'var(--green)22', color: 'var(--green)',
+                        border: '1px solid var(--green)66', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      Resume
+                    </button>
+                    <button
+                      onClick={() => handleCancelPipeline(p.id).then(() => {
+                        setPausedHunts(prev => prev.filter(x => x.id !== p.id));
+                      })}
+                      style={{
+                        padding: '6px 10px', background: 'transparent', color: 'var(--muted)',
+                        border: '1px solid var(--border)', borderRadius: 5, fontSize: 12, cursor: 'pointer',
+                      }}
+                    >
+                      Discard
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -318,10 +435,38 @@ export default function Hunt({ onNavigate }: HuntProps) {
                   marginLeft: 10, fontSize: 11, fontWeight: 600,
                   color: p.status === 'ready' ? 'var(--green)' : p.status === 'failed' ? 'var(--red)' : 'var(--blue)',
                 }}>
-                  {p.status === 'ready' ? 'COMPLETE' : p.status === 'failed' ? 'FAILED' : 'RUNNING'}
+                  {p.status === 'ready' ? 'COMPLETE' : p.status === 'failed' ? 'FAILED' : p.status === 'paused' ? 'PAUSED' : 'RUNNING'}
                 </span>
               </div>
-              <span style={{ color: 'var(--muted)', fontSize: 12 }}>{p.progress}%</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: 'var(--muted)', fontSize: 12 }}>{p.progress}%</span>
+                {p.status !== 'ready' && p.status !== 'failed' && p.status !== 'paused' && (
+                  <>
+                    <button
+                      onClick={() => handlePausePipeline(p.id)}
+                      title="Pause (save progress, resume later)"
+                      style={{
+                        padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        background: 'var(--yellow)22', color: 'var(--yellow)',
+                        border: '1px solid var(--yellow)66', borderRadius: 4,
+                      }}
+                    >
+                      Pause
+                    </button>
+                    <button
+                      onClick={() => handleCancelPipeline(p.id)}
+                      title="Cancel (discard progress)"
+                      style={{
+                        padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        background: 'transparent', color: 'var(--muted)',
+                        border: '1px solid var(--border)', borderRadius: 4,
+                      }}
+                    >
+                      Stop
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Progress bar */}

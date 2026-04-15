@@ -46,7 +46,7 @@ const STAGES: PipelineStage[] = ['cloning', 'analyzing', 'scanning', 'filtering'
 
 // ── Active Pipeline Tracking ───────────────────────────────────────────────
 
-const activePipelines = new Map<string, { cancel: () => void }>();
+const activePipelines = new Map<string, { cancel: () => void; pause: () => void }>();
 
 // ── Pipeline Runner ────────────────────────────────────────────────────────
 
@@ -95,13 +95,21 @@ export async function runPipeline(opts: PipelineOptions): Promise<string> {
     started_at: new Date().toISOString(),
   });
 
-  // Register cancellation
+  // Register cancellation and pause controls
+  let paused = false;
   activePipelines.set(pipelineId, {
     cancel: () => { cancelled = true; },
+    pause: () => { paused = true; },
   });
 
+  const checkState = (): 'run' | 'paused' | 'cancelled' => {
+    if (cancelled) return 'cancelled';
+    if (paused) return 'paused';
+    return 'run';
+  };
+
   // Run pipeline async
-  runPipelineAsync(pipelineId, projectId, projectPath, opts, () => cancelled).catch(err => {
+  runPipelineAsync(pipelineId, projectId, projectPath, opts, checkState).catch(err => {
     console.error(`[Pipeline ${pipelineId}] Fatal error:`, err);
     updatePipelineRun(pipelineId, {
       status: 'failed',
@@ -126,11 +134,23 @@ async function runPipelineAsync(
   projectId: number,
   projectPath: string,
   opts: PipelineOptions,
-  isCancelled: () => boolean,
+  checkState: () => 'run' | 'paused' | 'cancelled',
 ): Promise<void> {
 
   const emit = (stage: string, detail: string, progress: number, status: 'running' | 'complete' | 'error' = 'running') => {
     broadcastProgress('pipeline', pipelineId, { step: stage, detail, progress, status });
+  };
+
+  /** Check if pipeline should stop. Returns true if we should exit. */
+  const shouldStop = (): boolean => {
+    const state = checkState();
+    if (state === 'cancelled') return true;
+    if (state === 'paused') {
+      updatePipelineRun(pipelineId, { status: 'paused' });
+      emit('Paused', 'Pipeline paused — resume from the Hunt page or API', getPipelineRun(pipelineId)?.progress || 0);
+      return true;
+    }
+    return false;
   };
 
   // ── Stage 1: Clone (if URL provided) ──────────────────────────────────
@@ -156,7 +176,7 @@ async function runPipelineAsync(
     }
   }
 
-  if (isCancelled()) return abortPipeline(pipelineId, 'Cancelled by user');
+  if (shouldStop()) return abortPipeline(pipelineId, checkState());
   if (!projectPath) throw new Error('No project path available');
 
   // ── Stage 2: Analyze ──────────────────────────────────────────────────
@@ -177,7 +197,7 @@ async function runPipelineAsync(
     `${meta.languages.join(', ')} | ${meta.buildSystems.join(', ') || 'no build system'} | ${deps.reduce((s, d) => s + d.packages.length, 0)} deps`,
     20);
 
-  if (isCancelled()) return abortPipeline(pipelineId, 'Cancelled by user');
+  if (shouldStop()) return abortPipeline(pipelineId, checkState());
 
   // ── Stage 2b: Git History Analysis ──────────────────────────────────
   emit('Git analysis', 'Analyzing commit history for security-relevant changes', 21);
@@ -203,7 +223,7 @@ async function runPipelineAsync(
     emit('Attack surface', `Skipped: ${err.message}`, 24);
   }
 
-  if (isCancelled()) return abortPipeline(pipelineId, 'Cancelled by user');
+  if (shouldStop()) return abortPipeline(pipelineId, checkState());
 
   // ── Stage 3: Select & Run Tools ───────────────────────────────────────
   const selection = opts.toolOverrides
@@ -332,7 +352,7 @@ async function runPipelineAsync(
 
   await waitForScansComplete(scanQueue, pipelineId, scanJobIds, emit, isCancelled);
 
-  if (isCancelled()) return abortPipeline(pipelineId, 'Cancelled by user');
+  if (shouldStop()) return abortPipeline(pipelineId, checkState());
 
   // Count raw findings
   const rawFindings = getScanFindings({ pipeline_id: pipelineId });
@@ -401,7 +421,7 @@ async function runPipelineAsync(
     `${rawCount} → ${afterAllFilters} findings (regex + dedup + AI + dep reachability) | ${chains.length} chains detected`,
     72);
 
-  if (isCancelled()) return abortPipeline(pipelineId, 'Cancelled by user');
+  if (shouldStop()) return abortPipeline(pipelineId, checkState());
 
   // ── Stage 5: AI Verification & Enrichment (with deep context) ─────────
   const pendingFindings = getScanFindings({ pipeline_id: pipelineId, status: 'pending' });
@@ -446,18 +466,29 @@ async function runPipelineAsync(
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function abortPipeline(pipelineId: string, reason: string): void {
-  updatePipelineRun(pipelineId, {
-    status: 'cancelled',
-    error: reason,
-    completed_at: new Date().toISOString(),
-  });
-  broadcastProgress('pipeline', pipelineId, {
-    step: 'Cancelled',
-    detail: reason,
-    progress: 0,
-    status: 'error',
-  });
+function abortPipeline(pipelineId: string, state: 'paused' | 'cancelled'): void {
+  if (state === 'paused') {
+    // Paused — keep status as 'paused', don't set completedAt (it's resumable)
+    updatePipelineRun(pipelineId, { status: 'paused' });
+    broadcastProgress('pipeline', pipelineId, {
+      step: 'Paused',
+      detail: 'Pipeline paused. Resume anytime from Hunt page.',
+      progress: getPipelineRun(pipelineId)?.progress || 0,
+      status: 'running', // Not 'error' — it's still alive
+    });
+  } else {
+    updatePipelineRun(pipelineId, {
+      status: 'cancelled',
+      error: 'Cancelled by user',
+      completed_at: new Date().toISOString(),
+    });
+    broadcastProgress('pipeline', pipelineId, {
+      step: 'Cancelled',
+      detail: 'Cancelled by user',
+      progress: 0,
+      status: 'error',
+    });
+  }
 }
 
 /** Wait for all scan jobs in a pipeline to finish. */
@@ -533,4 +564,172 @@ export function cancelPipeline(pipelineId: string): boolean {
     return true;
   }
   return false;
+}
+
+/** Pause a running pipeline — preserves progress for later resume. */
+export function pausePipeline(pipelineId: string): boolean {
+  const active = activePipelines.get(pipelineId);
+  if (active) {
+    active.pause();
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Resume a paused pipeline. Re-enters the pipeline at the stage it was paused.
+ * Stages already completed (clone, scan results in DB) are skipped.
+ */
+export async function resumePipeline(pipelineId: string): Promise<boolean> {
+  const pipeline = getPipelineRun(pipelineId);
+  if (!pipeline || pipeline.status !== 'paused') return false;
+
+  const project = getProjectById(pipeline.project_id);
+  if (!project?.path) return false;
+
+  const opts: PipelineOptions = JSON.parse(pipeline.config || '{}');
+
+  // Mark as running again
+  updatePipelineRun(pipelineId, { status: 'scanning', error: undefined as any });
+
+  // Re-register controls
+  let cancelled = false;
+  let paused = false;
+  activePipelines.set(pipelineId, {
+    cancel: () => { cancelled = true; },
+    pause: () => { paused = true; },
+  });
+
+  const checkState = (): 'run' | 'paused' | 'cancelled' => {
+    if (cancelled) return 'cancelled';
+    if (paused) return 'paused';
+    return 'run';
+  };
+
+  // Determine which stage to resume from
+  const stage = pipeline.current_stage || 'scanning';
+  const progress = pipeline.progress || 0;
+
+  broadcastProgress('pipeline', pipelineId, {
+    step: 'Resuming',
+    detail: `Resuming from "${stage}" stage (${progress}% complete)`,
+    progress,
+    status: 'running',
+  });
+
+  // Run the remainder async
+  resumePipelineAsync(pipelineId, pipeline.project_id, project.path, opts, stage, checkState).catch(err => {
+    console.error(`[Pipeline ${pipelineId}] Resume error:`, err);
+    updatePipelineRun(pipelineId, {
+      status: 'failed',
+      error: err.message,
+      completed_at: new Date().toISOString(),
+    });
+  }).finally(() => {
+    activePipelines.delete(pipelineId);
+  });
+
+  return true;
+}
+
+/**
+ * Internal: run pipeline stages starting from the resume point.
+ * Skips stages that already completed based on DB state.
+ */
+async function resumePipelineAsync(
+  pipelineId: string,
+  projectId: number,
+  projectPath: string,
+  opts: PipelineOptions,
+  resumeStage: string,
+  checkState: () => 'run' | 'paused' | 'cancelled',
+): Promise<void> {
+  const emit = (stage: string, detail: string, progress: number, status: 'running' | 'complete' | 'error' = 'running') => {
+    broadcastProgress('pipeline', pipelineId, { step: stage, detail, progress, status });
+  };
+
+  const shouldStop = (): boolean => {
+    const state = checkState();
+    if (state === 'cancelled') return true;
+    if (state === 'paused') {
+      updatePipelineRun(pipelineId, { status: 'paused' });
+      emit('Paused', 'Pipeline paused again', getPipelineRun(pipelineId)?.progress || 0);
+      return true;
+    }
+    return false;
+  };
+
+  // Stage ordering: which stages come after the resume point?
+  const stageOrder = ['cloning', 'analyzing', 'scanning', 'filtering', 'verifying', 'ready'];
+  const resumeIdx = stageOrder.indexOf(resumeStage);
+
+  // Skip to the right stage. Findings from previous scans are already in DB.
+  const meta = detectProjectMeta(projectPath);
+
+  if (resumeIdx <= stageOrder.indexOf('filtering')) {
+    // Need to re-run filtering on existing findings
+    emit('Resuming filter', 'Re-running false positive filtering on existing findings...', 55);
+    updatePipelineRun(pipelineId, { current_stage: 'filtering', progress: 55 });
+
+    const { runSmartFilter } = await import('./smart-filter.js');
+    await runSmartFilter(pipelineId, projectPath);
+
+    // Dep reachability
+    try {
+      const pendingAfterFilter = getScanFindings({ pipeline_id: pipelineId, status: 'pending' });
+      const { filterUnreachableDeps } = await import('./dep-reachability.js');
+      const depResult = filterUnreachableDeps(pendingAfterFilter, projectPath);
+      if (depResult.rejected.length > 0) {
+        for (const r of depResult.rejected) {
+          if (r.finding.id) {
+            updateScanFinding(r.finding.id, {
+              status: 'auto_rejected',
+              rejection_reason: r.reason,
+            });
+          }
+        }
+      }
+    } catch { /* skip */ }
+
+    // Chain detection
+    try {
+      const pendingForChains = getScanFindings({ pipeline_id: pipelineId, status: 'pending' });
+      const { detectChains } = await import('./chain-detector.js');
+      detectChains(pendingForChains);
+    } catch { /* skip */ }
+
+    if (shouldStop()) return abortPipeline(pipelineId, checkState());
+  }
+
+  if (resumeIdx <= stageOrder.indexOf('verifying')) {
+    // Run AI verification on remaining pending findings
+    const pendingFindings = getScanFindings({ pipeline_id: pipelineId, status: 'pending' });
+
+    if (pendingFindings.length > 0) {
+      updatePipelineRun(pipelineId, { current_stage: 'verifying', progress: 75 });
+      emit('AI verification', `Verifying ${pendingFindings.length} findings...`, 75);
+
+      const { runAIVerification } = await import('./ai-verify.js');
+      const verifyResult = await runAIVerification(pipelineId, projectPath, (completed, total) => {
+        const progress = 75 + Math.round((completed / total) * 20);
+        emit('AI verification', `Verified ${completed}/${total}`, progress);
+      });
+
+      updatePipelineRun(pipelineId, { findings_after_verify: verifyResult.verified, progress: 95 });
+    }
+
+    if (shouldStop()) return abortPipeline(pipelineId, checkState());
+  }
+
+  // Mark complete
+  const finalCount = getScanFindings({ pipeline_id: pipelineId, status: 'pending' }).length;
+  updatePipelineRun(pipelineId, {
+    status: 'ready',
+    current_stage: 'ready',
+    progress: 100,
+    findings_after_verify: finalCount,
+    completed_at: new Date().toISOString(),
+  });
+
+  emit('Pipeline complete', `${finalCount} findings ready for review (resumed)`, 100, 'complete');
 }

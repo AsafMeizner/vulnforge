@@ -4,7 +4,7 @@ import {
   getActivePipelineRuns,
   getPipelineRuns,
 } from '../db.js';
-import { runPipeline, cancelPipeline } from '../pipeline/orchestrator.js';
+import { runPipeline, cancelPipeline, pausePipeline, resumePipeline } from '../pipeline/orchestrator.js';
 
 const router = Router();
 
@@ -104,6 +104,41 @@ router.get('/', (req: Request, res: Response) => {
     const activeOnly = req.query.active === 'true';
     const pipelines = activeOnly ? getActivePipelineRuns() : getPipelineRuns();
     res.json({ data: pipelines, total: pipelines.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/pipeline/:id/pause ──────────────────────────────────────────
+
+router.post('/:id/pause', (req: Request, res: Response) => {
+  try {
+    const success = pausePipeline(req.params.id);
+    if (success) {
+      res.json({ message: 'Pipeline paused', pipelineId: req.params.id });
+    } else {
+      res.status(404).json({ error: 'Pipeline not running or not found' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/pipeline/:id/resume ────────────────────────────────────────
+
+router.post('/:id/resume', async (req: Request, res: Response) => {
+  try {
+    const success = await resumePipeline(req.params.id);
+    if (success) {
+      res.json({ message: 'Pipeline resumed', pipelineId: req.params.id });
+    } else {
+      const pipeline = getPipelineRun(req.params.id);
+      if (!pipeline) {
+        res.status(404).json({ error: 'Pipeline not found' });
+      } else {
+        res.status(400).json({ error: `Pipeline is "${pipeline.status}", not paused` });
+      }
+    }
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

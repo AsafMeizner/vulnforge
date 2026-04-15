@@ -303,6 +303,12 @@ export const getPipelines = (activeOnly = false) =>
 export const cancelPipeline = (id: string) =>
   request<{ message: string }>(`/pipeline/${id}`, { method: 'DELETE' });
 
+export const pausePipeline = (id: string) =>
+  request<{ message: string; pipelineId: string }>(`/pipeline/${id}/pause`, { method: 'POST' });
+
+export const resumePipeline = (id: string) =>
+  request<{ message: string; pipelineId: string }>(`/pipeline/${id}/resume`, { method: 'POST' });
+
 export const importProjectFromUrl = (url: string, branch?: string, depth?: number) =>
   request<{ id: number; name: string; status: string }>('/projects/import-url', {
     method: 'POST',
