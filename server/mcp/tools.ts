@@ -2016,4 +2016,76 @@ export const mcpTools: MCPToolDef[] = [
       return { hypotheses, total: hypotheses.length };
     },
   },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ADVANCED RUNTIME TOOLS (Theme 3C/3E/3F) — symbolic, memory, binary
+  // ═══════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'start_symbolic_exec',
+    description: 'Run angr symbolic execution on a binary to reach a target address or symbol. Useful for generating inputs that reach hard-to-hit code paths.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        binary_path: { type: 'string' },
+        find_addr: { type: 'string', description: 'Address "0x401234" or symbol name' },
+        avoid_addr: { type: 'string' },
+        timeout: { type: 'number', description: 'Seconds' },
+        stdin_size: { type: 'number' },
+      },
+      required: ['binary_path', 'find_addr'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: 'symexec' as any, tool: 'angr',
+        config: args,
+      });
+      return { id, status: 'queued' };
+    },
+  },
+
+  {
+    name: 'analyze_core_dump',
+    description: 'Analyze a Linux core dump against its binary to extract signal, backtrace, registers, and shared libs. Uses gdb batch mode.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        binary_path: { type: 'string' },
+        core_path: { type: 'string' },
+        timeout: { type: 'number' },
+      },
+      required: ['binary_path', 'core_path'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: 'memory' as any, tool: 'core-dump',
+        config: args,
+      });
+      return { id, status: 'queued' };
+    },
+  },
+
+  {
+    name: 'analyze_binary',
+    description: 'Run radare2/rizin binary analysis on a target. "quick" returns imports/exports/sections/strings; "full" adds aa + function list + main disasm.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        binary_path: { type: 'string' },
+        analysis_depth: { type: 'string', enum: ['quick', 'full'] },
+        timeout: { type: 'number' },
+      },
+      required: ['binary_path'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: 'binary' as any, tool: 'radare2',
+        config: args,
+      });
+      return { id, status: 'queued' };
+    },
+  },
 ];

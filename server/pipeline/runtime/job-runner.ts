@@ -57,6 +57,9 @@ export class RuntimeJobRunner {
       { path: './network/pcap.js', exportName: 'PcapExecutor', label: 'pcap' },
       { path: './network/nmap.js', exportName: 'NmapExecutor', label: 'nmap' },
       { path: './git/bisect.js', exportName: 'GitBisectExecutor', label: 'git-bisect' },
+      { path: './symexec/angr.js', exportName: 'AngrExecutor', label: 'angr' },
+      { path: './memory/core-dump.js', exportName: 'CoreDumpExecutor', label: 'core-dump' },
+      { path: './binary/radare2.js', exportName: 'Radare2Executor', label: 'radare2' },
     ];
 
     for (const mod of modules) {
