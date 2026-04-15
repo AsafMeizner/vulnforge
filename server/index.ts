@@ -33,6 +33,9 @@ import runtimeRouter from './routes/runtime.js';
 // Historical Intelligence (Theme 4)
 import historyRouter from './routes/history.js';
 
+// Exploit Development (Theme 2)
+import exploitsRouter from './routes/exploits.js';
+
 // MCP
 import { setupMcpServer } from './mcp/index.js';
 
@@ -96,6 +99,7 @@ async function main(): Promise<void> {
   app.use('/api/session', sessionRouter);
   app.use('/api/runtime', runtimeRouter);
   app.use('/api/history', historyRouter);
+  app.use('/api/exploits', exploitsRouter);
 
   // Runtime executors init (after DB ready)
   try {

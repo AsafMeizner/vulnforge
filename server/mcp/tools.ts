@@ -34,6 +34,12 @@ import {
   getCveIntelById,
   getCveProjectMatches,
   getBisectResults,
+  getExploits,
+  getExploitById,
+  createExploit,
+  updateExploit,
+  getProofLadder,
+  setProofTier,
 } from '../db.js';
 import { streamTool } from '../scanner/runner.js';
 import { triageFinding } from '../ai/router.js';
@@ -1766,6 +1772,127 @@ export const mcpTools: MCPToolDef[] = [
     },
     handler: async (args: any) => {
       return { results: getBisectResults({ job_id: args.job_id }) };
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // EXPLOIT DEVELOPMENT TOOLS (Theme 2) — PoC workbench, proof ladder
+  // ═══════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'list_exploits',
+    description: 'List exploits/PoCs with optional filters by linked finding or proof ladder tier.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        finding_id: { type: 'number' },
+        tier: { type: 'string', enum: ['pattern', 'manual', 'traced', 'poc', 'weaponized'] },
+      },
+    },
+    handler: async (args: any) => {
+      const rows = getExploits({ finding_id: args.finding_id, tier: args.tier });
+      return { exploits: rows, total: rows.length };
+    },
+  },
+
+  {
+    name: 'get_exploit',
+    description: 'Read an exploit by ID, including its full code.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'number' } },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const e = getExploitById(args.id);
+      if (!e) throw new Error(`Exploit ${args.id} not found`);
+      return e;
+    },
+  },
+
+  {
+    name: 'create_exploit',
+    description: 'Create a new PoC/exploit. Can be linked to a finding and bootstrapped from a template.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        finding_id: { type: 'number' },
+        language: { type: 'string' },
+        code: { type: 'string' },
+        tier: { type: 'string' },
+        notes: { type: 'string' },
+        template: { type: 'string', description: 'Optional template ID this PoC derived from' },
+      },
+      required: ['title'],
+    },
+    handler: async (args: any) => {
+      const id = createExploit({
+        title: args.title,
+        finding_id: args.finding_id,
+        language: args.language || 'python',
+        code: args.code || '',
+        tier: args.tier || 'pattern',
+        notes: args.notes,
+        template: args.template,
+      });
+      return getExploitById(id);
+    },
+  },
+
+  {
+    name: 'update_exploit',
+    description: 'Update an exploit\'s code, tier, notes, or title.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        title: { type: 'string' },
+        code: { type: 'string' },
+        tier: { type: 'string' },
+        notes: { type: 'string' },
+        last_run_status: { type: 'string' },
+        last_run_output: { type: 'string' },
+      },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const { id, ...updates } = args;
+      const existing = getExploitById(id);
+      if (!existing) throw new Error(`Exploit ${id} not found`);
+      updateExploit(id, updates);
+      return getExploitById(id);
+    },
+  },
+
+  {
+    name: 'get_proof_ladder',
+    description: 'Get the proof ladder for a finding — tracks progress from pattern -> manual -> traced -> poc -> weaponized.',
+    inputSchema: {
+      type: 'object',
+      properties: { finding_id: { type: 'number' } },
+      required: ['finding_id'],
+    },
+    handler: async (args: any) => {
+      return getProofLadder(args.finding_id) || { finding_id: args.finding_id, current_tier: 'pattern' };
+    },
+  },
+
+  {
+    name: 'advance_proof_tier',
+    description: 'Advance a finding\'s proof ladder to a new tier. Tiers are: pattern (regex match), manual (human-reviewed), traced (data flow confirmed), poc (working PoC), weaponized (reliable exploit).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        finding_id: { type: 'number' },
+        tier: { type: 'string', enum: ['pattern', 'manual', 'traced', 'poc', 'weaponized'] },
+        notes: { type: 'string' },
+      },
+      required: ['finding_id', 'tier'],
+    },
+    handler: async (args: any) => {
+      setProofTier(args.finding_id, args.tier, args.notes);
+      return getProofLadder(args.finding_id);
     },
   },
 ];

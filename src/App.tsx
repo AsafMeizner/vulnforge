@@ -15,11 +15,12 @@ import ReviewQueue from '@/pages/ReviewQueue';
 import HypothesisBoard from '@/pages/HypothesisBoard';
 import Runtime from '@/pages/Runtime';
 import History from '@/pages/History';
+import Exploits from '@/pages/Exploits';
 import { QuickCapture } from '@/components/QuickCapture';
 
-type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history';
+type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history' | 'exploits';
 
-const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses', 'runtime', 'history']);
+const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses', 'runtime', 'history', 'exploits']);
 
 function hashToPage(hash: string): Page {
   const raw = hash.replace(/^#/, '') as Page;
@@ -112,6 +113,12 @@ const ICONS: Record<Page, React.ReactElement> = {
       <path d="M8 4.5V8l2.5 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
     </svg>
   ),
+  exploits: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M2 14l4-4M6 10l4-4M10 6l4-4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+      <path d="M10 2l4 4-2 2-4-4 2-2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+    </svg>
+  ),
   settings: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4"/>
@@ -129,6 +136,7 @@ const navItems: NavItem[] = [
   { id: 'hypotheses', label: 'Hypotheses' },
   { id: 'review',     label: 'Review'     },
   { id: 'runtime',    label: 'Runtime'    },
+  { id: 'exploits',   label: 'Exploits'   },
   { id: 'history',    label: 'History'    },
   { id: 'scanner',    label: 'Scanner'    },
   { id: 'projects',   label: 'Projects'   },
@@ -407,6 +415,9 @@ function PageContent({ page, searchQuery, navExtra, onNavigate }: PageContentPro
 
     case 'history':
       return <History />;
+
+    case 'exploits':
+      return <Exploits />;
 
     case 'review': {
       const pipelineId =

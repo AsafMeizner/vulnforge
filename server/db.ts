@@ -561,6 +561,41 @@ function createTables(): void {
     )
   `);
 
+  // Exploit Development (Theme 2) tables
+  db.run(`
+    CREATE TABLE IF NOT EXISTS exploits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      finding_id INTEGER,
+      title TEXT NOT NULL,
+      language TEXT DEFAULT 'python',
+      code TEXT DEFAULT '',
+      tier TEXT DEFAULT 'pattern',
+      notes TEXT DEFAULT '',
+      template TEXT,
+      last_run_status TEXT,
+      last_run_output TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (finding_id) REFERENCES vulnerabilities(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS proof_ladder (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      finding_id INTEGER NOT NULL UNIQUE,
+      current_tier TEXT DEFAULT 'pattern',
+      pattern_at TEXT,
+      manual_at TEXT,
+      traced_at TEXT,
+      poc_at TEXT,
+      weaponized_at TEXT,
+      notes TEXT DEFAULT '',
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (finding_id) REFERENCES vulnerabilities(id)
+    )
+  `);
+
   migrateSchema();
   seedDefaultNotesProvider();
   persistDb();
@@ -1246,6 +1281,36 @@ export interface CveProjectMatchRow {
   matched_at?: string;
 }
 
+// ── Exploit Development (Theme 2) types ──────────────────────────────────
+
+export interface ExploitRow {
+  id?: number;
+  finding_id?: number;
+  title: string;
+  language?: string;
+  code?: string;
+  tier?: string;                 // pattern | manual | traced | poc | weaponized
+  notes?: string;
+  template?: string;
+  last_run_status?: string;
+  last_run_output?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ProofLadderRow {
+  id?: number;
+  finding_id: number;
+  current_tier?: string;
+  pattern_at?: string;
+  manual_at?: string;
+  traced_at?: string;
+  poc_at?: string;
+  weaponized_at?: string;
+  notes?: string;
+  updated_at?: string;
+}
+
 export function getDbRoutingRules(): RoutingRuleRow[] {
   return execQuery('SELECT * FROM routing_rules ORDER BY task, priority ASC') as unknown as RoutingRuleRow[];
 }
@@ -1615,6 +1680,79 @@ export function createCveProjectMatch(m: CveProjectMatchRow): number {
      VALUES (?, ?, ?, ?, ?, ?)`,
     [m.cve_id, m.project_id, m.match_reason || null, m.dependency_name || null, m.dependency_version || null, m.confidence ?? null]
   );
+}
+
+// ── Exploits CRUD ────────────────────────────────────────────────────────
+
+export function getExploits(filters: { finding_id?: number; tier?: string } = {}): ExploitRow[] {
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (filters.finding_id !== undefined) { conds.push('finding_id = ?'); params.push(filters.finding_id); }
+  if (filters.tier) { conds.push('tier = ?'); params.push(filters.tier); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  return execQuery(`SELECT * FROM exploits ${where} ORDER BY updated_at DESC LIMIT 200`, params) as unknown as ExploitRow[];
+}
+
+export function getExploitById(id: number): ExploitRow | null {
+  const rows = execQuery('SELECT * FROM exploits WHERE id = ?', [id]);
+  return rows[0] as ExploitRow || null;
+}
+
+export function createExploit(e: ExploitRow): number {
+  return execRun(
+    `INSERT INTO exploits (finding_id, title, language, code, tier, notes, template)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [e.finding_id ?? null, e.title, e.language || 'python', e.code || '', e.tier || 'pattern', e.notes || '', e.template || null]
+  );
+}
+
+export function updateExploit(id: number, updates: Partial<ExploitRow>): void {
+  const exclude = ['id', 'created_at'];
+  const fields = Object.keys(updates).filter(k => !exclude.includes(k));
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(
+    `UPDATE exploits SET ${setClause}, updated_at = datetime('now') WHERE id = ?`,
+    [...values, id]
+  );
+  persistDb();
+}
+
+export function deleteExploit(id: number): void {
+  db.run('DELETE FROM exploits WHERE id = ?', [id]);
+  persistDb();
+}
+
+// ── Proof Ladder CRUD ────────────────────────────────────────────────────
+
+export function getProofLadder(finding_id: number): ProofLadderRow | null {
+  const rows = execQuery('SELECT * FROM proof_ladder WHERE finding_id = ?', [finding_id]);
+  return rows[0] as ProofLadderRow || null;
+}
+
+export function setProofTier(finding_id: number, tier: string, notes?: string): void {
+  const now = new Date().toISOString();
+  const tierCol = `${tier}_at`;
+  const existing = getProofLadder(finding_id);
+  if (existing) {
+    // Build an update that sets the current tier + the corresponding timestamp column
+    const updates: string[] = ['current_tier = ?', `${tierCol} = COALESCE(${tierCol}, ?)`, "updated_at = datetime('now')"];
+    const params: any[] = [tier, now];
+    if (notes !== undefined) { updates.push('notes = ?'); params.push(notes); }
+    params.push(finding_id);
+    db.run(`UPDATE proof_ladder SET ${updates.join(', ')} WHERE finding_id = ?`, params);
+  } else {
+    db.run(
+      `INSERT INTO proof_ladder (finding_id, current_tier, ${tierCol}, notes) VALUES (?, ?, ?, ?)`,
+      [finding_id, tier, now, notes || '']
+    );
+  }
+  persistDb();
+}
+
+export function getAllProofLadders(): ProofLadderRow[] {
+  return execQuery('SELECT * FROM proof_ladder ORDER BY updated_at DESC LIMIT 500') as unknown as ProofLadderRow[];
 }
 
 export function deleteSessionState(scope: string, scope_id: number | null, key?: string): void {

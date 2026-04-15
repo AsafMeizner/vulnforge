@@ -661,3 +661,74 @@ export const analyzeCommit = (project_id: number, sha: string) =>
 
 export const getProjectHistory = (id: number) =>
   request<any>(`/history/project/${id}`);
+
+// ─── Exploit Development (Theme 2) ─────────────────────────────────────────
+
+export interface Exploit {
+  id: number;
+  finding_id?: number;
+  title: string;
+  language: string;
+  code: string;
+  tier: string;
+  notes?: string;
+  template?: string;
+  last_run_status?: string;
+  last_run_output?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExploitTemplate {
+  id: string;
+  name: string;
+  language: string;
+  category: string;
+  description: string;
+  code: string;
+}
+
+export interface ProofLadder {
+  id?: number;
+  finding_id: number;
+  current_tier: string;
+  pattern_at?: string;
+  manual_at?: string;
+  traced_at?: string;
+  poc_at?: string;
+  weaponized_at?: string;
+  notes?: string;
+  updated_at?: string;
+}
+
+export const listExploits = (params: { finding_id?: number; tier?: string } = {}) => {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined) qs.set(k, String(v)); });
+  return request<{ data: Exploit[]; total: number }>(`/exploits?${qs.toString()}`);
+};
+
+export const getExploit = (id: number) => request<Exploit>(`/exploits/${id}`);
+
+export const createExploit = (body: Partial<Exploit>) =>
+  request<Exploit>('/exploits', { method: 'POST', body: JSON.stringify(body) });
+
+export const updateExploit = (id: number, body: Partial<Exploit>) =>
+  request<Exploit>(`/exploits/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+
+export const deleteExploit = (id: number) =>
+  request<{ deleted: boolean }>(`/exploits/${id}`, { method: 'DELETE' });
+
+export const listExploitTemplates = () =>
+  request<{ data: ExploitTemplate[]; total: number }>('/exploits/templates');
+
+export const getProofLadder = (finding_id: number) =>
+  request<ProofLadder>(`/exploits/ladder/${finding_id}`);
+
+export const setProofTier = (finding_id: number, tier: string, notes?: string) =>
+  request<ProofLadder>(`/exploits/ladder/${finding_id}`, {
+    method: 'POST',
+    body: JSON.stringify({ tier, notes }),
+  });
+
+export const listAllProofLadders = () =>
+  request<{ data: ProofLadder[]; total: number }>('/exploits/ladders');
