@@ -10,10 +10,11 @@ import {
 import type { Vulnerability, Severity, VulnStatus } from '@/lib/types';
 import { SeverityBadge, StatusBadge, CvssScore } from '@/components/Badge';
 import { useToast } from '@/components/Toast';
+import { NotesPanel } from '@/components/NotesPanel';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'fix' | 'report' | 'ai' | 'history';
+type Tab = 'overview' | 'fix' | 'report' | 'ai' | 'history' | 'notes';
 type ReportSubTab = 'email' | 'advisory' | 'summary';
 
 const SEVERITIES: Severity[] = ['Critical', 'High', 'Medium', 'Low', 'Info'];
@@ -720,6 +721,7 @@ Question: `;
                 {tabBtn('fix', 'Fix')}
                 {tabBtn('report', 'Report')}
                 {tabBtn('ai', 'AI Analysis')}
+                {tabBtn('notes', 'Notes')}
                 {tabBtn('history', 'History')}
               </div>
             </div>
@@ -1210,6 +1212,13 @@ Question: `;
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* ── NOTES TAB ── */}
+              {tab === 'notes' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <NotesPanel findingId={vuln.id} initiallyOpen={true} />
                 </div>
               )}
 

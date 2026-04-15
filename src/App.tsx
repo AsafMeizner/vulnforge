@@ -12,10 +12,12 @@ import Plugins from '@/pages/Plugins';
 import Settings from '@/pages/Settings';
 import Hunt from '@/pages/Hunt';
 import ReviewQueue from '@/pages/ReviewQueue';
+import HypothesisBoard from '@/pages/HypothesisBoard';
+import { QuickCapture } from '@/components/QuickCapture';
 
-type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review';
+type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses';
 
-const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review']);
+const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses']);
 
 function hashToPage(hash: string): Page {
   const raw = hash.replace(/^#/, '') as Page;
@@ -90,6 +92,12 @@ const ICONS: Record<Page, React.ReactElement> = {
       <path d="M5 8h6M5 5.5h6M5 10.5h3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
     </svg>
   ),
+  hypotheses: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M8 1.8c-2.4 0-4.3 1.9-4.3 4.3 0 1.5.7 2.8 1.9 3.6v1.2c0 .4.3.7.7.7h3.4c.4 0 .7-.3.7-.7v-1.2c1.2-.8 1.9-2.1 1.9-3.6 0-2.4-1.9-4.3-4.3-4.3z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+      <path d="M6.3 13.5h3.4M7 15h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+    </svg>
+  ),
   settings: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4"/>
@@ -104,6 +112,7 @@ const navItems: NavItem[] = [
   { id: 'hunt',       label: 'Hunt'       },
   { id: 'dashboard',  label: 'Dashboard'  },
   { id: 'findings',   label: 'Findings'   },
+  { id: 'hypotheses', label: 'Hypotheses' },
   { id: 'review',     label: 'Review'     },
   { id: 'scanner',    label: 'Scanner'    },
   { id: 'projects',   label: 'Projects'   },
@@ -118,6 +127,7 @@ export default function App() {
   const [page, setPage] = useState<Page>(() => hashToPage(window.location.hash));
   const [searchQuery, setSearchQuery] = useState('');
   const [navExtra, setNavExtra] = useState<unknown>(null);
+  const [quickCaptureOpen, setQuickCaptureOpen] = useState(false);
 
   // ── Hash-based routing ─────────────────────────────────────────────────
 
@@ -164,6 +174,11 @@ export default function App() {
       if (e.key === 'Escape') {
         setSearchQuery('');
         (document.getElementById('global-search') as HTMLInputElement | null)?.blur();
+      }
+      // Global Ctrl/Cmd+N -> open QuickCapture. Works even inside inputs.
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        setQuickCaptureOpen(true);
       }
     };
     window.addEventListener('keydown', handler);
@@ -300,6 +315,12 @@ export default function App() {
           </div>
         </main>
       </div>
+
+      {/* Global QuickCapture — opened via Ctrl/Cmd+N from anywhere */}
+      <QuickCapture
+        open={quickCaptureOpen}
+        onClose={() => setQuickCaptureOpen(false)}
+      />
     </ToastProvider>
   );
 }
@@ -361,6 +382,9 @@ function PageContent({ page, searchQuery, navExtra, onNavigate }: PageContentPro
 
     case 'hunt':
       return <Hunt onNavigate={onNavigate} />;
+
+    case 'hypotheses':
+      return <HypothesisBoard />;
 
     case 'review': {
       const pipelineId =

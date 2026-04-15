@@ -6,6 +6,7 @@ import {
   getAllProjects,
   createProject,
   updateProject,
+  getProjectById,
   getScanById,
   getAllChecklists,
   getChecklistById,
@@ -18,12 +19,20 @@ import {
   getActivePipelineRuns,
   getPipelineRuns,
   getStats,
+  getNotes,
+  getNoteById,
+  createNote,
+  updateNote,
+  getSessionState,
+  setSessionState,
 } from '../db.js';
 import { streamTool } from '../scanner/runner.js';
 import { triageFinding } from '../ai/router.js';
 import { pluginManager } from '../plugins/manager.js';
 import { PLUGIN_CATALOG } from '../plugins/registry.js';
 import { verifyFullChecklist } from '../checklists/verifier.js';
+import { getProvider, getDefaultProvider } from '../pipeline/notes/index.js';
+import type { NoteMeta } from '../pipeline/notes/index.js';
 
 // ── Tool definitions for MCP server ───────────────────────────────────────
 
@@ -888,6 +897,460 @@ export const mcpTools: MCPToolDef[] = [
     },
     handler: async () => {
       return getStats();
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // NOTES / RESEARCH WORKSPACE TOOLS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── create_note ─────────────────────────────────────────────────────────
+  {
+    name: 'create_note',
+    description: 'Create a note, hypothesis, or observation. Links to a project and/or findings.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Note title' },
+        content: { type: 'string', description: 'Markdown body of the note' },
+        type: {
+          type: 'string',
+          enum: ['note', 'hypothesis', 'observation', 'exploit-idea', 'todo'],
+          description: 'Note type (default: note)',
+        },
+        status: {
+          type: 'string',
+          enum: ['open', 'investigating', 'confirmed', 'disproved', 'obsolete'],
+          description: 'Status — primarily for hypotheses',
+        },
+        project_id: { type: 'number', description: 'Associated project ID' },
+        finding_ids: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Linked vulnerability/finding IDs',
+        },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Free-form tags',
+        },
+        confidence: { type: 'number', description: 'Confidence score between 0 and 1' },
+        provider: { type: 'string', description: 'Notes provider name (defaults to the configured default)' },
+      },
+      required: ['title', 'content'],
+    },
+    handler: async (args: any) => {
+      if (!args.title) throw new Error('title is required');
+      if (args.content === undefined || args.content === null) {
+        throw new Error('content is required');
+      }
+
+      const provider = args.provider
+        ? await getProvider(String(args.provider))
+        : await getDefaultProvider();
+
+      const now = new Date().toISOString();
+      const meta: NoteMeta = {
+        title: String(args.title),
+        type: args.type || 'note',
+        status: args.status,
+        projectId: args.project_id !== undefined ? Number(args.project_id) : undefined,
+        findingIds: Array.isArray(args.finding_ids)
+          ? args.finding_ids.map((n: any) => Number(n)).filter((n: number) => !isNaN(n))
+          : undefined,
+        tags: Array.isArray(args.tags) ? args.tags.map((t: any) => String(t)) : undefined,
+        confidence: args.confidence !== undefined ? Number(args.confidence) : undefined,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const { externalId } = await provider.createNote(meta, String(args.content));
+
+      const id = createNote({
+        provider: provider.name,
+        external_id: externalId,
+        title: meta.title,
+        type: meta.type || 'note',
+        status: meta.status || undefined,
+        tags: JSON.stringify(meta.tags || []),
+        project_id: meta.projectId,
+        finding_ids: JSON.stringify(meta.findingIds || []),
+        file_refs: JSON.stringify([]),
+        confidence: meta.confidence,
+      });
+
+      return {
+        id,
+        title: meta.title,
+        type: meta.type || 'note',
+        provider: provider.name,
+        externalId,
+      };
+    },
+  },
+
+  // ── list_notes ──────────────────────────────────────────────────────────
+  {
+    name: 'list_notes',
+    description: 'List notes with optional filters by project, type, status, tag, or linked finding.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'number', description: 'Filter by project ID' },
+        type: { type: 'string', description: 'Filter by note type' },
+        status: { type: 'string', description: 'Filter by note status' },
+        tag: { type: 'string', description: 'Filter by tag (exact match)' },
+        finding_id: { type: 'number', description: 'Filter by linked finding ID' },
+        limit: { type: 'number', description: 'Max results (default 50)' },
+      },
+    },
+    handler: async (args: any) => {
+      const limit = args.limit ? Math.min(Number(args.limit), 50) : 50;
+      const notes = getNotes({
+        project_id: args.project_id !== undefined ? Number(args.project_id) : undefined,
+        type: args.type ? String(args.type) : undefined,
+        status: args.status ? String(args.status) : undefined,
+        tag: args.tag ? String(args.tag) : undefined,
+        finding_id: args.finding_id !== undefined ? Number(args.finding_id) : undefined,
+        limit,
+      });
+      return { notes, total: notes.length };
+    },
+  },
+
+  // ── read_note ───────────────────────────────────────────────────────────
+  {
+    name: 'read_note',
+    description: 'Read the full content of a note including its markdown body.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'number', description: 'Note ID' },
+      },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const note = getNoteById(Number(args.id));
+      if (!note) throw new Error(`Note ${args.id} not found`);
+
+      const provider = await getProvider(note.provider);
+      const result = await provider.readNote(note.external_id);
+
+      return {
+        ...note,
+        content: result.markdown,
+      };
+    },
+  },
+
+  // ── update_note ─────────────────────────────────────────────────────────
+  {
+    name: 'update_note',
+    description: 'Update a note\'s content, status, tags, or other metadata.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'number', description: 'Note ID to update' },
+        title: { type: 'string', description: 'New title' },
+        content: { type: 'string', description: 'New markdown body' },
+        status: { type: 'string', description: 'New status' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Replacement tags list',
+        },
+        confidence: { type: 'number', description: 'Updated confidence 0-1' },
+      },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const id = Number(args.id);
+      const note = getNoteById(id);
+      if (!note) throw new Error(`Note ${id} not found`);
+
+      const provider = await getProvider(note.provider);
+
+      // If content (or title) provided, update the underlying note file.
+      if (args.content !== undefined || args.title !== undefined) {
+        const existing = await provider.readNote(note.external_id);
+        const nextMarkdown = args.content !== undefined ? String(args.content) : existing.markdown;
+        const metaUpdate: Partial<NoteMeta> = {};
+        if (args.title !== undefined) metaUpdate.title = String(args.title);
+        if (args.status !== undefined) metaUpdate.status = String(args.status);
+        if (Array.isArray(args.tags)) metaUpdate.tags = args.tags.map((t: any) => String(t));
+        if (args.confidence !== undefined) metaUpdate.confidence = Number(args.confidence);
+        await provider.updateNote(note.external_id, nextMarkdown, metaUpdate);
+      }
+
+      // Update the DB row metadata.
+      const dbUpdates: Partial<typeof note> = {};
+      if (args.title !== undefined) dbUpdates.title = String(args.title);
+      if (args.status !== undefined) dbUpdates.status = String(args.status);
+      if (Array.isArray(args.tags)) dbUpdates.tags = JSON.stringify(args.tags.map((t: any) => String(t)));
+      if (args.confidence !== undefined) dbUpdates.confidence = Number(args.confidence);
+
+      if (Object.keys(dbUpdates).length > 0) {
+        updateNote(id, dbUpdates);
+      }
+
+      return getNoteById(id);
+    },
+  },
+
+  // ── search_notes ────────────────────────────────────────────────────────
+  {
+    name: 'search_notes',
+    description: 'Search notes by text query (matches title and content, case-insensitive).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search text' },
+        project_id: { type: 'number', description: 'Restrict search to a project' },
+      },
+      required: ['query'],
+    },
+    handler: async (args: any) => {
+      const needle = String(args.query || '').toLowerCase();
+      if (!needle) throw new Error('query is required');
+
+      const notes = getNotes({
+        project_id: args.project_id !== undefined ? Number(args.project_id) : undefined,
+        limit: 200,
+      });
+
+      const matches: any[] = [];
+      for (const note of notes) {
+        if (matches.length >= 50) break;
+
+        // Fast path: title match
+        const titleHit = (note.title || '').toLowerCase().includes(needle);
+
+        let contentHit = false;
+        let snippet: string | undefined;
+        try {
+          const provider = await getProvider(note.provider);
+          const { markdown } = await provider.readNote(note.external_id);
+          if ((markdown || '').toLowerCase().includes(needle)) {
+            contentHit = true;
+            const idx = markdown.toLowerCase().indexOf(needle);
+            const start = Math.max(0, idx - 60);
+            const end = Math.min(markdown.length, idx + needle.length + 60);
+            snippet = markdown.substring(start, end).replace(/\s+/g, ' ').trim();
+          }
+        } catch {
+          // provider read failed — fall back to title-only match
+        }
+
+        if (titleHit || contentHit) {
+          matches.push({ ...note, snippet });
+        }
+      }
+
+      return { notes: matches, total: matches.length, query: args.query };
+    },
+  },
+
+  // ── link_note_to_finding ────────────────────────────────────────────────
+  {
+    name: 'link_note_to_finding',
+    description: 'Link a note to a specific vulnerability finding for cross-reference.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        note_id: { type: 'number', description: 'Note ID' },
+        finding_id: { type: 'number', description: 'Vulnerability/finding ID to link' },
+      },
+      required: ['note_id', 'finding_id'],
+    },
+    handler: async (args: any) => {
+      const noteId = Number(args.note_id);
+      const findingId = Number(args.finding_id);
+
+      const note = getNoteById(noteId);
+      if (!note) throw new Error(`Note ${noteId} not found`);
+
+      let findingIds: number[] = [];
+      try {
+        const parsed = JSON.parse(note.finding_ids || '[]');
+        if (Array.isArray(parsed)) {
+          findingIds = parsed.map((n: any) => Number(n)).filter((n: number) => !isNaN(n));
+        }
+      } catch {
+        findingIds = [];
+      }
+
+      if (!findingIds.includes(findingId)) {
+        findingIds.push(findingId);
+        updateNote(noteId, { finding_ids: JSON.stringify(findingIds) });
+      }
+
+      return getNoteById(noteId);
+    },
+  },
+
+  // ── list_hypotheses ─────────────────────────────────────────────────────
+  {
+    name: 'list_hypotheses',
+    description: 'List research hypotheses. Hypotheses are notes with type="hypothesis" and track investigation status.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'number', description: 'Filter by project ID' },
+        status: {
+          type: 'string',
+          enum: ['open', 'investigating', 'confirmed', 'disproved', 'obsolete'],
+          description: 'Filter by hypothesis status',
+        },
+      },
+    },
+    handler: async (args: any) => {
+      const hypotheses = getNotes({
+        project_id: args.project_id !== undefined ? Number(args.project_id) : undefined,
+        type: 'hypothesis',
+        status: args.status ? String(args.status) : undefined,
+        limit: 50,
+      });
+
+      const statusCounts: Record<string, number> = {
+        open: 0, investigating: 0, confirmed: 0, disproved: 0, obsolete: 0,
+      };
+      for (const h of hypotheses) {
+        const s = h.status || 'open';
+        statusCounts[s] = (statusCounts[s] || 0) + 1;
+      }
+
+      return {
+        hypotheses,
+        total: hypotheses.length,
+        status_counts: statusCounts,
+      };
+    },
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SESSION STATE TOOLS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── get_session_state ───────────────────────────────────────────────────
+  {
+    name: 'get_session_state',
+    description: 'Get saved session state — the user\'s last investigation context, filters, active items, etc.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scope: {
+          type: 'string',
+          enum: ['global', 'project', 'finding'],
+          description: 'Scope of the state entry',
+        },
+        scope_id: { type: 'number', description: 'Project or finding ID (omit for global)' },
+        key: { type: 'string', description: 'Optional key to fetch a single entry' },
+      },
+      required: ['scope'],
+    },
+    handler: async (args: any) => {
+      const scope = String(args.scope);
+      if (!['global', 'project', 'finding'].includes(scope)) {
+        throw new Error(`Invalid scope "${scope}" (must be global | project | finding)`);
+      }
+      const scopeId = args.scope_id !== undefined ? Number(args.scope_id) : null;
+      const key = args.key ? String(args.key) : undefined;
+
+      const rows = getSessionState(scope, scopeId, key);
+
+      const parsed = rows.map((r: any) => {
+        let value: any = r.value;
+        try { value = JSON.parse(r.value); } catch { /* leave raw */ }
+        return { ...r, value };
+      });
+
+      return { entries: parsed, total: parsed.length };
+    },
+  },
+
+  // ── set_session_state ───────────────────────────────────────────────────
+  {
+    name: 'set_session_state',
+    description: 'Save a piece of session state. Used to leave breadcrumbs for later or for other agents.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scope: {
+          type: 'string',
+          enum: ['global', 'project', 'finding'],
+          description: 'Scope of the state entry',
+        },
+        scope_id: { type: 'number', description: 'Project or finding ID (omit for global)' },
+        key: { type: 'string', description: 'State key' },
+        value: { description: 'Any JSON-serializable value' },
+      },
+      required: ['scope', 'key'],
+    },
+    handler: async (args: any) => {
+      const scope = String(args.scope);
+      if (!['global', 'project', 'finding'].includes(scope)) {
+        throw new Error(`Invalid scope "${scope}" (must be global | project | finding)`);
+      }
+      if (!args.key) throw new Error('key is required');
+
+      const scopeId = args.scope_id !== undefined ? Number(args.scope_id) : null;
+      const serialized = JSON.stringify(args.value ?? null);
+
+      setSessionState(scope, scopeId, String(args.key), serialized);
+      return { saved: true, scope, scope_id: scopeId, key: args.key };
+    },
+  },
+
+  // ── get_active_context ──────────────────────────────────────────────────
+  {
+    name: 'get_active_context',
+    description: 'Get the user\'s most recent research context — current project, finding, open hypothesis. Use this to pick up where they left off.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+    handler: async () => {
+      const readGlobalKey = (key: string): any => {
+        const rows = getSessionState('global', null, key);
+        if (!rows || rows.length === 0) return null;
+        try { return JSON.parse(rows[0].value); }
+        catch { return rows[0].value ?? null; }
+      };
+
+      const lastProjectRaw = readGlobalKey('last_project_id');
+      const lastFindingRaw = readGlobalKey('last_finding_id');
+      const lastHypothesisRaw = readGlobalKey('last_hypothesis_id');
+
+      const toId = (v: any): number | null => {
+        if (v === null || v === undefined) return null;
+        const n = typeof v === 'object' ? Number((v as any).id ?? NaN) : Number(v);
+        return isNaN(n) ? null : n;
+      };
+
+      const projectId = toId(lastProjectRaw);
+      const findingId = toId(lastFindingRaw);
+      const hypothesisId = toId(lastHypothesisRaw);
+
+      const project = projectId !== null ? getProjectById(projectId) : null;
+      const finding = findingId !== null ? getVulnerabilityById(findingId) : null;
+      const hypothesis = hypothesisId !== null ? getNoteById(hypothesisId) : null;
+
+      let pendingCount = 0;
+      if (project && project.id !== undefined) {
+        try {
+          const counts = countScanFindings({ project_id: project.id });
+          pendingCount = Number(counts?.pending || 0);
+        } catch {
+          pendingCount = 0;
+        }
+      }
+
+      return {
+        project: project || null,
+        finding: finding || null,
+        hypothesis: hypothesis || null,
+        pending_count: pendingCount,
+      };
     },
   },
 ];

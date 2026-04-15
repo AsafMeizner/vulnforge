@@ -424,8 +424,63 @@ function createTables(): void {
     )
   `);
 
+  // Research Workspace tables
+  db.run(`
+    CREATE TABLE IF NOT EXISTS notes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      provider TEXT NOT NULL DEFAULT 'local',
+      external_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      type TEXT DEFAULT 'note',
+      status TEXT,
+      tags TEXT DEFAULT '[]',
+      project_id INTEGER,
+      finding_ids TEXT DEFAULT '[]',
+      file_refs TEXT DEFAULT '[]',
+      confidence REAL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS notes_providers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      type TEXT NOT NULL,
+      enabled INTEGER DEFAULT 1,
+      is_default INTEGER DEFAULT 0,
+      config TEXT DEFAULT '{}'
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS session_state (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      scope TEXT NOT NULL,
+      scope_id INTEGER,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(scope, scope_id, key)
+    )
+  `);
+
   migrateSchema();
+  seedDefaultNotesProvider();
   persistDb();
+}
+
+/** Seed the local notes provider on first run. */
+function seedDefaultNotesProvider(): void {
+  const rows = execQuery('SELECT COUNT(*) as c FROM notes_providers');
+  const count = (rows[0]?.c as number) || 0;
+  if (count === 0) {
+    db.run(
+      `INSERT INTO notes_providers (name, type, enabled, is_default, config) VALUES (?, ?, ?, ?, ?)`,
+      ['local', 'local', 1, 1, JSON.stringify({ base_path: 'X:/vulnforge/data/notes' })]
+    );
+  }
 }
 
 /** Add columns to existing tables without breaking existing data. */
@@ -981,6 +1036,42 @@ export interface RoutingRuleRow {
   enabled: number;
 }
 
+// ── Research Workspace types ──────────────────────────────────────────────
+
+export interface NoteRow {
+  id?: number;
+  provider: string;
+  external_id: string;
+  title: string;
+  type?: string;
+  status?: string;
+  tags?: string;             // JSON array
+  project_id?: number;
+  finding_ids?: string;      // JSON array
+  file_refs?: string;        // JSON array
+  confidence?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface NotesProviderRow {
+  id?: number;
+  name: string;
+  type: string;
+  enabled?: number;
+  is_default?: number;
+  config?: string;           // JSON
+}
+
+export interface SessionStateRow {
+  id?: number;
+  scope: string;             // global | project | finding
+  scope_id?: number;
+  key: string;
+  value: string;             // JSON
+  updated_at?: string;
+}
+
 export function getDbRoutingRules(): RoutingRuleRow[] {
   return execQuery('SELECT * FROM routing_rules ORDER BY task, priority ASC') as unknown as RoutingRuleRow[];
 }
@@ -999,4 +1090,165 @@ export function setDbRoutingRules(rules: Omit<RoutingRuleRow, 'id'>[]): void {
 export function countRoutingRules(): number {
   const rows = execQuery('SELECT COUNT(*) as c FROM routing_rules');
   return (rows[0]?.c as number) || 0;
+}
+
+// ── Notes CRUD ────────────────────────────────────────────────────────────
+
+export interface NoteFilters {
+  project_id?: number;
+  type?: string;
+  status?: string;
+  tag?: string;
+  finding_id?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export function getNotes(filters: NoteFilters = {}): NoteRow[] {
+  const conds: string[] = [];
+  const params: any[] = [];
+
+  if (filters.project_id !== undefined) { conds.push('project_id = ?'); params.push(filters.project_id); }
+  if (filters.type) { conds.push('type = ?'); params.push(filters.type); }
+  if (filters.status) { conds.push('status = ?'); params.push(filters.status); }
+  if (filters.tag) { conds.push("tags LIKE ?"); params.push(`%"${filters.tag}"%`); }
+  if (filters.finding_id !== undefined) { conds.push("finding_ids LIKE ?"); params.push(`%${filters.finding_id}%`); }
+
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  const limit = filters.limit ? `LIMIT ${Number(filters.limit)}` : 'LIMIT 200';
+  const offset = filters.offset ? `OFFSET ${Number(filters.offset)}` : '';
+
+  return execQuery(
+    `SELECT * FROM notes ${where} ORDER BY updated_at DESC ${limit} ${offset}`,
+    params
+  ) as unknown as NoteRow[];
+}
+
+export function getNoteById(id: number): NoteRow | null {
+  const rows = execQuery('SELECT * FROM notes WHERE id = ?', [id]);
+  return rows[0] as NoteRow || null;
+}
+
+export function createNote(n: NoteRow): number {
+  return execRun(
+    `INSERT INTO notes (provider, external_id, title, type, status, tags, project_id, finding_ids, file_refs, confidence)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      n.provider, n.external_id, n.title,
+      n.type || 'note', n.status || null,
+      n.tags || '[]', n.project_id ?? null,
+      n.finding_ids || '[]', n.file_refs || '[]',
+      n.confidence ?? null,
+    ]
+  );
+}
+
+export function updateNote(id: number, updates: Partial<NoteRow>): void {
+  const exclude = ['id', 'created_at'];
+  const fields = Object.keys(updates).filter(k => !exclude.includes(k));
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(
+    `UPDATE notes SET ${setClause}, updated_at = datetime('now') WHERE id = ?`,
+    [...values, id]
+  );
+  persistDb();
+}
+
+export function deleteNote(id: number): void {
+  db.run('DELETE FROM notes WHERE id = ?', [id]);
+  persistDb();
+}
+
+// ── Notes Providers CRUD ──────────────────────────────────────────────────
+
+export function getNotesProviders(): NotesProviderRow[] {
+  return execQuery('SELECT * FROM notes_providers ORDER BY is_default DESC, name ASC') as unknown as NotesProviderRow[];
+}
+
+export function getNotesProviderById(id: number): NotesProviderRow | null {
+  const rows = execQuery('SELECT * FROM notes_providers WHERE id = ?', [id]);
+  return rows[0] as NotesProviderRow || null;
+}
+
+export function getNotesProviderByName(name: string): NotesProviderRow | null {
+  const rows = execQuery('SELECT * FROM notes_providers WHERE name = ?', [name]);
+  return rows[0] as NotesProviderRow || null;
+}
+
+export function getDefaultNotesProvider(): NotesProviderRow | null {
+  const rows = execQuery('SELECT * FROM notes_providers WHERE is_default = 1 AND enabled = 1 LIMIT 1');
+  return rows[0] as NotesProviderRow || null;
+}
+
+export function createNotesProvider(p: NotesProviderRow): number {
+  return execRun(
+    `INSERT INTO notes_providers (name, type, enabled, is_default, config) VALUES (?, ?, ?, ?, ?)`,
+    [p.name, p.type, p.enabled ?? 1, p.is_default ?? 0, p.config || '{}']
+  );
+}
+
+export function updateNotesProvider(id: number, updates: Partial<NotesProviderRow>): void {
+  const fields = Object.keys(updates).filter(k => k !== 'id');
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(`UPDATE notes_providers SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
+}
+
+export function deleteNotesProvider(id: number): void {
+  db.run('DELETE FROM notes_providers WHERE id = ?', [id]);
+  persistDb();
+}
+
+// ── Session State CRUD ────────────────────────────────────────────────────
+
+export function getSessionState(scope: string, scope_id: number | null, key?: string): SessionStateRow[] {
+  if (key) {
+    if (scope_id === null) {
+      return execQuery('SELECT * FROM session_state WHERE scope = ? AND scope_id IS NULL AND key = ?', [scope, key]) as unknown as SessionStateRow[];
+    }
+    return execQuery('SELECT * FROM session_state WHERE scope = ? AND scope_id = ? AND key = ?', [scope, scope_id, key]) as unknown as SessionStateRow[];
+  }
+  if (scope_id === null) {
+    return execQuery('SELECT * FROM session_state WHERE scope = ? AND scope_id IS NULL', [scope]) as unknown as SessionStateRow[];
+  }
+  return execQuery('SELECT * FROM session_state WHERE scope = ? AND scope_id = ?', [scope, scope_id]) as unknown as SessionStateRow[];
+}
+
+export function setSessionState(scope: string, scope_id: number | null, key: string, value: string): void {
+  // Upsert via DELETE + INSERT to avoid UNIQUE constraint issues with NULL
+  if (scope_id === null) {
+    db.run('DELETE FROM session_state WHERE scope = ? AND scope_id IS NULL AND key = ?', [scope, key]);
+    db.run(
+      'INSERT INTO session_state (scope, scope_id, key, value) VALUES (?, NULL, ?, ?)',
+      [scope, key, value]
+    );
+  } else {
+    db.run('DELETE FROM session_state WHERE scope = ? AND scope_id = ? AND key = ?', [scope, scope_id, key]);
+    db.run(
+      'INSERT INTO session_state (scope, scope_id, key, value) VALUES (?, ?, ?, ?)',
+      [scope, scope_id, key, value]
+    );
+  }
+  persistDb();
+}
+
+export function deleteSessionState(scope: string, scope_id: number | null, key?: string): void {
+  if (key) {
+    if (scope_id === null) {
+      db.run('DELETE FROM session_state WHERE scope = ? AND scope_id IS NULL AND key = ?', [scope, key]);
+    } else {
+      db.run('DELETE FROM session_state WHERE scope = ? AND scope_id = ? AND key = ?', [scope, scope_id, key]);
+    }
+  } else {
+    if (scope_id === null) {
+      db.run('DELETE FROM session_state WHERE scope = ? AND scope_id IS NULL', [scope]);
+    } else {
+      db.run('DELETE FROM session_state WHERE scope = ? AND scope_id = ?', [scope, scope_id]);
+    }
+  }
+  persistDb();
 }

@@ -5,6 +5,7 @@ import { SeverityBadge, StatusBadge } from '@/components/Badge';
 import { Modal } from '@/components/Modal';
 import { FindingDetailModal } from './FindingDetail';
 import { useToast } from '@/components/Toast';
+import { NotesPanel } from '@/components/NotesPanel';
 
 function relativeTime(iso: string | null) {
   if (!iso) return 'Never';
@@ -222,6 +223,11 @@ export default function Projects() {
               </tbody>
             </table>
           )}
+
+          {/* Research Workspace — notes for this project */}
+          <div style={{ padding: 16, borderTop: '1px solid var(--border)' }}>
+            <NotesPanel projectId={selectedProject.id} initiallyOpen={false} />
+          </div>
         </div>
       )}
 

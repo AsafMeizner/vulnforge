@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getTools, updateAIProvider, getAIProviders } from '@/lib/api';
+import {
+  getTools, updateAIProvider, getAIProviders,
+  listNotesProviders, createNotesProvider, updateNotesProvider,
+  deleteNotesProvider, testNotesProvider,
+  type NotesProvider as NotesProviderRow,
+} from '@/lib/api';
 import type { Tool, AIProvider } from '@/lib/types';
 import { useToast } from '@/components/Toast';
 
@@ -17,7 +22,7 @@ const DEFAULT_PROFILES: ScanProfile[] = [
   { id: 'memory', name: 'Memory Safety', tools: ['uaf_detector', 'realloc_dangling_scanner', 'cross_arch_truncation'], severity_threshold: 'High' },
 ];
 
-type SettingsTab = 'general' | 'tools' | 'profiles';
+type SettingsTab = 'general' | 'tools' | 'profiles' | 'notes';
 
 export default function Settings() {
   const [tab, setTab] = useState<SettingsTab>('general');
@@ -90,6 +95,7 @@ export default function Settings() {
         <button style={tabStyle('general')} onClick={() => setTab('general')}>General</button>
         <button style={tabStyle('tools')} onClick={() => setTab('tools')}>Tools</button>
         <button style={tabStyle('profiles')} onClick={() => setTab('profiles')}>Scan Profiles</button>
+        <button style={tabStyle('notes')} onClick={() => setTab('notes')}>Note Backends</button>
       </div>
 
       {/* General tab */}
@@ -246,8 +252,207 @@ export default function Settings() {
           ))}
         </div>
       )}
+
+      {/* Note Backends tab */}
+      {tab === 'notes' && <NoteBackendsSection />}
     </div>
   );
+}
+
+function NoteBackendsSection() {
+  const { toast } = useToast();
+  const [providers, setProviders] = useState<NotesProviderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newType, setNewType] = useState<'local' | 'obsidian'>('obsidian');
+  const [newPath, setNewPath] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await listNotesProviders();
+      setProviders(res.data || []);
+    } catch (err: any) {
+      toast(`Failed to load: ${err.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleAdd = async () => {
+    if (!newName.trim() || !newPath.trim()) {
+      toast('Name and path are required', 'error');
+      return;
+    }
+    try {
+      const config = newType === 'obsidian'
+        ? { vault_path: newPath.trim(), subfolder: 'VulnForge' }
+        : { base_path: newPath.trim() };
+      await createNotesProvider({ name: newName.trim(), type: newType, config, enabled: true });
+      toast(`Added ${newName}`, 'success');
+      setAdding(false);
+      setNewName('');
+      setNewPath('');
+      load();
+    } catch (err: any) {
+      toast(`Failed: ${err.message}`, 'error');
+    }
+  };
+
+  const handleTest = async (id: number) => {
+    try {
+      const res = await testNotesProvider(id);
+      if (res.ok) toast('Connection OK', 'success');
+      else toast(`Connection failed: ${res.error || 'unknown error'}`, 'error');
+    } catch (err: any) {
+      toast(`Test failed: ${err.message}`, 'error');
+    }
+  };
+
+  const handleToggle = async (p: NotesProviderRow) => {
+    try {
+      await updateNotesProvider(p.id, { enabled: p.enabled ? 0 : 1 } as any);
+      load();
+    } catch (err: any) {
+      toast(`Update failed: ${err.message}`, 'error');
+    }
+  };
+
+  const handleSetDefault = async (p: NotesProviderRow) => {
+    try {
+      // Unset any current default, set this one
+      for (const other of providers) {
+        if (other.is_default && other.id !== p.id) {
+          await updateNotesProvider(other.id, { is_default: 0 } as any);
+        }
+      }
+      await updateNotesProvider(p.id, { is_default: 1 } as any);
+      toast(`${p.name} set as default`, 'success');
+      load();
+    } catch (err: any) {
+      toast(`Update failed: ${err.message}`, 'error');
+    }
+  };
+
+  const handleDelete = async (id: number, name: string) => {
+    if (!confirm(`Delete provider "${name}"? Existing notes will remain in the backend but won't be listed in VulnForge.`)) return;
+    try {
+      await deleteNotesProvider(id);
+      toast('Provider removed', 'info');
+      load();
+    } catch (err: any) {
+      toast(`Delete failed: ${err.message}`, 'error');
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>
+        Note backends store your research notes, hypotheses, and observations. Each provider keeps content in its own format (local markdown files, Obsidian vault, etc.) — VulnForge only stores metadata. You can enable multiple backends.
+      </p>
+
+      {loading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Loading...</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {providers.map(p => {
+            const config = (() => { try { return JSON.parse(p.config || '{}'); } catch { return {}; } })();
+            return (
+              <div key={p.id} style={{
+                background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8,
+                padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{p.name}</span>
+                    <span style={{
+                      fontSize: 10, padding: '2px 8px', borderRadius: 10, textTransform: 'uppercase',
+                      background: `var(--${p.type === 'obsidian' ? 'purple' : 'blue'})22`,
+                      color: `var(--${p.type === 'obsidian' ? 'purple' : 'blue'})`,
+                    }}>{p.type}</span>
+                    {p.is_default ? (
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--green)22', color: 'var(--green)' }}>DEFAULT</span>
+                    ) : null}
+                    {!p.enabled ? (
+                      <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--muted)22', color: 'var(--muted)' }}>DISABLED</span>
+                    ) : null}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, fontFamily: 'monospace' }}>
+                    {config.vault_path || config.base_path || config.url || '(no path)'}
+                    {config.subfolder ? ` → ${config.subfolder}/` : ''}
+                  </div>
+                </div>
+                <button onClick={() => handleTest(p.id)} style={btn('var(--blue)')}>Test</button>
+                <button onClick={() => handleToggle(p)} style={btn('var(--surface-2)')}>
+                  {p.enabled ? 'Disable' : 'Enable'}
+                </button>
+                {!p.is_default && p.enabled ? (
+                  <button onClick={() => handleSetDefault(p)} style={btn('var(--surface-2)')}>Set default</button>
+                ) : null}
+                <button onClick={() => handleDelete(p.id, p.name)} style={btn('var(--red)')}>Delete</button>
+              </div>
+            );
+          })}
+
+          {providers.length === 0 && (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13, border: '1px dashed var(--border)', borderRadius: 8 }}>
+              No note backends configured.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add new provider */}
+      {!adding ? (
+        <button onClick={() => setAdding(true)} style={{
+          padding: '10px 16px', background: 'var(--surface-2)', color: 'var(--text)',
+          border: '1px dashed var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13,
+        }}>
+          + Add note backend
+        </button>
+      ) : (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--blue)', borderRadius: 8, padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 12 }}>Add Note Backend</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Name</label>
+              <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. obsidian-main"
+                style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Type</label>
+              <select value={newType} onChange={e => setNewType(e.target.value as any)} style={inputStyle}>
+                <option value="obsidian">Obsidian Vault</option>
+                <option value="local">Local Filesystem</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+              {newType === 'obsidian' ? 'Vault path (the directory containing .obsidian/)' : 'Base directory for note files'}
+            </label>
+            <input value={newPath} onChange={e => setNewPath(e.target.value)}
+              placeholder={newType === 'obsidian' ? 'C:\\Users\\you\\Documents\\MyVault' : 'X:\\vulnforge\\data\\notes'}
+              style={inputStyle} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleAdd} style={btn('var(--green)')}>Add</button>
+            <button onClick={() => setAdding(false)} style={btn('var(--surface-2)')}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function btn(bg: string): React.CSSProperties {
+  return {
+    background: bg, color: 'var(--text)', border: '1px solid var(--border)',
+    borderRadius: 5, padding: '6px 12px', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap',
+  };
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

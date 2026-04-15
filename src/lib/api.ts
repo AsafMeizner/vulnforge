@@ -337,3 +337,174 @@ export const deepAnalyze = (vuln_id: number) =>
     method: 'POST',
     body: JSON.stringify({ vuln_id }),
   });
+
+// ─── Notes (Theme 1) ────────────────────────────────────────────────────────
+
+export interface Note {
+  id: number;
+  provider: string;
+  external_id: string;
+  title: string;
+  type: string;
+  status?: string;
+  tags: string[] | string;
+  project_id?: number;
+  finding_ids: number[] | string;
+  file_refs: any[] | string;
+  confidence?: number;
+  content?: string; // populated on GET /:id
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotesProvider {
+  id: number;
+  name: string;
+  type: string;
+  enabled: number;
+  is_default: number;
+  config: string;
+}
+
+export const listNotes = (params: {
+  project_id?: number;
+  type?: string;
+  status?: string;
+  tag?: string;
+  finding_id?: number;
+  limit?: number;
+}) => {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined) qs.set(k, String(v));
+  });
+  return request<{ data: Note[]; total: number }>(`/notes?${qs.toString()}`);
+};
+
+export const getNote = (id: number) => request<Note>(`/notes/${id}`);
+
+export const createNote = (body: {
+  title: string;
+  content: string;
+  type?: string;
+  status?: string;
+  project_id?: number;
+  finding_ids?: number[];
+  tags?: string[];
+  confidence?: number;
+  provider?: string;
+}) =>
+  request<Note>('/notes', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const updateNote = (
+  id: number,
+  body: Partial<{
+    title: string;
+    content: string;
+    status: string;
+    tags: string[];
+    confidence: number;
+  }>
+) =>
+  request<Note>(`/notes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
+export const deleteNote = (id: number) =>
+  request<{ deleted: boolean }>(`/notes/${id}`, { method: 'DELETE' });
+
+export const linkNoteToFinding = (id: number, finding_id: number) =>
+  request<Note>(`/notes/${id}/link`, {
+    method: 'POST',
+    body: JSON.stringify({ finding_id }),
+  });
+
+export const searchNotes = (query: string, project_id?: number) =>
+  request<{ data: Note[] }>('/notes/search', {
+    method: 'POST',
+    body: JSON.stringify({ query, project_id }),
+  });
+
+export const listHypotheses = (params: { project_id?: number; status?: string }) => {
+  const qs = new URLSearchParams({ ...params, type: 'hypothesis' } as any);
+  return request<{ data: Note[] }>(`/notes?${qs.toString()}`);
+};
+
+// Providers
+export const listNotesProviders = () =>
+  request<{ data: NotesProvider[] }>('/notes-providers');
+
+export const createNotesProvider = (body: {
+  name: string;
+  type: string;
+  config: any;
+  enabled?: boolean;
+  is_default?: boolean;
+}) =>
+  request<NotesProvider>('/notes-providers', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const updateNotesProvider = (
+  id: number,
+  body: Partial<NotesProvider & { config: any }>
+) =>
+  request<NotesProvider>(`/notes-providers/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
+export const deleteNotesProvider = (id: number) =>
+  request<{ deleted: boolean }>(`/notes-providers/${id}`, { method: 'DELETE' });
+
+export const testNotesProvider = (id: number) =>
+  request<{ ok: boolean; error?: string }>(`/notes-providers/${id}/test`, {
+    method: 'POST',
+  });
+
+// ─── Session state (Theme 1) ────────────────────────────────────────────────
+export const getSessionState = (
+  scope: 'global' | 'project' | 'finding',
+  scope_id?: number,
+  key?: string
+) => {
+  const qs = new URLSearchParams({ scope });
+  if (scope_id !== undefined) qs.set('scope_id', String(scope_id));
+  if (key) qs.set('key', key);
+  return request<{
+    data: Array<{
+      scope: string;
+      scope_id: number | null;
+      key: string;
+      value: any;
+    }>;
+  }>(`/session?${qs.toString()}`);
+};
+
+export const setSessionState = (
+  scope: 'global' | 'project' | 'finding',
+  key: string,
+  value: any,
+  scope_id?: number
+) =>
+  request<{ saved: boolean }>('/session', {
+    method: 'POST',
+    body: JSON.stringify({ scope, scope_id, key, value }),
+  });
+
+export const deleteSessionState = (
+  scope: string,
+  key: string,
+  scope_id?: number
+) => {
+  const qs = new URLSearchParams({ scope, key });
+  if (scope_id !== undefined) qs.set('scope_id', String(scope_id));
+  return request<{ deleted: boolean }>(`/session?${qs.toString()}`, {
+    method: 'DELETE',
+  });
+};

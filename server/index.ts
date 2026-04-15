@@ -23,6 +23,10 @@ import scanFindingsRouter from './routes/scan-findings.js';
 // Pipeline
 import pipelineRouter from './routes/pipeline.js';
 
+// Research Workspace (Theme 1)
+import notesRouter from './routes/notes.js';
+import sessionRouter from './routes/session.js';
+
 // MCP
 import { setupMcpServer } from './mcp/index.js';
 
@@ -82,6 +86,8 @@ async function main(): Promise<void> {
   app.use('/api/reports', reportsRouter);
   app.use('/api/scan-findings', scanFindingsRouter);
   app.use('/api/pipeline', pipelineRouter);
+  app.use('/api/notes', notesRouter);
+  app.use('/api/session', sessionRouter);
 
   // AI chat endpoint
   app.post('/api/ai/chat', async (req, res) => {
