@@ -732,3 +732,66 @@ export const setProofTier = (finding_id: number, tier: string, notes?: string) =
 
 export const listAllProofLadders = () =>
   request<{ data: ProofLadder[]; total: number }>('/exploits/ladders');
+
+// ─── AI Copilot (Theme 8) ──────────────────────────────────────────────────
+
+export interface InvestigateStep {
+  index: number;
+  thought: string;
+  proposed_action: string;
+  proposed_args?: Record<string, any>;
+  status: 'pending' | 'approved' | 'rejected' | 'executed' | 'failed';
+  result?: string;
+  approved_at?: string;
+  executed_at?: string;
+}
+
+export interface InvestigateSession {
+  id: string;
+  finding_id?: number;
+  goal: string;
+  status: 'active' | 'completed' | 'cancelled';
+  steps: InvestigateStep[];
+  context: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export const listInvestigations = () =>
+  request<{ data: InvestigateSession[]; total: number }>('/ai-investigate/sessions');
+
+export const getInvestigation = (id: string) =>
+  request<InvestigateSession>(`/ai-investigate/sessions/${id}`);
+
+export const startInvestigation = (body: { goal: string; finding_id?: number }) =>
+  request<InvestigateSession>('/ai-investigate/sessions', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+export const proposeNextStep = (id: string) =>
+  request<InvestigateStep>(`/ai-investigate/sessions/${id}/next-step`, { method: 'POST' });
+
+export const executeInvestigateStep = (id: string, stepIndex: number) =>
+  request<InvestigateStep>(`/ai-investigate/sessions/${id}/execute/${stepIndex}`, { method: 'POST' });
+
+export const rejectInvestigateStep = (id: string, stepIndex: number, reason?: string) =>
+  request<InvestigateStep>(`/ai-investigate/sessions/${id}/reject/${stepIndex}`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+
+export const cancelInvestigation = (id: string) =>
+  request<{ cancelled: boolean }>(`/ai-investigate/sessions/${id}/cancel`, { method: 'POST' });
+
+export const extractAssumptions = (file: string, functionName: string) =>
+  request<any>('/ai-investigate/assumptions', {
+    method: 'POST',
+    body: JSON.stringify({ file, function: functionName }),
+  });
+
+export const generateHypotheses = (project_id: number) =>
+  request<{ data: Array<{ title: string; rationale: string; file?: string; priority: string }> }>('/ai-investigate/hypotheses', {
+    method: 'POST',
+    body: JSON.stringify({ project_id }),
+  });

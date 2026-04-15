@@ -36,6 +36,9 @@ import historyRouter from './routes/history.js';
 // Exploit Development (Theme 2)
 import exploitsRouter from './routes/exploits.js';
 
+// AI Copilot Upgrade (Theme 8)
+import aiInvestigateRouter from './routes/ai-investigate.js';
+
 // MCP
 import { setupMcpServer } from './mcp/index.js';
 
@@ -100,6 +103,7 @@ async function main(): Promise<void> {
   app.use('/api/runtime', runtimeRouter);
   app.use('/api/history', historyRouter);
   app.use('/api/exploits', exploitsRouter);
+  app.use('/api/ai-investigate', aiInvestigateRouter);
 
   // Runtime executors init (after DB ready)
   try {

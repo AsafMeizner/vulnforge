@@ -1895,4 +1895,125 @@ export const mcpTools: MCPToolDef[] = [
       return getProofLadder(args.finding_id);
     },
   },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // AI COPILOT TOOLS (Theme 8) — investigate mode, assumption extraction
+  // ═══════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'start_investigation',
+    description: 'Start an interactive AI investigation session with per-step approval. Each step is proposed by the AI and requires explicit user approval before execution. Use propose_next_step and execute_investigation_step to drive the loop.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        goal: { type: 'string', description: 'What you want to investigate' },
+        finding_id: { type: 'number', description: 'Optional finding to scope the investigation' },
+      },
+      required: ['goal'],
+    },
+    handler: async (args: any) => {
+      const { startInvestigation } = await import('../pipeline/ai/investigate.js');
+      return await startInvestigation(args.goal, args.finding_id);
+    },
+  },
+
+  {
+    name: 'propose_next_step',
+    description: 'Ask the AI to propose the next step in an investigation. Returns a pending step that needs approval.',
+    inputSchema: {
+      type: 'object',
+      properties: { session_id: { type: 'string' } },
+      required: ['session_id'],
+    },
+    handler: async (args: any) => {
+      const { proposeNextStep } = await import('../pipeline/ai/investigate.js');
+      return await proposeNextStep(args.session_id);
+    },
+  },
+
+  {
+    name: 'execute_investigation_step',
+    description: 'Approve and execute a pending investigation step. Runs the proposed action (read_file, grep, git_blame, etc.) and returns the result.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string' },
+        step_index: { type: 'number' },
+      },
+      required: ['session_id', 'step_index'],
+    },
+    handler: async (args: any) => {
+      const { executeStep } = await import('../pipeline/ai/investigate.js');
+      return await executeStep(args.session_id, args.step_index);
+    },
+  },
+
+  {
+    name: 'reject_investigation_step',
+    description: 'Reject a pending investigation step with an optional reason. The AI will then propose an alternative on the next propose_next_step call.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session_id: { type: 'string' },
+        step_index: { type: 'number' },
+        reason: { type: 'string' },
+      },
+      required: ['session_id', 'step_index'],
+    },
+    handler: async (args: any) => {
+      const { rejectStep } = await import('../pipeline/ai/investigate.js');
+      return rejectStep(args.session_id, args.step_index, args.reason);
+    },
+  },
+
+  {
+    name: 'list_investigations',
+    description: 'List active and completed investigation sessions.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+    handler: async () => {
+      const { listInvestigations } = await import('../pipeline/ai/investigate.js');
+      const sessions = listInvestigations();
+      return { sessions, total: sessions.length };
+    },
+  },
+
+  {
+    name: 'extract_assumptions',
+    description: 'Ask the AI to read a function and list all its implicit assumptions (input validation, state, bounds, invariants). Useful for formal review — you can then mark which assumptions are actually enforced by callers.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'Absolute path to source file' },
+        function: { type: 'string', description: 'Function name to analyze' },
+      },
+      required: ['file', 'function'],
+    },
+    handler: async (args: any) => {
+      const { extractAssumptions } = await import('../pipeline/ai/assumptions.js');
+      return await extractAssumptions(args.file, args.function);
+    },
+  },
+
+  {
+    name: 'generate_hypotheses',
+    description: 'AI brainstorms a prioritized list of "places to investigate" for a project by scanning file names and content for security-relevant patterns. Returns 5-10 hypotheses with rationale.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'number' },
+      },
+      required: ['project_id'],
+    },
+    handler: async (args: any) => {
+      const { getProjectById } = await import('../db.js');
+      const project = getProjectById(args.project_id);
+      if (!project?.path) throw new Error('Project has no local path');
+      const { generateHypotheses } = await import('../pipeline/ai/assumptions.js');
+      const hypotheses = await generateHypotheses(project.path);
+      return { hypotheses, total: hypotheses.length };
+    },
+  },
 ];

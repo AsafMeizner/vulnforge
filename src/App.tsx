@@ -16,11 +16,12 @@ import HypothesisBoard from '@/pages/HypothesisBoard';
 import Runtime from '@/pages/Runtime';
 import History from '@/pages/History';
 import Exploits from '@/pages/Exploits';
+import Investigate from '@/pages/Investigate';
 import { QuickCapture } from '@/components/QuickCapture';
 
-type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history' | 'exploits';
+type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history' | 'exploits' | 'investigate';
 
-const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses', 'runtime', 'history', 'exploits']);
+const VALID_PAGES = new Set<Page>(['dashboard', 'findings', 'scanner', 'projects', 'tools', 'checklists', 'ai', 'plugins', 'settings', 'hunt', 'review', 'hypotheses', 'runtime', 'history', 'exploits', 'investigate']);
 
 function hashToPage(hash: string): Page {
   const raw = hash.replace(/^#/, '') as Page;
@@ -119,6 +120,13 @@ const ICONS: Record<Page, React.ReactElement> = {
       <path d="M10 2l4 4-2 2-4-4 2-2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
     </svg>
   ),
+  investigate: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4"/>
+      <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+      <circle cx="7" cy="7" r="1" fill="currentColor"/>
+    </svg>
+  ),
   settings: (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4"/>
@@ -137,6 +145,7 @@ const navItems: NavItem[] = [
   { id: 'review',     label: 'Review'     },
   { id: 'runtime',    label: 'Runtime'    },
   { id: 'exploits',   label: 'Exploits'   },
+  { id: 'investigate',label: 'Investigate'},
   { id: 'history',    label: 'History'    },
   { id: 'scanner',    label: 'Scanner'    },
   { id: 'projects',   label: 'Projects'   },
@@ -418,6 +427,9 @@ function PageContent({ page, searchQuery, navExtra, onNavigate }: PageContentPro
 
     case 'exploits':
       return <Exploits />;
+
+    case 'investigate':
+      return <Investigate />;
 
     case 'review': {
       const pipelineId =
