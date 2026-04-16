@@ -153,26 +153,65 @@ const ICONS: Record<Page, React.ReactElement> = {
 
 interface NavItem { id: Page; label: string }
 
-const navItems: NavItem[] = [
-  { id: 'hunt',       label: 'Hunt'       },
-  { id: 'dashboard',  label: 'Dashboard'  },
-  { id: 'findings',   label: 'Findings'   },
-  { id: 'hypotheses', label: 'Hypotheses' },
-  { id: 'review',     label: 'Review'     },
-  { id: 'runtime',    label: 'Runtime'    },
-  { id: 'exploits',   label: 'Exploits'   },
-  { id: 'investigate',label: 'Investigate'},
-  { id: 'disclosure', label: 'Disclosure' },
-  { id: 'audit',      label: 'Audit'      },
-  { id: 'history',    label: 'History'    },
-  { id: 'scanner',    label: 'Scanner'    },
-  { id: 'projects',   label: 'Projects'   },
-  { id: 'tools',      label: 'Tools'      },
-  { id: 'checklists', label: 'Checklists' },
-  { id: 'ai',         label: 'AI'         },
-  { id: 'plugins',    label: 'Plugins'    },
-  { id: 'settings',   label: 'Settings'   },
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+  defaultOpen?: boolean;
+}
+
+const navGroups: NavGroup[] = [
+  {
+    label: '',
+    defaultOpen: true,
+    items: [
+      { id: 'hunt',       label: 'Hunt'       },
+      { id: 'dashboard',  label: 'Dashboard'  },
+    ],
+  },
+  {
+    label: 'Research',
+    defaultOpen: true,
+    items: [
+      { id: 'findings',   label: 'Findings'   },
+      { id: 'hypotheses', label: 'Hypotheses' },
+      { id: 'review',     label: 'Review'     },
+      { id: 'investigate',label: 'Investigate'},
+    ],
+  },
+  {
+    label: 'Analysis',
+    defaultOpen: true,
+    items: [
+      { id: 'scanner',    label: 'Scanner'    },
+      { id: 'runtime',    label: 'Runtime'    },
+      { id: 'exploits',   label: 'Exploits'   },
+      { id: 'history',    label: 'History'    },
+    ],
+  },
+  {
+    label: 'Disclosure',
+    defaultOpen: false,
+    items: [
+      { id: 'disclosure', label: 'Disclosure' },
+      { id: 'audit',      label: 'Audit'      },
+    ],
+  },
+  {
+    label: 'System',
+    defaultOpen: false,
+    items: [
+      { id: 'projects',   label: 'Projects'   },
+      { id: 'tools',      label: 'Tools'      },
+      { id: 'checklists', label: 'Checklists' },
+      { id: 'ai',         label: 'AI'         },
+      { id: 'plugins',    label: 'Plugins'    },
+      { id: 'settings',   label: 'Settings'   },
+    ],
+  },
 ];
+
+// Flat list for command palette lookups
+const navItems: NavItem[] = navGroups.flatMap(g => g.items);
 
 export default function App() {
   const [page, setPage] = useState<Page>(() => hashToPage(window.location.hash));
@@ -271,48 +310,8 @@ export default function App() {
             </p>
           </div>
 
-          {/* Nav items */}
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => handleNav(item.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 9,
-                padding: '8px 16px',
-                border: 'none',
-                background: page === item.id ? 'var(--surface-2)' : item.id === 'hunt' ? 'var(--green)11' : 'transparent',
-                color: page === item.id ? 'var(--text)' : item.id === 'hunt' ? 'var(--green)' : 'var(--muted)',
-                cursor: 'pointer',
-                fontSize: 13,
-                textAlign: 'left',
-                width: '100%',
-                borderLeft: page === item.id ? '2px solid var(--blue)' : '2px solid transparent',
-                transition: 'color 0.12s, background 0.12s',
-              }}
-              onMouseEnter={e => {
-                if (page !== item.id) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)';
-              }}
-              onMouseLeave={e => {
-                if (page !== item.id) (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)';
-              }}
-            >
-              <span style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 16,
-                height: 16,
-                flexShrink: 0,
-                color: 'inherit',
-                opacity: page === item.id ? 1 : 0.7,
-              }}>
-                {ICONS[item.id]}
-              </span>
-              <span>{item.label}</span>
-            </button>
-          ))}
+          {/* Nav groups */}
+          <NavSidebar groups={navGroups} page={page} onNav={handleNav} />
 
           {/* Bottom version */}
           <div style={{ marginTop: 'auto', padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
@@ -450,6 +449,88 @@ function buildCommands(
       action: () => setShortcutOverlayOpen(true),
     },
   ];
+}
+
+// ── NavSidebar — collapsible grouped navigation ─────────────────────────
+
+function NavSidebar({ groups, page, onNav }: { groups: NavGroup[]; page: Page; onNav: (p: Page) => void }) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(
+    () => new Set(groups.filter(g => g.label && !g.defaultOpen).map(g => g.label))
+  );
+
+  const toggle = (label: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      next.has(label) ? next.delete(label) : next.add(label);
+      return next;
+    });
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {groups.map(group => {
+        const isCollapsed = group.label && collapsed.has(group.label);
+        // Auto-expand if the active page is in this group
+        const hasActive = group.items.some(item => item.id === page);
+
+        return (
+          <div key={group.label || '_top'}>
+            {/* Group header (only for named groups) */}
+            {group.label && (
+              <button
+                onClick={() => toggle(group.label)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  width: '100%', padding: '6px 16px', border: 'none',
+                  background: 'transparent', cursor: 'pointer',
+                  color: 'var(--muted)', fontSize: 10, fontWeight: 700,
+                  textTransform: 'uppercase', letterSpacing: '0.8px',
+                  marginTop: 8,
+                }}
+              >
+                <span style={{ fontSize: 8, transition: 'transform 0.15s', transform: isCollapsed && !hasActive ? 'rotate(-90deg)' : 'rotate(0)' }}>
+                  ▾
+                </span>
+                {group.label}
+              </button>
+            )}
+
+            {/* Group items (always show if active page is here) */}
+            {(!isCollapsed || hasActive) && group.items.map(item => (
+              <button
+                key={item.id}
+                onClick={() => onNav(item.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 9,
+                  padding: '7px 16px', border: 'none',
+                  background: page === item.id ? 'var(--surface-2)' : item.id === 'hunt' ? 'var(--green)11' : 'transparent',
+                  color: page === item.id ? 'var(--text)' : item.id === 'hunt' ? 'var(--green)' : 'var(--muted)',
+                  cursor: 'pointer', fontSize: 13, textAlign: 'left', width: '100%',
+                  borderLeft: page === item.id ? '2px solid var(--blue)' : '2px solid transparent',
+                  transition: 'color 0.12s, background 0.12s',
+                }}
+                onMouseEnter={e => {
+                  if (page !== item.id) (e.currentTarget as HTMLButtonElement).style.color = 'var(--text)';
+                }}
+                onMouseLeave={e => {
+                  if (page !== item.id) (e.currentTarget as HTMLButtonElement).style.color = 'var(--muted)';
+                }}
+              >
+                <span style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 16, height: 16, flexShrink: 0,
+                  color: 'inherit', opacity: page === item.id ? 1 : 0.7,
+                }}>
+                  {ICONS[item.id]}
+                </span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 interface PageContentProps {

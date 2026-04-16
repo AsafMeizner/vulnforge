@@ -436,7 +436,7 @@ export const listHypotheses = (params: { project_id?: number; status?: string })
 
 // Providers
 export const listNotesProviders = () =>
-  request<{ data: NotesProvider[] }>('/notes-providers');
+  request<{ data: NotesProvider[] }>('/notes/providers');
 
 export const createNotesProvider = (body: {
   name: string;
@@ -445,7 +445,7 @@ export const createNotesProvider = (body: {
   enabled?: boolean;
   is_default?: boolean;
 }) =>
-  request<NotesProvider>('/notes-providers', {
+  request<NotesProvider>('/notes/providers', {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -454,16 +454,16 @@ export const updateNotesProvider = (
   id: number,
   body: Partial<NotesProvider & { config: any }>
 ) =>
-  request<NotesProvider>(`/notes-providers/${id}`, {
+  request<NotesProvider>(`/notes/providers/${id}`, {
     method: 'PUT',
     body: JSON.stringify(body),
   });
 
 export const deleteNotesProvider = (id: number) =>
-  request<{ deleted: boolean }>(`/notes-providers/${id}`, { method: 'DELETE' });
+  request<{ deleted: boolean }>(`/notes/providers/${id}`, { method: 'DELETE' });
 
 export const testNotesProvider = (id: number) =>
-  request<{ ok: boolean; error?: string }>(`/notes-providers/${id}/test`, {
+  request<{ ok: boolean; error?: string }>(`/notes/providers/${id}/test`, {
     method: 'POST',
   });
 
