@@ -28,15 +28,22 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
 
   // Load findings
   const loadFindings = useCallback(async () => {
-    if (!pipelineId) return;
     setLoading(true);
     try {
-      const [findingsRes, pipelineRes] = await Promise.all([
-        getPipelineFindings(pipelineId, 'pending'),
-        getPipelineStatus(pipelineId),
-      ]);
-      setFindings(findingsRes.data);
-      setPipeline(pipelineRes);
+      if (pipelineId) {
+        const [findingsRes, pipelineRes] = await Promise.all([
+          getPipelineFindings(pipelineId, 'pending'),
+          getPipelineStatus(pipelineId),
+        ]);
+        setFindings(findingsRes.data);
+        setPipeline(pipelineRes);
+      } else {
+        // No specific pipeline — show ALL pending scan findings across all pipelines
+        const { getScanFindings } = await import('@/lib/api');
+        const res = await getScanFindings({ status: 'pending' });
+        setFindings(res.data);
+        setPipeline(null);
+      }
     } catch (err: any) {
       toast('error', `Failed to load: ${err.message}`);
     } finally {
@@ -110,16 +117,7 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
     }
   };
 
-  // No pipeline specified
-  if (!pipelineId) {
-    return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <h2 style={{ color: 'var(--text)', marginBottom: 12 }}>No Pipeline Selected</h2>
-        <p style={{ color: 'var(--muted)' }}>Start a hunt from the Hunt page to generate findings for review.</p>
-        <button onClick={() => onNavigate('hunt')} style={btnStyle('var(--blue)')}>Go to Hunt</button>
-      </div>
-    );
-  }
+  // Removed the "No Pipeline Selected" blocker — ReviewQueue now loads all pending findings when no pipelineId is set
 
   if (loading) {
     return (

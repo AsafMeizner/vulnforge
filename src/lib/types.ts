@@ -3,11 +3,21 @@ export type VulnStatus = 'New' | 'Triaged' | 'Submitted' | 'Fixed' | 'Rejected' 
 
 export interface Stats {
   total: number;
+  totalVulns?: number;
   critical: number;
   high: number;
+  medium?: number;
+  low?: number;
+  submitted?: number;
+  verified?: number;
   projects: number;
+  totalProjects?: number;
   tools: number;
-  recentScans: number;
+  totalTools?: number;
+  recentScans: any[];
+  recentVulns?: any[];
+  bySeverity?: Array<{ severity: string; count: number }>;
+  byStatus?: Array<{ status: string; count: number }>;
 }
 
 export interface Vulnerability {

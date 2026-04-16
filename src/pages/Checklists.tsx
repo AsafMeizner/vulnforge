@@ -1,251 +1,227 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { getProjects, type Project } from '@/lib/api';
+import { useToast } from '@/components/Toast';
 
-interface ChecklistItem {
-  id: string;
-  label: string;
-  checked: boolean;
-  severity?: string;
-  cwe?: string;
+const BASE = '/api';
+async function req<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    ...options,
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
+  return res.json();
 }
 
-interface Checklist {
-  id: string;
+interface ChecklistSummary {
+  id: number;
   name: string;
-  description: string;
+  category?: string;
+  total_items: number;
+  verified_count: number;
+  progress_pct: number;
+}
+
+interface ChecklistItem {
+  id: number;
+  checklist_id: number;
+  category?: string;
+  title: string;
+  description?: string;
+  severity?: string;
+  tool_names?: string;
+  verified: number;
+  vuln_id?: number;
+  notes?: string;
+}
+
+interface ChecklistDetail extends ChecklistSummary {
   items: ChecklistItem[];
 }
 
-const BUILTIN_CHECKLISTS: Checklist[] = [
-  {
-    id: 'preauth',
-    name: 'Pre-Auth Attack Surface',
-    description: 'Check all code paths reachable before authentication',
-    items: [
-      { id: 'pa1', label: 'Network accept() → first auth check traced', checked: false, severity: 'Critical' },
-      { id: 'pa2', label: 'TLS/DTLS parsing before cert validation', checked: false, severity: 'Critical' },
-      { id: 'pa3', label: 'Protocol version negotiation handling', checked: false, severity: 'High' },
-      { id: 'pa4', label: 'Banner/greeting generation (format strings)', checked: false, severity: 'High' },
-      { id: 'pa5', label: 'UDP packet parsing (no connection state)', checked: false, severity: 'High' },
-      { id: 'pa6', label: 'HTTP parsing before route dispatch', checked: false, severity: 'Medium' },
-      { id: 'pa7', label: 'DNS response parsing (client-side)', checked: false, severity: 'High' },
-    ],
-  },
-  {
-    id: 'memory',
-    name: 'Memory Safety',
-    description: 'Common memory corruption patterns',
-    items: [
-      { id: 'ms1', label: 'Integer overflow in allocation size (n * sizeof)', checked: false, severity: 'Critical', cwe: 'CWE-190' },
-      { id: 'ms2', label: 'realloc() return value used before NULL check', checked: false, severity: 'High', cwe: 'CWE-476' },
-      { id: 'ms3', label: 'Use-after-free on error paths', checked: false, severity: 'Critical', cwe: 'CWE-416' },
-      { id: 'ms4', label: 'Off-by-one in buffer indexing', checked: false, severity: 'High', cwe: 'CWE-193' },
-      { id: 'ms5', label: 'Stack variable address returned/stored', checked: false, severity: 'High', cwe: 'CWE-562' },
-      { id: 'ms6', label: 'Double-free on error unwind', checked: false, severity: 'Critical', cwe: 'CWE-415' },
-      { id: 'ms7', label: 'uint64→size_t truncation on 32-bit targets', checked: false, severity: 'High', cwe: 'CWE-197' },
-    ],
-  },
-  {
-    id: 'crypto',
-    name: 'Cryptography',
-    description: 'Cryptographic implementation weaknesses',
-    items: [
-      { id: 'cr1', label: 'Timing-safe comparison for secrets (memcmp)', checked: false, severity: 'High', cwe: 'CWE-385' },
-      { id: 'cr2', label: 'RNG seeding with time/PID only', checked: false, severity: 'High', cwe: 'CWE-338' },
-      { id: 'cr3', label: 'Hard-coded cryptographic keys or IVs', checked: false, severity: 'Critical', cwe: 'CWE-321' },
-      { id: 'cr4', label: 'ECB mode usage', checked: false, severity: 'High', cwe: 'CWE-327' },
-      { id: 'cr5', label: 'Certificate validation bypass (skip verify flag)', checked: false, severity: 'Critical', cwe: 'CWE-295' },
-      { id: 'cr6', label: 'Nonce reuse in AEAD ciphers', checked: false, severity: 'Critical', cwe: 'CWE-330' },
-      { id: 'cr7', label: 'Key material in core dump / log files', checked: false, severity: 'High', cwe: 'CWE-312' },
-    ],
-  },
-  {
-    id: 'concurrency',
-    name: 'Concurrency',
-    description: 'Race conditions and async-signal safety',
-    items: [
-      { id: 'co1', label: 'Signal handler calls non-async-signal-safe functions', checked: false, severity: 'Critical', cwe: 'CWE-364' },
-      { id: 'co2', label: 'TOCTOU on file operations', checked: false, severity: 'High', cwe: 'CWE-367' },
-      { id: 'co3', label: 'Shared state accessed without locks', checked: false, severity: 'High', cwe: 'CWE-362' },
-      { id: 'co4', label: 'Lock ordering inconsistency (deadlock/livelock)', checked: false, severity: 'Medium' },
-      { id: 'co5', label: 'setjmp/longjmp across lock boundaries', checked: false, severity: 'High' },
-      { id: 'co6', label: 'PID reuse race (kill/waitpid)', checked: false, severity: 'Medium', cwe: 'CWE-362' },
-    ],
-  },
-];
-
 export default function Checklists() {
-  const [checklists, setChecklists] = useState<Checklist[]>(
-    () => {
-      try {
-        const saved = localStorage.getItem('vf_checklists');
-        return saved ? JSON.parse(saved) as Checklist[] : BUILTIN_CHECKLISTS;
-      } catch {
-        return BUILTIN_CHECKLISTS;
-      }
+  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const [checklists, setChecklists] = useState<ChecklistSummary[]>([]);
+  const [selected, setSelected] = useState<ChecklistDetail | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectId, setProjectId] = useState<number | ''>('');
+  const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [clRes, projRes] = await Promise.all([
+        req<{ data: ChecklistSummary[] }>('/checklists'),
+        getProjects(),
+      ]);
+      setChecklists(clRes.data);
+      setProjects(projRes);
+    } catch (err: any) {
+      toast(`Load failed: ${err.message}`, 'error');
+    } finally {
+      setLoading(false);
     }
-  );
-  const [activeId, setActiveId] = useState<string>(checklists[0]?.id ?? '');
+  }, [toast]);
 
-  const toggle = (checklistId: string, itemId: string) => {
-    const updated = checklists.map(cl =>
-      cl.id !== checklistId ? cl : {
-        ...cl,
-        items: cl.items.map(it =>
-          it.id !== itemId ? it : { ...it, checked: !it.checked }
-        ),
-      }
-    );
-    setChecklists(updated);
-    localStorage.setItem('vf_checklists', JSON.stringify(updated));
+  useEffect(() => { load(); }, [load]);
+
+  const loadChecklist = async (id: number) => {
+    try {
+      const detail = await req<ChecklistDetail>(`/checklists/${id}`);
+      setSelected(detail);
+    } catch (err: any) {
+      toast(`Failed: ${err.message}`, 'error');
+    }
   };
 
-  const resetChecklist = (checklistId: string) => {
-    const updated = checklists.map(cl =>
-      cl.id !== checklistId ? cl : {
-        ...cl,
-        items: cl.items.map(it => ({ ...it, checked: false })),
-      }
-    );
-    setChecklists(updated);
-    localStorage.setItem('vf_checklists', JSON.stringify(updated));
+  const handleVerify = async () => {
+    if (!selected || !projectId) {
+      toast('Select a checklist and a project', 'error');
+      return;
+    }
+    setVerifying(true);
+    try {
+      await req<any>(`/checklists/${selected.id}/verify`, {
+        method: 'POST',
+        body: JSON.stringify({ project_id: Number(projectId) }),
+      });
+      toast('Verification complete', 'success');
+      loadChecklist(selected.id);
+      load();
+    } catch (err: any) {
+      toast(`Verify failed: ${err.message}`, 'error');
+    } finally {
+      setVerifying(false);
+    }
   };
 
-  const active = checklists.find(cl => cl.id === activeId);
-  const checkedCount = active?.items.filter(it => it.checked).length ?? 0;
-  const totalCount = active?.items.length ?? 0;
-  const progress = totalCount > 0 ? (checkedCount / totalCount) * 100 : 0;
-
-  const severityColor: Record<string, string> = {
-    Critical: 'var(--red)',
-    High: 'var(--orange)',
-    Medium: 'var(--yellow)',
-    Low: 'var(--muted)',
+  const toggleItem = async (item: ChecklistItem) => {
+    try {
+      await req<any>(`/checklists/items/${item.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ verified: item.verified ? 0 : 1 }),
+      });
+      if (selected) loadChecklist(selected.id);
+      load();
+    } catch (err: any) {
+      toast(`Update failed: ${err.message}`, 'error');
+    }
   };
 
   return (
-    <div style={{ display: 'flex', gap: 20, height: 'calc(100vh - 120px)' }}>
-      {/* Sidebar */}
-      <div style={{ width: 220, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600, marginBottom: 8 }}>
-          Checklists
+    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: 'var(--text)' }}>Security Checklists</h2>
+          <p style={{ fontSize: 12, color: 'var(--muted)', margin: '4px 0 0' }}>
+            Audit checklists stored in the database. Select a project and auto-verify items against its findings.
+          </p>
         </div>
-        {checklists.map(cl => {
-          const done = cl.items.filter(it => it.checked).length;
-          const total = cl.items.length;
-          return (
-            <button
-              key={cl.id}
-              onClick={() => setActiveId(cl.id)}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 4,
-                padding: '10px 12px',
-                background: activeId === cl.id ? 'var(--surface)' : 'transparent',
-                border: `1px solid ${activeId === cl.id ? 'var(--blue)' : 'var(--border)'}`,
-                borderRadius: 6,
-                cursor: 'pointer',
-                textAlign: 'left',
-              }}
-            >
-              <span style={{ fontSize: 12, fontWeight: 600, color: activeId === cl.id ? 'var(--text)' : 'var(--muted)' }}>
-                {cl.name}
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
-                  <div style={{ width: `${total > 0 ? (done / total) * 100 : 0}%`, height: '100%', background: done === total ? 'var(--green)' : 'var(--blue)', borderRadius: 2, transition: 'width 0.2s' }} />
-                </div>
-                <span style={{ fontSize: 10, color: 'var(--muted)' }}>{done}/{total}</span>
-              </div>
-            </button>
-          );
-        })}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <select value={projectId} onChange={e => setProjectId(e.target.value ? Number(e.target.value) : '')} style={selectStyle}>
+            <option value="">Select project...</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <button
+            onClick={handleVerify}
+            disabled={verifying || !selected || !projectId}
+            style={{
+              padding: '8px 14px', background: verifying ? 'var(--muted)' : 'var(--green)',
+              color: '#000', border: 'none', borderRadius: 6, fontSize: 12,
+              fontWeight: 700, cursor: verifying ? 'wait' : 'pointer',
+              opacity: (!selected || !projectId) ? 0.4 : 1,
+            }}
+          >
+            {verifying ? 'Verifying...' : 'Auto-Verify Against Project'}
+          </button>
+        </div>
       </div>
 
-      {/* Main content */}
-      {active && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
-            <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--text)' }}>{active.name}</h2>
-              <p style={{ fontSize: 12, color: 'var(--muted)', margin: '4px 0 0' }}>{active.description}</p>
+      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16, flex: 1, overflow: 'hidden' }}>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'auto' }}>
+          {loading ? (
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>Loading...</div>
+          ) : checklists.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+              No checklists loaded. Restart server to seed defaults.
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: progress === 100 ? 'var(--green)' : 'var(--text)' }}>
-                  {checkedCount}/{totalCount}
+          ) : (
+            checklists.map(cl => (
+              <div key={cl.id} onClick={() => loadChecklist(cl.id)} style={{
+                padding: '14px 16px', borderBottom: '1px solid var(--border)',
+                background: selected?.id === cl.id ? 'var(--surface-2)' : 'transparent', cursor: 'pointer',
+              }}>
+                <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600, marginBottom: 6 }}>{cl.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, height: 6, background: 'var(--bg)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', borderRadius: 3, width: `${cl.progress_pct}%`,
+                      background: cl.progress_pct === 100 ? 'var(--green)' : cl.progress_pct > 50 ? 'var(--yellow)' : 'var(--orange)',
+                      transition: 'width 0.3s',
+                    }} />
+                  </div>
+                  <span style={{ color: 'var(--muted)', fontSize: 11 }}>{cl.verified_count}/{cl.total_items}</span>
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase' }}>complete</div>
+                {cl.category && <span style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, display: 'block' }}>{cl.category}</span>}
               </div>
-              <button
-                onClick={() => resetChecklist(active.id)}
-                style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 5, padding: '5px 12px', color: 'var(--muted)', fontSize: 11, cursor: 'pointer' }}
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-
-          {/* Progress bar */}
-          <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden', flexShrink: 0 }}>
-            <div style={{ width: `${progress}%`, height: '100%', background: progress === 100 ? 'var(--green)' : 'var(--blue)', borderRadius: 2, transition: 'width 0.3s' }} />
-          </div>
-
-          {/* Items */}
-          <div style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {active.items.map(item => (
-              <label
-                key={item.id}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '12px 16px',
-                  background: item.checked ? 'var(--surface)' : 'var(--surface)',
-                  border: `1px solid ${item.checked ? 'var(--border)' : 'var(--border)'}`,
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  opacity: item.checked ? 0.6 : 1,
-                  transition: 'opacity 0.15s',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={item.checked}
-                  onChange={() => toggle(active.id, item.id)}
-                  style={{ accentColor: 'var(--green)', width: 15, height: 15, flexShrink: 0 }}
-                />
-                <span style={{
-                  flex: 1,
-                  fontSize: 13,
-                  color: item.checked ? 'var(--muted)' : 'var(--text)',
-                  textDecoration: item.checked ? 'line-through' : 'none',
-                }}>
-                  {item.label}
-                </span>
-                {item.cwe && (
-                  <code style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 3, border: '1px solid var(--border)' }}>
-                    {item.cwe}
-                  </code>
-                )}
-                {item.severity && (
-                  <span style={{
-                    fontSize: 10,
-                    fontWeight: 600,
-                    color: severityColor[item.severity] ?? 'var(--muted)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.3px',
-                    minWidth: 48,
-                    textAlign: 'right',
-                  }}>
-                    {item.severity}
-                  </span>
-                )}
-              </label>
-            ))}
-          </div>
+            ))
+          )}
         </div>
-      )}
+
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'auto' }}>
+          {!selected ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+              Select a checklist to view items.
+            </div>
+          ) : (
+            <div>
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <h3 style={{ margin: 0, color: 'var(--text)', fontSize: 16, flex: 1 }}>{selected.name}</h3>
+                <span style={{
+                  padding: '4px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600,
+                  background: selected.progress_pct === 100 ? 'var(--green)22' : 'var(--yellow)22',
+                  color: selected.progress_pct === 100 ? 'var(--green)' : 'var(--yellow)',
+                }}>
+                  {selected.progress_pct}% complete
+                </span>
+              </div>
+              <div style={{ padding: '8px 0' }}>
+                {selected.items.map(item => {
+                  const sevColor = item.severity === 'Critical' ? 'var(--red)' : item.severity === 'High' ? 'var(--orange)' : item.severity === 'Medium' ? 'var(--yellow)' : 'var(--muted)';
+                  return (
+                    <div key={item.id} style={{
+                      padding: '12px 18px', borderBottom: '1px solid var(--border)',
+                      display: 'flex', gap: 12, alignItems: 'flex-start',
+                      opacity: item.verified ? 0.7 : 1,
+                    }}>
+                      <input type="checkbox" checked={!!item.verified} onChange={() => toggleItem(item)}
+                        style={{ marginTop: 3, accentColor: 'var(--green)', cursor: 'pointer' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: 'var(--text)', fontSize: 13, textDecoration: item.verified ? 'line-through' : 'none' }}>
+                          {item.title}
+                        </div>
+                        {item.description && (
+                          <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 3, lineHeight: 1.5 }}>{item.description}</div>
+                        )}
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
+                          {item.severity && <span style={{ fontSize: 10, color: sevColor, fontWeight: 600 }}>{item.severity}</span>}
+                          {item.category && <span style={{ fontSize: 10, color: 'var(--muted)', background: 'var(--bg)', padding: '1px 6px', borderRadius: 3 }}>{item.category}</span>}
+                          {item.vuln_id && <span style={{ fontSize: 10, color: 'var(--blue)', fontFamily: 'monospace' }}>linked to #{item.vuln_id}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
+
+const selectStyle: React.CSSProperties = {
+  padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)',
+  borderRadius: 6, color: 'var(--text)', fontSize: 12, cursor: 'pointer',
+};

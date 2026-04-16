@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getStats, getVulnerabilities, getScans, getPipelines, type PipelineRun } from '@/lib/api';
+import { getStats, getVulnerabilities, getScans, getPipelines, listNotes, listDisclosures, listRuntimeJobs, type PipelineRun } from '@/lib/api';
 import type { Stats, Vulnerability, Scan } from '@/lib/types';
 import { SeverityBadge, StatusBadge, CvssScore } from '@/components/Badge';
 import { useToast } from '@/components/Toast';
@@ -60,6 +60,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const [findings, setFindings] = useState<Vulnerability[]>([]);
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [featureCounts, setFeatureCounts] = useState<{ notes: number; runtimeJobs: number; disclosures: number; pipelines: number }>({ notes: 0, runtimeJobs: 0, disclosures: 0, pipelines: 0 });
   const { toast } = useToast();
 
   const load = async () => {
@@ -73,6 +74,22 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       setStats(s);
       setFindings(v.data);
       setScans(sc);
+
+      // Load secondary counts (non-blocking, best-effort)
+      try {
+        const [nr, rr, dr, pr] = await Promise.all([
+          listNotes({}).catch(() => ({ total: 0 })),
+          listRuntimeJobs({}).catch(() => ({ total: 0 })),
+          listDisclosures().catch(() => ({ total: 0 })),
+          getPipelines().catch(() => ({ total: 0 })),
+        ]);
+        setFeatureCounts({
+          notes: nr.total || 0,
+          runtimeJobs: rr.total || 0,
+          disclosures: dr.total || 0,
+          pipelines: pr.total || 0,
+        });
+      } catch { /* ignore secondary failures */ }
     } catch (err) {
       toast(`Failed to load dashboard: ${err instanceof Error ? err.message : err}`, 'error');
     } finally {
@@ -140,6 +157,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         <StatCard label="Medium" value={loading ? '—' : (stats?.medium ?? 0)} color="var(--yellow)" />
         <StatCard label="Verified" value={loading ? '—' : (stats?.verified ?? 0)} color="var(--green)" />
         <StatCard label="Projects" value={loading ? '—' : (stats?.totalProjects ?? stats?.projects ?? 0)} color="var(--blue)" />
+      </div>
+
+      {/* Feature summary row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
+        <StatCard label="Notes" value={featureCounts.notes} color="var(--blue)" />
+        <StatCard label="Runtime Jobs" value={featureCounts.runtimeJobs} color="var(--purple)" />
+        <StatCard label="Disclosures" value={featureCounts.disclosures} color="var(--orange)" />
+        <StatCard label="Pipelines" value={featureCounts.pipelines} color="var(--green)" />
       </div>
 
       {/* Two-column layout: severity distribution + recent activity */}

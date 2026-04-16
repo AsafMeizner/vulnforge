@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getProjects, importProject, getVulnerabilities } from '@/lib/api';
+import { getProjects, importProject, importProjectFromUrl, getVulnerabilities } from '@/lib/api';
 import type { Project, Vulnerability } from '@/lib/types';
 import { SeverityBadge, StatusBadge } from '@/components/Badge';
 import { Modal } from '@/components/Modal';
@@ -231,49 +231,12 @@ export default function Projects() {
         </div>
       )}
 
-      {/* Import modal */}
-      <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Import Project" width={480}>
-        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={labelStyle}>Project Path</label>
-            <input
-              type="text"
-              placeholder="/path/to/project or C:\projects\target"
-              value={importPath}
-              onChange={e => setImportPath(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleImport()}
-              style={inputStyle}
-              autoFocus
-            />
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
-              Absolute path to the repository root. The project name will be inferred from the directory name.
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button
-              onClick={() => setImportOpen(false)}
-              style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 5, padding: '7px 16px', color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleImport}
-              disabled={importing}
-              style={{
-                background: importing ? 'var(--surface-2)' : 'var(--blue)',
-                border: 'none',
-                borderRadius: 5,
-                padding: '7px 16px',
-                color: importing ? 'var(--muted)' : '#fff',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: importing ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {importing ? 'Importing...' : 'Import'}
-            </button>
-          </div>
-        </div>
+      {/* Import modal — Local Path or Git URL */}
+      <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Import Project" width={520}>
+        <ImportProjectForm
+          onImported={() => { setImportOpen(false); loadProjects(); }}
+          onCancel={() => setImportOpen(false)}
+        />
       </Modal>
 
       {/* Finding detail modal */}
@@ -307,4 +270,97 @@ const inputStyle: React.CSSProperties = {
   fontSize: 13,
   outline: 'none',
   fontFamily: 'inherit',
+  boxSizing: 'border-box',
 };
+
+function ImportProjectForm({ onImported, onCancel }: { onImported: () => void; onCancel: () => void }) {
+  const { toast } = useToast();
+  const [mode, setMode] = useState<'path' | 'url'>('url');
+  const [localPath, setLocalPath] = useState('');
+  const [url, setUrl] = useState('');
+  const [branch, setBranch] = useState('');
+  const [importing, setImporting] = useState(false);
+
+  const handleImport = async () => {
+    setImporting(true);
+    try {
+      if (mode === 'path') {
+        if (!localPath.trim()) { toast('Path is required', 'error'); setImporting(false); return; }
+        await importProject(localPath.trim());
+      } else {
+        if (!url.trim()) { toast('URL is required', 'error'); setImporting(false); return; }
+        await importProjectFromUrl(url.trim(), branch || undefined);
+      }
+      toast('Project imported', 'success');
+      onImported();
+    } catch (err: any) {
+      toast(`Import failed: ${err.message}`, 'error');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Mode toggle */}
+      <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
+        <button onClick={() => setMode('url')} style={{
+          flex: 1, padding: '8px 0', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+          background: mode === 'url' ? 'var(--surface-2)' : 'transparent',
+          color: mode === 'url' ? 'var(--text)' : 'var(--muted)',
+        }}>Git URL</button>
+        <button onClick={() => setMode('path')} style={{
+          flex: 1, padding: '8px 0', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+          background: mode === 'path' ? 'var(--surface-2)' : 'transparent',
+          color: mode === 'path' ? 'var(--text)' : 'var(--muted)',
+        }}>Local Path</button>
+      </div>
+
+      {mode === 'url' ? (
+        <>
+          <div>
+            <label style={labelStyle}>Repository URL</label>
+            <input value={url} onChange={e => setUrl(e.target.value)}
+              placeholder="https://github.com/org/repo"
+              onKeyDown={e => e.key === 'Enter' && handleImport()}
+              autoFocus style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Branch (optional)</label>
+            <input value={branch} onChange={e => setBranch(e.target.value)}
+              placeholder="main" style={inputStyle} />
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+            The repo will be cloned, language auto-detected, and dependencies extracted.
+          </div>
+        </>
+      ) : (
+        <div>
+          <label style={labelStyle}>Project Path</label>
+          <input value={localPath} onChange={e => setLocalPath(e.target.value)}
+            placeholder="/path/to/project or C:\projects\target"
+            onKeyDown={e => e.key === 'Enter' && handleImport()}
+            autoFocus style={inputStyle} />
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+            Absolute path to an existing local repository.
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button onClick={onCancel} style={{
+          background: 'var(--surface-2)', border: '1px solid var(--border)',
+          borderRadius: 5, padding: '7px 16px', color: 'var(--text)', fontSize: 13, cursor: 'pointer',
+        }}>Cancel</button>
+        <button onClick={handleImport} disabled={importing} style={{
+          background: importing ? 'var(--surface-2)' : 'var(--blue)', border: 'none',
+          borderRadius: 5, padding: '7px 16px',
+          color: importing ? 'var(--muted)' : '#fff',
+          fontSize: 13, fontWeight: 600, cursor: importing ? 'not-allowed' : 'pointer',
+        }}>
+          {importing ? 'Importing...' : 'Import'}
+        </button>
+      </div>
+    </div>
+  );
+}
