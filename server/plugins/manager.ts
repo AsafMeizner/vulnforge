@@ -148,13 +148,17 @@ export class PluginManager {
       entry = {
         name: urlName,
         source_url: nameOrUrl,
+        website_url: nameOrUrl,
         type: 'scanner',
         description: `Installed from ${nameOrUrl}`,
+        long_description: `User-installed plugin from ${nameOrUrl}`,
         install_command: `git clone ${nameOrUrl}`,
         run_command: '',
         parse_output: 'text',
         requires: [],
         version: 'unknown',
+        category: 'user-installed',
+        stars: '—',
       };
     }
 

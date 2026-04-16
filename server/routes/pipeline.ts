@@ -86,7 +86,7 @@ router.post('/batch', async (req: Request, res: Response) => {
 
 router.get('/:id', (req: Request, res: Response) => {
   try {
-    const pipeline = getPipelineRun(req.params.id);
+    const pipeline = getPipelineRun(String(req.params.id));
     if (!pipeline) {
       res.status(404).json({ error: 'Pipeline not found' });
       return;
@@ -113,9 +113,9 @@ router.get('/', (req: Request, res: Response) => {
 
 router.post('/:id/pause', (req: Request, res: Response) => {
   try {
-    const success = pausePipeline(req.params.id);
+    const success = pausePipeline(String(req.params.id));
     if (success) {
-      res.json({ message: 'Pipeline paused', pipelineId: req.params.id });
+      res.json({ message: 'Pipeline paused', pipelineId: String(req.params.id) });
     } else {
       res.status(404).json({ error: 'Pipeline not running or not found' });
     }
@@ -128,11 +128,11 @@ router.post('/:id/pause', (req: Request, res: Response) => {
 
 router.post('/:id/resume', async (req: Request, res: Response) => {
   try {
-    const success = await resumePipeline(req.params.id);
+    const success = await resumePipeline(String(req.params.id));
     if (success) {
-      res.json({ message: 'Pipeline resumed', pipelineId: req.params.id });
+      res.json({ message: 'Pipeline resumed', pipelineId: String(req.params.id) });
     } else {
-      const pipeline = getPipelineRun(req.params.id);
+      const pipeline = getPipelineRun(String(req.params.id));
       if (!pipeline) {
         res.status(404).json({ error: 'Pipeline not found' });
       } else {
@@ -148,7 +148,7 @@ router.post('/:id/resume', async (req: Request, res: Response) => {
 
 router.delete('/:id', (req: Request, res: Response) => {
   try {
-    const success = cancelPipeline(req.params.id);
+    const success = cancelPipeline(String(req.params.id));
     if (success) {
       res.json({ message: 'Pipeline cancelled' });
     } else {

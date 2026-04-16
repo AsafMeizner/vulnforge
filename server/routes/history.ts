@@ -32,7 +32,7 @@ router.get('/cves', (req: Request, res: Response) => {
 // GET /api/history/cves/:id - single CVE
 router.get('/cves/:id', (req: Request, res: Response) => {
   try {
-    const cve = getCveIntelById(req.params.id);
+    const cve = getCveIntelById(String(req.params.id));
     if (!cve) { res.status(404).json({ error: 'CVE not found' }); return; }
     res.json({
       ...cve,
@@ -101,7 +101,7 @@ router.post('/analyze-commit', async (req: Request, res: Response) => {
 // GET /api/history/project/:id - full history for a project
 router.get('/project/:id', async (req: Request, res: Response) => {
   try {
-    const id = Number(req.params.id);
+    const id = Number(String(req.params.id));
     const project = getProjectById(id);
     if (!project) { res.status(404).json({ error: 'project not found' }); return; }
 

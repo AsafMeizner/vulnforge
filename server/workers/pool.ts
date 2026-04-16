@@ -11,6 +11,7 @@
 import { cpus } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 import cp from 'child_process';
 
 import { getDb, persistDb } from '../db.js';
@@ -39,8 +40,20 @@ export function startWorkerPool(cfg: PoolConfig = {}): void {
     console.log('[pool] not in server mode — worker pool disabled');
     return;
   }
+  // Require the compiled worker script before spawning. In dev (tsx) the
+  // .js doesn't exist and every spawn would fail with MODULE_NOT_FOUND;
+  // set VULNFORGE_WORKERS=0 or run `npm run build:server` to enable.
+  const scriptPath = path.resolve(__dirname, 'scan-worker.js');
+  if (!existsSync(scriptPath)) {
+    console.log(`[pool] compiled scan-worker.js not found at ${scriptPath} — worker pool disabled (run 'npm run build:server' for server-executor jobs)`);
+    return;
+  }
   const cores = Math.max(1, cpus().length - 1);
-  const count = Math.max(1, cfg.worker_count ?? Number(process.env.VULNFORGE_WORKERS || cores));
+  const count = Math.max(0, cfg.worker_count ?? Number(process.env.VULNFORGE_WORKERS || cores));
+  if (count === 0) {
+    console.log('[pool] worker count is 0 — pool disabled');
+    return;
+  }
   const fairness = cfg.fairness_cap ?? Math.max(1, Math.floor(count / 2));
 
   for (let i = 0; i < count; i++) {

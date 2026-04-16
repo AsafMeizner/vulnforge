@@ -64,7 +64,7 @@ router.get('/crashes', (req: Request, res: Response) => {
 // POST /api/runtime/crashes/:id/link - link a crash to a finding
 router.post('/crashes/:id/link', async (req: Request, res: Response) => {
   try {
-    const id = Number(req.params.id);
+    const id = Number(String(req.params.id));
     const { finding_id } = req.body;
     if (!finding_id) { res.status(400).json({ error: 'finding_id required' }); return; }
     const crash = getFuzzCrashById(id);
@@ -110,7 +110,7 @@ router.post('/', async (req: Request, res: Response) => {
 // GET /api/runtime/:id - job details
 router.get('/:id', (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job) { res.status(404).json({ error: 'job not found' }); return; }
     res.json(hydrate(job));
   } catch (err: any) {
@@ -122,7 +122,7 @@ router.get('/:id', (req: Request, res: Response) => {
 router.post('/:id/stop', async (req: Request, res: Response) => {
   try {
     const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
-    const ok = await runtimeJobRunner.stop(req.params.id);
+    const ok = await runtimeJobRunner.stop(String(req.params.id));
     res.json({ stopped: ok });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -132,9 +132,9 @@ router.post('/:id/stop', async (req: Request, res: Response) => {
 // DELETE /api/runtime/:id - delete job + output dir
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job) { res.status(404).json({ error: 'job not found' }); return; }
-    deleteRuntimeJob(req.params.id);
+    deleteRuntimeJob(String(req.params.id));
     if (job.output_dir) {
       try { await fs.rm(job.output_dir, { recursive: true, force: true }); } catch { /* ignore */ }
     }
@@ -147,7 +147,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 // GET /api/runtime/:id/output - tail output log
 router.get('/:id/output', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job) { res.status(404).json({ error: 'job not found' }); return; }
     if (!job.output_dir) { res.status(404).json({ error: 'no output directory' }); return; }
 
@@ -169,7 +169,7 @@ router.get('/:id/output', async (req: Request, res: Response) => {
 // GET /api/runtime/:id/crashes - per-job crashes
 router.get('/:id/crashes', (req: Request, res: Response) => {
   try {
-    const crashes = getFuzzCrashes({ job_id: req.params.id });
+    const crashes = getFuzzCrashes({ job_id: String(req.params.id) });
     res.json({ data: crashes, total: crashes.length });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -179,11 +179,11 @@ router.get('/:id/crashes', (req: Request, res: Response) => {
 // GET /api/runtime/:id/pcap - download raw pcap
 router.get('/:id/pcap', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job?.output_dir) { res.status(404).json({ error: 'not found' }); return; }
     const pcapPath = path.join(job.output_dir, 'capture.pcap');
     await fs.access(pcapPath);
-    res.download(pcapPath, `${req.params.id}.pcap`);
+    res.download(pcapPath, `${String(req.params.id)}.pcap`);
   } catch {
     res.status(404).json({ error: 'pcap not found' });
   }
@@ -192,7 +192,7 @@ router.get('/:id/pcap', async (req: Request, res: Response) => {
 // GET /api/runtime/:id/packets - parse pcap with tshark
 router.get('/:id/packets', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job?.output_dir) { res.status(404).json({ error: 'not found' }); return; }
     const pcapPath = path.join(job.output_dir, 'capture.pcap');
     try { await fs.access(pcapPath); } catch { res.json({ data: [] }); return; }
@@ -226,12 +226,12 @@ router.get('/:id/packets', async (req: Request, res: Response) => {
 // POST /api/runtime/:id/pause - pause a sandbox container
 router.post('/:id/pause', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job) { res.status(404).json({ error: 'job not found' }); return; }
     if (job.type !== 'sandbox') { res.status(400).json({ error: 'only sandbox jobs can be paused' }); return; }
 
     const { updateRuntimeJob } = await import('../db.js');
-    updateRuntimeJob(req.params.id, { status: 'paused' });
+    updateRuntimeJob(String(req.params.id), { status: 'paused' });
     // The executor polling loop will detect the status change and call docker pause
     res.json({ paused: true });
   } catch (err: any) {
@@ -242,11 +242,11 @@ router.post('/:id/pause', async (req: Request, res: Response) => {
 // POST /api/runtime/:id/resume - resume a paused sandbox
 router.post('/:id/resume', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job) { res.status(404).json({ error: 'job not found' }); return; }
 
     const { updateRuntimeJob } = await import('../db.js');
-    updateRuntimeJob(req.params.id, { status: 'running' });
+    updateRuntimeJob(String(req.params.id), { status: 'running' });
     res.json({ resumed: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -256,7 +256,7 @@ router.post('/:id/resume', async (req: Request, res: Response) => {
 // POST /api/runtime/:id/snapshot - create a named snapshot
 router.post('/:id/snapshot', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
 
     const stats = JSON.parse(job.stats || '{}');
@@ -270,7 +270,7 @@ router.post('/:id/snapshot', async (req: Request, res: Response) => {
 
     const tag = await dockerSnapshot(stats.container_id, name);
     const snapId = createSandboxSnapshot({
-      job_id: req.params.id,
+      job_id: String(req.params.id),
       name,
       type: stats.sandbox_type || 'docker',
       description,
@@ -286,7 +286,7 @@ router.post('/:id/snapshot', async (req: Request, res: Response) => {
 router.get('/:id/snapshots', (req: Request, res: Response) => {
   try {
     const { getSandboxSnapshots } = require('../db.js');
-    const snaps = getSandboxSnapshots(req.params.id);
+    const snaps = getSandboxSnapshots(String(req.params.id));
     res.json({ data: snaps, total: snaps.length });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -296,7 +296,7 @@ router.get('/:id/snapshots', (req: Request, res: Response) => {
 // GET /api/runtime/:id/processes - list running processes
 router.get('/:id/processes', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
 
     const stats = JSON.parse(job.stats || '{}');
@@ -313,7 +313,7 @@ router.get('/:id/processes', async (req: Request, res: Response) => {
 // GET /api/runtime/:id/resources - live resource stats
 router.get('/:id/resources', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
 
     const stats = JSON.parse(job.stats || '{}');
@@ -330,7 +330,7 @@ router.get('/:id/resources', async (req: Request, res: Response) => {
 // POST /api/runtime/:id/upload - upload file into sandbox
 router.post('/:id/upload', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
 
     const stats = JSON.parse(job.stats || '{}');
@@ -350,7 +350,7 @@ router.post('/:id/upload', async (req: Request, res: Response) => {
 // GET /api/runtime/:id/download/:path - download file from sandbox
 router.get('/:id/download/*', async (req: Request, res: Response) => {
   try {
-    const job = getRuntimeJobById(req.params.id);
+    const job = getRuntimeJobById(String(req.params.id));
     if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
 
     const stats = JSON.parse(job.stats || '{}');

@@ -68,7 +68,7 @@ export interface VerifyResult {
 
 export function verifyAccessToken(token: string): VerifyResult {
   try {
-    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] }) as AccessTokenClaims;
+    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] }) as unknown as AccessTokenClaims;
     if (typeof decoded !== 'object' || typeof decoded.sub !== 'number') {
       return { ok: false, error: 'malformed' };
     }

@@ -69,7 +69,7 @@ router.get('/', (req: Request, res: Response) => {
     }
 
     const scopeIdResult = parseScopeId(scope, req.query.scope_id);
-    if (!scopeIdResult.ok) {
+    if (scopeIdResult.ok === false) {
       res.status(400).json({ error: scopeIdResult.error });
       return;
     }
@@ -99,7 +99,7 @@ router.post('/', (req: Request, res: Response) => {
     }
 
     const scopeIdResult = parseScopeId(scope, rawScopeId);
-    if (!scopeIdResult.ok) {
+    if (scopeIdResult.ok === false) {
       res.status(400).json({ error: scopeIdResult.error });
       return;
     }
@@ -142,7 +142,7 @@ router.delete('/', (req: Request, res: Response) => {
     }
 
     const scopeIdResult = parseScopeId(scope, req.query.scope_id);
-    if (!scopeIdResult.ok) {
+    if (scopeIdResult.ok === false) {
       res.status(400).json({ error: scopeIdResult.error });
       return;
     }
@@ -175,7 +175,7 @@ router.post('/clear', (req: Request, res: Response) => {
     }
 
     const scopeIdResult = parseScopeId(scope, rawScopeId);
-    if (!scopeIdResult.ok) {
+    if (scopeIdResult.ok === false) {
       res.status(400).json({ error: scopeIdResult.error });
       return;
     }

@@ -103,8 +103,8 @@ export function buildCallGraph(projectPath: string): CallGraphEdge[] {
 
   function scanDir(dir: string, depth: number): void {
     if (depth > 5) return;
-    let entries: ReturnType<typeof readdirSync>;
-    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    let entries: import('fs').Dirent[];
+    try { entries = readdirSync(dir, { withFileTypes: true, encoding: 'utf8' }); } catch { return; }
 
     for (const entry of entries) {
       if (SKIP_DIRS.has(entry.name) || entry.name.startsWith('.')) continue;

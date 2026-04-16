@@ -14,10 +14,17 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from './jwt.js';
 
+/**
+ * Union-shape user object attached to req.user by any auth path.
+ * `device_id` is present on JWT-session flow (subsystem B13.4) but absent
+ * from the legacy phase 14/15 API-token flow; `username` is the opposite.
+ * Keeping both optional means one augmentation works for both middlewares.
+ */
 export interface AuthedUser {
   id: number;
   role: string;
-  device_id: string;
+  device_id?: string;
+  username?: string;
 }
 
 declare global {

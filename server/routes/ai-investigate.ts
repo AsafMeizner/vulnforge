@@ -26,7 +26,7 @@ router.get('/sessions', (_req: Request, res: Response) => {
 
 router.get('/sessions/:id', (req: Request, res: Response) => {
   try {
-    const session = getInvestigation(req.params.id);
+    const session = getInvestigation(String(req.params.id));
     if (!session) { res.status(404).json({ error: 'session not found' }); return; }
     res.json(session);
   } catch (err: any) {
@@ -47,7 +47,7 @@ router.post('/sessions', async (req: Request, res: Response) => {
 
 router.post('/sessions/:id/next-step', async (req: Request, res: Response) => {
   try {
-    const step = await proposeNextStep(req.params.id);
+    const step = await proposeNextStep(String(req.params.id));
     res.json(step);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -56,7 +56,7 @@ router.post('/sessions/:id/next-step', async (req: Request, res: Response) => {
 
 router.post('/sessions/:id/execute/:step', async (req: Request, res: Response) => {
   try {
-    const step = await executeStep(req.params.id, Number(req.params.step));
+    const step = await executeStep(String(req.params.id), Number(req.params.step));
     res.json(step);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -65,7 +65,7 @@ router.post('/sessions/:id/execute/:step', async (req: Request, res: Response) =
 
 router.post('/sessions/:id/reject/:step', (req: Request, res: Response) => {
   try {
-    const step = rejectStep(req.params.id, Number(req.params.step), req.body?.reason);
+    const step = rejectStep(String(req.params.id), Number(req.params.step), req.body?.reason);
     res.json(step);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -74,7 +74,7 @@ router.post('/sessions/:id/reject/:step', (req: Request, res: Response) => {
 
 router.post('/sessions/:id/cancel', (req: Request, res: Response) => {
   try {
-    cancelInvestigation(req.params.id);
+    cancelInvestigation(String(req.params.id));
     res.json({ cancelled: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

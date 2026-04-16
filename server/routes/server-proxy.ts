@@ -39,11 +39,15 @@ router.post('/ai/invoke', async (req: Request, res: Response) => {
     if (!provider) return res.status(404).json({ error: `no server AI capability: ${capability}` });
     if (!provider.enabled) return res.status(409).json({ error: 'capability disabled' });
 
-    // Delegate to existing AI runtime. Import lazily so this file stays
-    // loadable in tests without the whole AI stack.
+    // Delegate to existing AI runtime. Lazy string-ref import so TS doesn't
+    // resolve at compile time — the module name is picked per deployment and
+    // may not exist until the AI stack is wired.
     let runtimeModule: any;
-    try { runtimeModule = await import('../ai/runtime.js'); }
-    catch (e: any) {
+    try {
+      const mod = '../ai/runtime.js';
+      // @ts-ignore — dynamic, resolved at runtime only
+      runtimeModule = await import(mod);
+    } catch (e: any) {
       return res.status(500).json({ error: `ai runtime unavailable: ${e.message}` });
     }
     const invoke = runtimeModule.invokeProvider || runtimeModule.default;

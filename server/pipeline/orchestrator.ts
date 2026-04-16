@@ -350,7 +350,7 @@ async function runPipelineAsync(
   // Wait for all scan jobs to complete
   emit('Running scans', `Waiting for ${scanJobIds.length} tool scans to complete...`, 36);
 
-  await waitForScansComplete(scanQueue, pipelineId, scanJobIds, emit, isCancelled);
+  await waitForScansComplete(scanQueue, pipelineId, scanJobIds, emit, () => checkState() === 'cancelled');
 
   if (shouldStop()) return abortPipeline(pipelineId, checkState());
 
@@ -466,7 +466,13 @@ async function runPipelineAsync(
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function abortPipeline(pipelineId: string, state: 'paused' | 'cancelled'): void {
+function abortPipeline(pipelineId: string, state: 'run' | 'paused' | 'cancelled'): void {
+  // Defensive no-op: callers check shouldStop() before hitting abort, but
+  // typing-wise checkState() can return 'run' too. Treat 'run' as a bug.
+  if (state === 'run') {
+    console.warn(`[orchestrator] abortPipeline called with state='run' (pipelineId=${pipelineId}) — skipping`);
+    return;
+  }
   if (state === 'paused') {
     // Paused — keep status as 'paused', don't set completedAt (it's resumable)
     updatePipelineRun(pipelineId, { status: 'paused' });
@@ -678,6 +684,7 @@ async function resumePipelineAsync(
     try {
       const pendingAfterFilter = getScanFindings({ pipeline_id: pipelineId, status: 'pending' });
       const { filterUnreachableDeps } = await import('./dep-reachability.js');
+      const { updateScanFinding } = await import('../db.js');
       const depResult = filterUnreachableDeps(pendingAfterFilter, projectPath);
       if (depResult.rejected.length > 0) {
         for (const r of depResult.rejected) {

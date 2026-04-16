@@ -65,8 +65,7 @@ ${stdout}
 === stderr ===
 ${stderr}`);
 
-    const resultLine = stdout.split('
-').find(l => l.startsWith('VULNFORGE_RESULT:'));
+    const resultLine = stdout.split('\n').find(l => l.startsWith('VULNFORGE_RESULT:'));
     if (resultLine) {
       try {
         const data = JSON.parse(resultLine.slice('VULNFORGE_RESULT:'.length));
@@ -143,7 +142,6 @@ ${stderr}`);
       'except Exception as e:',
       '    print(json.dumps({"error": str(e)}))',
       '    sys.exit(1)',
-    ].join('
-');
+    ].join('\n');
   }
 }

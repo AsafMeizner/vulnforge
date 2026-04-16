@@ -92,7 +92,7 @@ router.get('/:name/callback', async (req: Request, res: Response) => {
       String(code),
       String(state),
     );
-    if (!outcome.ok) return res.status(400).send(renderError(outcome.error));
+    if (outcome.ok === false) return res.status(400).send(renderError(outcome.error));
 
     // Render a tiny HTML page telling the user to paste the code into their desktop.
     res.type('html').send(renderPastePage(outcome.one_time_code, outcome.email));

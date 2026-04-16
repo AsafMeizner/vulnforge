@@ -19,17 +19,12 @@ import { ulid } from '../utils/ulid.js';
 export const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const REFRESH_BCRYPT_COST = 6; // low cost — tokens already have 256 bits of entropy
 
-export interface RefreshTokenRow {
-  id?: number;
-  user_id: number;
-  token_hash: string;
-  device_id: string;
-  device_name: string;
-  expires_at: number;
-  revoked: 0 | 1;
-  created_at: number;
-  last_used_at: number | null;
-}
+/**
+ * Refresh-token row shape — imported from db.ts to keep the two CRUD
+ * surfaces aligned. Re-exported here so callers can pick either module.
+ */
+export type { RefreshTokenRow } from '../db.js';
+import type { RefreshTokenRow } from '../db.js';
 
 /** Generate a fresh refresh token + device_id on first login for a device. */
 export function mintRefreshToken(): { raw: string; expires_at: number } {

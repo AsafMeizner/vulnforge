@@ -219,7 +219,7 @@ router.get('/me', (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ error: 'not authenticated' });
   const user = getUserById(req.user.id);
   if (!user) return res.status(404).json({ error: 'user not found' });
-  res.json({ ...sanitizeUser(user), device_id: req.user.device_id });
+  res.json({ ...sanitizeUser(user), device_id: req.user.device_id ?? null });
 });
 
 export default router;

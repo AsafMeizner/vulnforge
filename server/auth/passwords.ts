@@ -36,12 +36,12 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
 }
 
 /** Cheap check — does a stored value look like a bcrypt hash? */
-export function isBcryptHash(value: unknown): value is string {
+export function isBcryptHash(value: unknown): boolean {
   return typeof value === 'string' && /^\$2[aby]\$\d{2}\$/.test(value);
 }
 
 /** Looks like the legacy scrypt format `hex_salt:hex_hash` used by server/auth/auth.ts. */
-export function isScryptHash(value: unknown): value is string {
+export function isScryptHash(value: unknown): boolean {
   if (typeof value !== 'string') return false;
   const parts = value.split(':');
   if (parts.length !== 2) return false;

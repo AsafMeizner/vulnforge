@@ -67,7 +67,12 @@ import exportRouter from './routes/export.js';
 import { setupMcpServer } from './mcp/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+// VULNFORGE_PORT takes precedence over PORT (matches docker-compose + install scripts).
+const PORT = process.env.VULNFORGE_PORT
+  ? parseInt(process.env.VULNFORGE_PORT)
+  : process.env.PORT
+  ? parseInt(process.env.PORT)
+  : 3001;
 const HEADLESS = process.env.VULNFORGE_HEADLESS === '1' || process.argv.includes('--headless');
 
 async function main(): Promise<void> {
