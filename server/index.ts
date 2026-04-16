@@ -5,8 +5,8 @@ import { fileURLToPath } from 'url';
 import path from 'path';
 
 import { initDb } from './db.js';
-import { initWebSocket } from './ws.js';
-import { initSyncWebSocket } from './sync/ws.js';
+import { initWebSocket, getWsServer } from './ws.js';
+import { initSyncWebSocket, getSyncWsServer } from './sync/ws.js';
 
 // Routes
 import vulnerabilitiesRouter from './routes/vulnerabilities.js';
@@ -513,6 +513,24 @@ Be technical, precise, and actionable.`;
   // ── WebSocket ─────────────────────────────────────────────────────────
   initWebSocket(server);
   initSyncWebSocket(server);
+
+  // Single upgrade-handler dispatches by path — avoids the ws library's
+  // "first WSS grabs every upgrade" conflict when two WSS instances share
+  // one HTTP server.
+  server.on('upgrade', (req, socket, head) => {
+    const { pathname } = new URL(req.url || '', 'http://localhost');
+    const wss = pathname === '/ws' ? getWsServer()
+              : pathname === '/sync' ? getSyncWsServer()
+              : null;
+    if (!wss) {
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket as any, head, (ws) => {
+      wss.emit('connection', ws, req);
+    });
+  });
+  console.log('[WS] Upgrade dispatcher registered for /ws + /sync');
   console.log('[WS] WebSocket server initialized at /ws');
 
   // ── MCP server via SSE at /mcp ────────────────────────────────────────

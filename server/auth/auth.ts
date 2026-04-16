@@ -10,6 +10,7 @@
 import crypto from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 import {
+  getUserById,
   getUserByUsername,
   getApiTokenByValue,
   countUsers,
@@ -17,6 +18,7 @@ import {
   updateUser,
   type UserRow,
 } from '../db.js';
+import { verifyAccessToken } from './jwt.js';
 
 // ── Password hashing ───────────────────────────────────────────────────────
 
@@ -63,6 +65,16 @@ export interface AuthenticatedRequest extends Request {
 /**
  * Auth middleware — checks for Bearer token or session.
  * If no users exist (fresh install), all requests pass through.
+ *
+ * Bearer token resolution order (added subsystem B13.4):
+ *   1. JWT access token (signed by server/auth/jwt.ts)
+ *   2. Long-lived API token (legacy api_tokens row)
+ *   3. Fall through to anonymous viewer
+ *
+ * This order matters because JWT tokens and API tokens share the same
+ * `Authorization: Bearer <...>` header slot. JWTs are always 3 dot-separated
+ * base64url segments and far longer than `vf_<hex>` tokens, so there's no
+ * ambiguity in practice.
  */
 export function authMiddleware(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
   // Skip auth if no users configured (single-user mode)
@@ -76,24 +88,33 @@ export function authMiddleware(req: AuthenticatedRequest, _res: Response, next: 
     return next(); // DB not ready yet
   }
 
-  // Check Bearer token
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
+
+    // 1. Try JWT first (new session flow).
+    try {
+      const result = verifyAccessToken(token);
+      if (result.ok && result.claims) {
+        const user = getUserById(result.claims.sub);
+        if (user) {
+          req.user = { id: user.id!, username: user.username, role: user.role };
+          return next();
+        }
+      }
+    } catch { /* fall through to API-token path */ }
+
+    // 2. Try legacy API token row.
     const tokenRow = getApiTokenByValue(token);
     if (tokenRow) {
-      // Check expiry
-      if (tokenRow.expires_at && new Date(tokenRow.expires_at) < new Date()) {
-        // Token expired — fall through to deny
-      } else {
+      if (!tokenRow.expires_at || new Date(tokenRow.expires_at) >= new Date()) {
         req.user = { id: tokenRow.user_id, username: tokenRow.username, role: tokenRow.role };
         return next();
       }
     }
   }
 
-  // No valid auth — in multi-user mode, allow read-only access for unauthenticated
-  // (specific routes can check role for write operations)
+  // No valid auth — allow read-only anonymous; write routes gate via RBAC.
   req.user = { id: 0, username: 'anonymous', role: 'viewer' };
   next();
 }

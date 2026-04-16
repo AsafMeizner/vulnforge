@@ -43,6 +43,7 @@ import {
   evaluateRefreshRow,
   REFRESH_TTL_MS,
 } from '../auth/refresh.js';
+import { requireAuth } from '../auth/middleware.js';
 
 const router = Router();
 
@@ -213,9 +214,11 @@ router.post('/bootstrap', async (req: Request, res: Response) => {
 });
 
 // ── GET /me ────────────────────────────────────────────────────────────────
-// Mount this one behind the auth middleware.
+// requireAuth applied inline because this router is mounted BEFORE the
+// global auth middleware (so /login and /bootstrap can pass unauthenticated).
+// Without this, req.user would never be populated from the Bearer token.
 
-router.get('/me', (req: Request, res: Response) => {
+router.get('/me', requireAuth, (req: Request, res: Response) => {
   if (!req.user) return res.status(401).json({ error: 'not authenticated' });
   const user = getUserById(req.user.id);
   if (!user) return res.status(404).json({ error: 'user not found' });

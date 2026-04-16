@@ -12,7 +12,10 @@ const subscriptions = new Map<string, Set<WebSocket>>();
 // ── Init ───────────────────────────────────────────────────────────────────
 
 export function initWebSocket(server: Server): WebSocketServer {
-  wss = new WebSocketServer({ server, path: '/ws' });
+  // noServer: true so we don't fight server/sync/ws.ts over /sync upgrades.
+  // server/index.ts dispatches /ws + /sync through a single upgrade handler.
+  wss = new WebSocketServer({ noServer: true });
+  void server; // signature kept for backward compatibility
 
   wss.on('connection', (ws: WebSocket) => {
     clients.add(ws);
@@ -86,6 +89,8 @@ export function initWebSocket(server: Server): WebSocketServer {
 // ── Broadcast helpers ──────────────────────────────────────────────────────
 
 /** Send a message to every connected client. */
+export function getWsServer(): WebSocketServer | null { return wss; }
+
 export function broadcast(msg: object): void {
   const payload = JSON.stringify(msg);
   for (const ws of clients) {

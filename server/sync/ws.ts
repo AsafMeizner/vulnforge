@@ -50,8 +50,12 @@ function extractToken(req: IncomingMessage): string | null {
   return null;
 }
 
+export function getSyncWsServer(): WebSocketServer | null { return syncWss; }
+
 export function initSyncWebSocket(server: Server): WebSocketServer {
-  syncWss = new WebSocketServer({ server, path: '/sync' });
+  // noServer — server/index.ts dispatches /ws + /sync through one upgrade handler.
+  syncWss = new WebSocketServer({ noServer: true });
+  void server;
 
   syncWss.on('connection', async (ws: AuthedWs, req: IncomingMessage) => {
     const token = extractToken(req);
