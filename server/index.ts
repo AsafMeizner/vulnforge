@@ -42,6 +42,7 @@ import aiInvestigateRouter from './routes/ai-investigate.js';
 // Auth + RBAC (Phase 14)
 import authRouter from './routes/auth.js';
 import authSessionRouter from './routes/auth-session.js';
+import syncRouter from './routes/sync.js';
 import { authMiddleware } from './auth/auth.js';
 
 // Teach Mode + Pattern Mining (Phase 15)
@@ -160,6 +161,7 @@ async function main(): Promise<void> {
   app.use('/api/teach', teachRouter);
   app.use('/api/integrations', integrationsRouter);
   app.use('/api/disclosure', disclosureRouter);
+  app.use('/api/sync', syncRouter);
   app.use('/api/export', exportRouter);
 
   // Runtime executors init (after DB ready)
