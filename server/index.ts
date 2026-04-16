@@ -44,6 +44,10 @@ import aiInvestigateRouter from './routes/ai-investigate.js';
 import authRouter from './routes/auth.js';
 import authSessionRouter from './routes/auth-session.js';
 import syncRouter from './routes/sync.js';
+import serverProxyRouter from './routes/server-proxy.js';
+import jobsRouter from './routes/jobs.js';
+import poolRouter from './routes/pool.js';
+import { startWorkerPool } from './workers/pool.js';
 import { authMiddleware } from './auth/auth.js';
 
 // Teach Mode + Pattern Mining (Phase 15)
@@ -163,6 +167,14 @@ async function main(): Promise<void> {
   app.use('/api/integrations', integrationsRouter);
   app.use('/api/disclosure', disclosureRouter);
   app.use('/api/sync', syncRouter);
+  app.use('/api/server', serverProxyRouter);
+  app.use('/api/jobs', jobsRouter);
+  app.use('/api/pool', poolRouter);
+
+  // Start the worker pool — no-op in desktop mode.
+  try { startWorkerPool(); } catch (e: any) {
+    console.warn('[pool] startup failed:', e.message);
+  }
   app.use('/api/export', exportRouter);
 
   // Runtime executors init (after DB ready)

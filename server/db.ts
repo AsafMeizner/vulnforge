@@ -921,6 +921,15 @@ function migrateSchema(): void {
     "ALTER TABLE scan_findings ADD COLUMN suggested_fix TEXT DEFAULT ''",
   ];
 
+  // Subsystem B: capability tables (ai_providers + integrations) pick up
+  // a `source` column so clients can distinguish locally-configured from
+  // server-exposed entries. `task_tags` on ai_providers feeds the manifest.
+  migrations.push(
+    `ALTER TABLE ai_providers ADD COLUMN source TEXT NOT NULL DEFAULT 'local'`,
+    `ALTER TABLE ai_providers ADD COLUMN task_tags TEXT DEFAULT '[]'`,
+    `ALTER TABLE integrations ADD COLUMN source TEXT NOT NULL DEFAULT 'local'`,
+  );
+
   // Subsystem B: sync columns on every syncable table.
   // `sync_scope` (not `scope`) because session_state already uses `scope`.
   for (const table of SYNC_ENABLED_TABLES) {
