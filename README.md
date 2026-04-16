@@ -5,7 +5,7 @@
 
 <p align="center">
   <strong>AI-powered vulnerability research platform.</strong><br>
-  Find, triage, verify, exploit, and report security vulnerabilities in open-source and proprietary software — all from one app.
+  Find, triage, verify, exploit, and report security vulnerabilities all from one open-source app.
 </p>
 
 <p align="center">
