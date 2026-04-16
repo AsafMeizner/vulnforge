@@ -648,6 +648,33 @@ function createTables(): void {
     )
   `);
 
+  // User Accounts + RBAC (Phase 14)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT DEFAULT 'researcher',
+      display_name TEXT,
+      email TEXT,
+      active INTEGER DEFAULT 1,
+      last_login TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS api_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      name TEXT,
+      expires_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
   // Sandbox Snapshots (VM integration)
   db.run(`
     CREATE TABLE IF NOT EXISTS sandbox_snapshots (
@@ -659,6 +686,36 @@ function createTables(): void {
       size_bytes INTEGER DEFAULT 0,
       description TEXT,
       FOREIGN KEY (job_id) REFERENCES runtime_jobs(id)
+    )
+  `);
+
+  // Teach Mode + Pattern Mining (Phase 15)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS teach_examples (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      finding_id INTEGER,
+      action TEXT NOT NULL,
+      reasoning TEXT,
+      pattern_extracted TEXT,
+      code_context TEXT,
+      user_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (finding_id) REFERENCES vulnerabilities(id)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS learned_patterns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      source_finding_id INTEGER,
+      pattern_type TEXT,
+      grep_pattern TEXT,
+      description TEXT,
+      confidence REAL DEFAULT 0.5,
+      times_matched INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (source_finding_id) REFERENCES vulnerabilities(id)
     )
   `);
 
@@ -1434,6 +1491,54 @@ export interface DisclosureEventRow {
   description?: string;
 }
 
+// ── User Accounts (Phase 14) ──────────────────────────────────────────────
+
+export interface UserRow {
+  id?: number;
+  username: string;
+  password_hash: string;
+  role: 'admin' | 'researcher' | 'viewer';
+  display_name?: string;
+  email?: string;
+  active?: number;
+  last_login?: string;
+  created_at?: string;
+}
+
+export interface ApiTokenRow {
+  id?: number;
+  user_id: number;
+  token: string;
+  name?: string;
+  expires_at?: string;
+  created_at?: string;
+}
+
+// ── Teach Mode + Pattern Mining (Phase 15) ───────────────────────────────
+
+export interface TeachExampleRow {
+  id?: number;
+  finding_id?: number;
+  action: string;                  // confirmed | rejected | false_positive
+  reasoning?: string;
+  pattern_extracted?: string;
+  code_context?: string;
+  user_id?: number;
+  created_at?: string;
+}
+
+export interface LearnedPatternRow {
+  id?: number;
+  name: string;
+  source_finding_id?: number;
+  pattern_type?: string;
+  grep_pattern?: string;
+  description?: string;
+  confidence?: number;
+  times_matched?: number;
+  created_at?: string;
+}
+
 export interface AuditLogRow {
   id?: number;
   ts?: string;
@@ -2037,6 +2142,125 @@ export function logAudit(entry: AuditLogRow): void {
       entry.details || null,
     ]
   );
+}
+
+// ── Users CRUD ──────────────────────────────────────────────────────────
+
+export function getUsers(): UserRow[] {
+  return execQuery('SELECT id, username, role, display_name, email, active, last_login, created_at FROM users ORDER BY created_at') as unknown as UserRow[];
+}
+
+export function getUserById(id: number): UserRow | null {
+  const rows = execQuery('SELECT * FROM users WHERE id = ?', [id]);
+  return rows[0] as UserRow || null;
+}
+
+export function getUserByUsername(username: string): UserRow | null {
+  const rows = execQuery('SELECT * FROM users WHERE username = ?', [username]);
+  return rows[0] as UserRow || null;
+}
+
+export function createUser(u: UserRow): number {
+  return execRun(
+    'INSERT INTO users (username, password_hash, role, display_name, email, active) VALUES (?, ?, ?, ?, ?, ?)',
+    [u.username, u.password_hash, u.role || 'researcher', u.display_name || null, u.email || null, u.active ?? 1]
+  );
+}
+
+export function updateUser(id: number, updates: Partial<UserRow>): void {
+  const exclude = ['id', 'created_at', 'password_hash'];
+  const fields = Object.keys(updates).filter(k => !exclude.includes(k));
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(`UPDATE users SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
+}
+
+export function updateUserPassword(id: number, hash: string): void {
+  db.run('UPDATE users SET password_hash = ? WHERE id = ?', [hash, id]);
+  persistDb();
+}
+
+export function deleteUser(id: number): void {
+  db.run('DELETE FROM api_tokens WHERE user_id = ?', [id]);
+  db.run('DELETE FROM users WHERE id = ?', [id]);
+  persistDb();
+}
+
+export function countUsers(): number {
+  const rows = execQuery('SELECT COUNT(*) as c FROM users');
+  return (rows[0]?.c as number) || 0;
+}
+
+// ── API Tokens ──────────────────────────────────────────────────────────
+
+export function getApiTokensByUser(userId: number): ApiTokenRow[] {
+  return execQuery(
+    'SELECT id, user_id, token, name, expires_at, created_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC',
+    [userId]
+  ) as unknown as ApiTokenRow[];
+}
+
+export function getApiTokenByValue(token: string): (ApiTokenRow & { username: string; role: string }) | null {
+  const rows = execQuery(
+    'SELECT t.*, u.username, u.role FROM api_tokens t JOIN users u ON t.user_id = u.id WHERE t.token = ? AND u.active = 1',
+    [token]
+  );
+  return rows[0] as any || null;
+}
+
+export function createApiToken(t: ApiTokenRow): number {
+  return execRun(
+    'INSERT INTO api_tokens (user_id, token, name, expires_at) VALUES (?, ?, ?, ?)',
+    [t.user_id, t.token, t.name || null, t.expires_at || null]
+  );
+}
+
+export function deleteApiToken(id: number): void {
+  db.run('DELETE FROM api_tokens WHERE id = ?', [id]);
+  persistDb();
+}
+
+// ── Teach Examples CRUD ─────────────────────────────────────────────────
+
+export function getTeachExamples(filters: { finding_id?: number; action?: string; limit?: number } = {}): TeachExampleRow[] {
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (filters.finding_id !== undefined) { conds.push('finding_id = ?'); params.push(filters.finding_id); }
+  if (filters.action) { conds.push('action = ?'); params.push(filters.action); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  const limit = filters.limit || 200;
+  return execQuery(`SELECT * FROM teach_examples ${where} ORDER BY created_at DESC LIMIT ${limit}`, params) as unknown as TeachExampleRow[];
+}
+
+export function createTeachExample(e: TeachExampleRow): number {
+  return execRun(
+    'INSERT INTO teach_examples (finding_id, action, reasoning, pattern_extracted, code_context, user_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [e.finding_id ?? null, e.action, e.reasoning || null, e.pattern_extracted || null, e.code_context || null, e.user_id ?? null]
+  );
+}
+
+// ── Learned Patterns CRUD ───────────────────────────────────────────────
+
+export function getLearnedPatterns(): LearnedPatternRow[] {
+  return execQuery('SELECT * FROM learned_patterns ORDER BY confidence DESC, times_matched DESC') as unknown as LearnedPatternRow[];
+}
+
+export function createLearnedPattern(p: LearnedPatternRow): number {
+  return execRun(
+    'INSERT INTO learned_patterns (name, source_finding_id, pattern_type, grep_pattern, description, confidence) VALUES (?, ?, ?, ?, ?, ?)',
+    [p.name, p.source_finding_id ?? null, p.pattern_type || null, p.grep_pattern || null, p.description || null, p.confidence ?? 0.5]
+  );
+}
+
+export function updateLearnedPattern(id: number, updates: Partial<LearnedPatternRow>): void {
+  const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(`UPDATE learned_patterns SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
 }
 
 export function deleteSessionState(scope: string, scope_id: number | null, key?: string): void {

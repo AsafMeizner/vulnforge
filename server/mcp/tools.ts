@@ -2337,6 +2337,87 @@ export const mcpTools: MCPToolDef[] = [
     },
   },
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // TEACH MODE + PATTERN MINING TOOLS (Phase 15)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'teach_from_decision',
+    description: 'Record a user decision on a finding (confirmed/rejected/false_positive) and optionally learn a reusable pattern from it. The AI extracts a grep pattern from confirmed findings for variant hunting.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        finding_id: { type: 'number' },
+        action: { type: 'string', enum: ['confirmed', 'rejected', 'false_positive'] },
+        reasoning: { type: 'string', description: 'Why you made this decision (stored for training)' },
+      },
+      required: ['finding_id', 'action'],
+    },
+    handler: async (args: any) => {
+      const { teachFromDecision } = await import('../pipeline/ai/teach.js');
+      return await teachFromDecision({
+        findingId: args.finding_id,
+        action: args.action,
+        reasoning: args.reasoning,
+      });
+    },
+  },
+
+  {
+    name: 'list_learned_patterns',
+    description: 'List all patterns learned from confirmed findings. These are automatically used in future scans.',
+    inputSchema: { type: 'object', properties: {} },
+    handler: async () => {
+      const { getPatterns } = await import('../pipeline/ai/teach.js');
+      const patterns = getPatterns();
+      return { patterns, total: patterns.length };
+    },
+  },
+
+  {
+    name: 'run_learned_patterns',
+    description: 'Run all learned patterns against a project to find new instances of previously confirmed bug classes.',
+    inputSchema: {
+      type: 'object',
+      properties: { project_id: { type: 'number' } },
+      required: ['project_id'],
+    },
+    handler: async (args: any) => {
+      const { getProjectById } = await import('../db.js');
+      const project = getProjectById(args.project_id);
+      if (!project?.path) throw new Error('Project has no local path');
+      const { runLearnedPatterns } = await import('../pipeline/ai/teach.js');
+      const results = await runLearnedPatterns(project.path);
+      return {
+        results: results.map(r => ({ pattern_name: r.pattern.name, matches: r.matches.length, first_match: r.matches[0] })),
+        total_patterns: results.length,
+        total_matches: results.reduce((n, r) => n + r.matches.length, 0),
+      };
+    },
+  },
+
+  {
+    name: 'validate_poc_in_sandbox',
+    description: 'Run an exploit from the workbench inside a Docker sandbox to validate it works. Returns exit code + output.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        exploit_id: { type: 'number' },
+        target_image: { type: 'string', description: 'Docker image to run in (default: ubuntu:22.04)' },
+        timeout: { type: 'number', description: 'Seconds (default: 30)' },
+      },
+      required: ['exploit_id'],
+    },
+    handler: async (args: any) => {
+      const { validatePoCInSandbox } = await import('../pipeline/ai/teach.js');
+      return await validatePoCInSandbox({
+        exploitId: args.exploit_id,
+        targetImage: args.target_image,
+        timeout: args.timeout,
+      });
+    },
+  },
+
   {
     name: 'get_vm_screenshot',
     description: 'Get the latest screenshot from a QEMU VM (VNC screen capture). Returns the file path. Future: will return base64 image for AI vision.',

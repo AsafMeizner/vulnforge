@@ -39,6 +39,13 @@ import exploitsRouter from './routes/exploits.js';
 // AI Copilot Upgrade (Theme 8)
 import aiInvestigateRouter from './routes/ai-investigate.js';
 
+// Auth + RBAC (Phase 14)
+import authRouter from './routes/auth.js';
+import { authMiddleware } from './auth/auth.js';
+
+// Teach Mode + Pattern Mining (Phase 15)
+import teachRouter from './routes/teach.js';
+
 // Disclosure & Bounty Ops (Theme 5)
 import disclosureRouter from './routes/disclosure.js';
 
@@ -109,8 +116,15 @@ async function main(): Promise<void> {
   app.use('/api/session', sessionRouter);
   app.use('/api/runtime', runtimeRouter);
   app.use('/api/history', historyRouter);
+  // Auth routes (no middleware — they handle their own auth)
+  app.use('/api/auth', authRouter);
+
+  // Apply auth middleware to all subsequent API routes
+  app.use('/api', authMiddleware as any);
+
   app.use('/api/exploits', exploitsRouter);
   app.use('/api/ai-investigate', aiInvestigateRouter);
+  app.use('/api/teach', teachRouter);
   app.use('/api/disclosure', disclosureRouter);
   app.use('/api/export', exportRouter);
 
