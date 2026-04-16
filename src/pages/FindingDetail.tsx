@@ -6,6 +6,21 @@ import {
   triggerAITriage,
   generateReport,
   sendAIChat,
+  suggestFix,
+  deepAnalyze,
+  listExploits,
+  createExploit,
+  getProofLadder,
+  setProofTier,
+  listRuntimeJobs,
+  listCrashes,
+  listDisclosures,
+  createDisclosure,
+  type Exploit,
+  type ProofLadder,
+  type RuntimeJob,
+  type FuzzCrash,
+  type Disclosure,
 } from '@/lib/api';
 import type { Vulnerability, Severity, VulnStatus } from '@/lib/types';
 import { SeverityBadge, StatusBadge, CvssScore } from '@/components/Badge';
@@ -14,7 +29,7 @@ import { NotesPanel } from '@/components/NotesPanel';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'fix' | 'report' | 'ai' | 'history' | 'notes';
+type Tab = 'overview' | 'fix' | 'report' | 'ai' | 'exploits' | 'runtime' | 'disclosure' | 'history' | 'notes';
 type ReportSubTab = 'email' | 'advisory' | 'summary';
 
 const SEVERITIES: Severity[] = ['Critical', 'High', 'Medium', 'Low', 'Info'];
@@ -719,6 +734,9 @@ Question: `;
               <div style={{ display: 'flex', gap: 0, overflowX: 'auto' }}>
                 {tabBtn('overview', 'Overview')}
                 {tabBtn('fix', 'Fix')}
+                {tabBtn('exploits', 'Exploits')}
+                {tabBtn('runtime', 'Runtime')}
+                {tabBtn('disclosure', 'Disclosure')}
                 {tabBtn('report', 'Report')}
                 {tabBtn('ai', 'AI Analysis')}
                 {tabBtn('notes', 'Notes')}
@@ -1215,6 +1233,21 @@ Question: `;
                 </div>
               )}
 
+              {/* ── EXPLOITS TAB ── */}
+              {tab === 'exploits' && (
+                <ExploitsTab findingId={vuln.id} />
+              )}
+
+              {/* ── RUNTIME TAB ── */}
+              {tab === 'runtime' && (
+                <RuntimeTab findingId={vuln.id} />
+              )}
+
+              {/* ── DISCLOSURE TAB ── */}
+              {tab === 'disclosure' && (
+                <DisclosureTab findingId={vuln.id} vulnTitle={vuln.title} />
+              )}
+
               {/* ── NOTES TAB ── */}
               {tab === 'notes' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1452,6 +1485,238 @@ function copyBtnStyle(copied: boolean): React.CSSProperties {
     flexShrink: 0,
     whiteSpace: 'nowrap',
   };
+}
+
+// ── Exploits Tab ──────────────────────────────────────────────────────────────
+
+function ExploitsTab({ findingId }: { findingId: number }) {
+  const [exploits, setExploits] = useState<Exploit[]>([]);
+  const [ladder, setLadder] = useState<ProofLadder | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    listExploits({ finding_id: findingId }).then(r => setExploits(r.data)).catch(() => {});
+    getProofLadder(findingId).then(setLadder).catch(() => {});
+  }, [findingId]);
+
+  const TIERS = ['pattern', 'manual', 'traced', 'poc', 'weaponized'] as const;
+  const TIER_COLORS: Record<string, string> = {
+    pattern: 'var(--muted)', manual: 'var(--blue)', traced: 'var(--yellow)',
+    poc: 'var(--orange)', weaponized: 'var(--red)',
+  };
+
+  const advanceTier = async (tier: string) => {
+    try {
+      const updated = await setProofTier(findingId, tier);
+      setLadder(updated);
+      toast(`Advanced to ${tier}`, 'success');
+    } catch (err: any) { toast(err.message, 'error'); }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Proof Ladder */}
+      <div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+          Proof Ladder
+        </div>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {TIERS.map((t, i) => {
+            const current = TIERS.indexOf((ladder?.current_tier || 'pattern') as any);
+            const active = i <= current;
+            return (
+              <button key={t} onClick={() => advanceTier(t)} style={{
+                flex: 1, padding: '8px 4px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                textTransform: 'uppercase', cursor: 'pointer',
+                background: active ? `${TIER_COLORS[t]}22` : 'var(--bg)',
+                color: active ? TIER_COLORS[t] : 'var(--muted)',
+                border: `1px solid ${active ? TIER_COLORS[t] : 'var(--border)'}`,
+              }}>{t}</button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Exploits list */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Exploits ({exploits.length})
+          </span>
+          <button onClick={async () => {
+            try {
+              await createExploit({ title: `PoC for finding #${findingId}`, finding_id: findingId });
+              const r = await listExploits({ finding_id: findingId });
+              setExploits(r.data);
+              toast('Exploit created', 'success');
+            } catch (err: any) { toast(err.message, 'error'); }
+          }} style={{
+            padding: '4px 10px', fontSize: 10, fontWeight: 600, cursor: 'pointer',
+            background: 'var(--green)22', color: 'var(--green)',
+            border: '1px solid var(--green)44', borderRadius: 4,
+          }}>+ New Exploit</button>
+        </div>
+        {exploits.length === 0 ? (
+          <div style={{ color: 'var(--muted)', fontSize: 12, padding: 16, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 6 }}>
+            No exploits yet. Create one to start building a PoC.
+          </div>
+        ) : (
+          exploits.map(e => (
+            <div key={e.id} style={{
+              padding: '10px 12px', marginBottom: 6,
+              background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
+              borderLeft: `3px solid ${TIER_COLORS[e.tier] || 'var(--muted)'}`,
+            }}>
+              <div style={{ color: 'var(--text)', fontSize: 13, fontWeight: 600 }}>{e.title}</div>
+              <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 2 }}>
+                {e.language} · {e.tier} · updated {e.updated_at?.split('T')[0] || ''}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Runtime Tab ──────────────────────────────────────────────────────────────
+
+function RuntimeTab({ findingId }: { findingId: number }) {
+  const [jobs, setJobs] = useState<RuntimeJob[]>([]);
+  const [crashes, setCrashes] = useState<FuzzCrash[]>([]);
+
+  useEffect(() => {
+    listRuntimeJobs({ finding_id: findingId }).then(r => setJobs(r.data)).catch(() => {});
+  }, [findingId]);
+
+  // Load crashes from any fuzz jobs linked to this finding
+  useEffect(() => {
+    const fuzzJobs = jobs.filter(j => j.type === 'fuzz');
+    if (fuzzJobs.length > 0) {
+      Promise.all(fuzzJobs.map(j => listCrashes(j.id).catch(() => ({ data: [] }))))
+        .then(results => setCrashes(results.flatMap(r => r.data)));
+    }
+  }, [jobs]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        Runtime Jobs for this Finding ({jobs.length})
+      </div>
+
+      {jobs.length === 0 ? (
+        <div style={{ color: 'var(--muted)', fontSize: 12, padding: 16, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 6 }}>
+          No runtime jobs linked. Start a fuzz campaign, debug session, or sandbox from the Runtime page.
+        </div>
+      ) : (
+        jobs.map(j => (
+          <div key={j.id} style={{
+            padding: '10px 12px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
+            display: 'flex', gap: 10, alignItems: 'center',
+          }}>
+            <span style={{
+              padding: '2px 8px', borderRadius: 10,
+              background: j.status === 'completed' ? 'var(--green)22' : j.status === 'running' ? 'var(--blue)22' : 'var(--muted)22',
+              color: j.status === 'completed' ? 'var(--green)' : j.status === 'running' ? 'var(--blue)' : 'var(--muted)',
+              fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+            }}>{j.status}</span>
+            <span style={{ color: 'var(--text)', fontSize: 13 }}>{j.type}/{j.tool}</span>
+            <span style={{ color: 'var(--muted)', fontSize: 11, marginLeft: 'auto' }}>{j.started_at?.split('T')[0]}</span>
+          </div>
+        ))
+      )}
+
+      {crashes.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+            Fuzz Crashes ({crashes.length})
+          </div>
+          {crashes.slice(0, 5).map(c => (
+            <div key={c.id} style={{
+              padding: '6px 10px', marginBottom: 4,
+              background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4,
+              fontSize: 11, display: 'flex', gap: 8,
+            }}>
+              <span style={{ color: c.exploitability === 'high' ? 'var(--red)' : 'var(--muted)', fontWeight: 600 }}>
+                {c.exploitability}
+              </span>
+              <span style={{ color: 'var(--text)' }}>{c.signal || 'unknown'}</span>
+              <span style={{ color: 'var(--muted)', fontFamily: 'monospace' }}>{c.stack_hash?.slice(0, 12)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Disclosure Tab ────────────────────────────────────────────────────────────
+
+function DisclosureTab({ findingId, vulnTitle }: { findingId: number; vulnTitle: string }) {
+  const [disclosures, setDisclosures] = useState<Disclosure[]>([]);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    listDisclosures({ finding_id: findingId }).then(r => setDisclosures(r.data)).catch(() => {});
+  }, [findingId]);
+
+  const STATUS_COLORS: Record<string, string> = {
+    draft: 'var(--muted)', submitted: 'var(--blue)', acknowledged: 'var(--purple)',
+    fixed: 'var(--yellow)', resolved: 'var(--green)', public: 'var(--green)', cancelled: 'var(--muted)',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          Disclosures ({disclosures.length})
+        </span>
+        <button onClick={async () => {
+          try {
+            await createDisclosure({ title: `Disclosure: ${vulnTitle}`, finding_id: findingId, status: 'draft' });
+            const r = await listDisclosures({ finding_id: findingId });
+            setDisclosures(r.data);
+            toast('Disclosure created', 'success');
+          } catch (err: any) { toast(err.message, 'error'); }
+        }} style={{
+          padding: '4px 10px', fontSize: 10, fontWeight: 600, cursor: 'pointer',
+          background: 'var(--orange)22', color: 'var(--orange)',
+          border: '1px solid var(--orange)44', borderRadius: 4,
+        }}>+ New Disclosure</button>
+      </div>
+
+      {disclosures.length === 0 ? (
+        <div style={{ color: 'var(--muted)', fontSize: 12, padding: 16, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 6 }}>
+          No disclosures yet. File one when the finding is verified and ready.
+        </div>
+      ) : (
+        disclosures.map(d => (
+          <div key={d.id} style={{
+            padding: '12px 14px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <span style={{
+                padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+                background: `${STATUS_COLORS[d.status]}22`, color: STATUS_COLORS[d.status],
+              }}>{d.status}</span>
+              <span style={{ color: 'var(--text)', fontSize: 13, fontWeight: 600 }}>{d.title}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--muted)' }}>
+              {d.cve_id && <span>CVE: {d.cve_id}</span>}
+              {d.sla_days_remaining !== undefined && d.sla_days_remaining !== null && (
+                <span style={{
+                  color: d.sla_status === 'overdue' ? 'var(--red)' : d.sla_status === 'warning' ? 'var(--yellow)' : 'var(--green)',
+                }}>
+                  {d.sla_days_remaining < 0 ? `${Math.abs(d.sla_days_remaining)}d overdue` : `${d.sla_days_remaining}d left`}
+                </span>
+              )}
+              {d.bounty_amount && <span style={{ color: 'var(--green)' }}>${d.bounty_amount}</span>}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
 }
 
 // ── Slide-over wrapper (replaces the old modal) ───────────────────────────────

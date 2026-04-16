@@ -101,7 +101,16 @@ async function main(): Promise<void> {
     next();
   });
 
-  // ── API Routes ────────────────────────────────────────────────────────
+  // ── Auth routes (BEFORE middleware — they handle their own auth) ────
+  app.use('/api/auth', authRouter);
+
+  // Health check (no auth needed)
+  app.get('/api/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+
+  // Apply auth middleware to ALL /api/* routes EXCEPT /api/auth
+  app.use('/api', authMiddleware as any);
+
+  // ── API Routes (all protected by auth middleware above) ──────────────
   app.use('/api/vulnerabilities', vulnerabilitiesRouter);
   app.use('/api/projects', projectsRouter);
   app.use('/api/scans', scansRouter);
@@ -116,12 +125,6 @@ async function main(): Promise<void> {
   app.use('/api/session', sessionRouter);
   app.use('/api/runtime', runtimeRouter);
   app.use('/api/history', historyRouter);
-  // Auth routes (no middleware — they handle their own auth)
-  app.use('/api/auth', authRouter);
-
-  // Apply auth middleware to all subsequent API routes
-  app.use('/api', authMiddleware as any);
-
   app.use('/api/exploits', exploitsRouter);
   app.use('/api/ai-investigate', aiInvestigateRouter);
   app.use('/api/teach', teachRouter);
