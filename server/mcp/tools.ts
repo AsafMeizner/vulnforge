@@ -2310,4 +2310,48 @@ export const mcpTools: MCPToolDef[] = [
       return await getDockerStats(stats.container_id);
     },
   },
+
+  {
+    name: 'start_vm',
+    description: 'Start a QEMU virtual machine. Supports x86_64, ARM, MIPS, RISC-V. Provides VNC for screen, SSH for shell, QMP for machine control.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        disk_image: { type: 'string', description: 'Path to .qcow2, .img, or .iso file' },
+        arch: { type: 'string', enum: ['x86_64', 'i386', 'arm', 'aarch64', 'mips', 'riscv64'], description: 'CPU architecture' },
+        memory: { type: 'string', description: 'RAM size (e.g. "2G")' },
+        cpus: { type: 'number' },
+        snapshot_mode: { type: 'boolean', description: 'Discard changes on shutdown' },
+        timeout: { type: 'number' },
+      },
+      required: ['disk_image'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: 'sandbox' as any,
+        tool: 'qemu',
+        config: args,
+      });
+      return { id, status: 'queued' };
+    },
+  },
+
+  {
+    name: 'get_vm_screenshot',
+    description: 'Get the latest screenshot from a QEMU VM (VNC screen capture). Returns the file path. Future: will return base64 image for AI vision.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const job = getRuntimeJobById(args.id);
+      if (!job) throw new Error('job not found');
+      const stats = JSON.parse(job.stats || '{}');
+      if (stats.sandbox_type !== 'qemu') throw new Error('Only QEMU VMs support screenshots');
+      const ssPath = job.output_dir ? `${job.output_dir}/screenshot.ppm` : null;
+      return { screenshot_path: ssPath, vnc_port: stats.vnc_port, ssh_port: stats.ssh_port };
+    },
+  },
 ];

@@ -61,6 +61,7 @@ export class RuntimeJobRunner {
       { path: './memory/core-dump.js', exportName: 'CoreDumpExecutor', label: 'core-dump' },
       { path: './binary/radare2.js', exportName: 'Radare2Executor', label: 'radare2' },
       { path: './sandbox/docker.js', exportName: 'DockerExecutor', label: 'docker-sandbox' },
+      { path: './sandbox/qemu.js', exportName: 'QemuExecutor', label: 'qemu-vm' },
     ];
 
     for (const mod of modules) {

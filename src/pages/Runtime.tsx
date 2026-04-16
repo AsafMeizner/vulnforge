@@ -389,7 +389,7 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   const update = (key: string, val: any) => setFormData(prev => ({ ...prev, [key]: val }));
 
-  const TOOL_MAP: Record<string, string> = { fuzz: 'libfuzzer', debug: 'gdb', capture: 'tcpdump', portscan: 'nmap', sandbox: 'docker' };
+  const TOOL_MAP: Record<string, string> = { fuzz: 'libfuzzer', debug: 'gdb', capture: 'tcpdump', portscan: 'nmap', sandbox: 'docker', vm: 'qemu' };
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -417,8 +417,8 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         <h3 style={{ margin: '0 0 16px', color: 'var(--text)', fontSize: 16 }}>New Runtime Job</h3>
 
         {/* Type selector */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 16 }}>
-          {(['fuzz', 'debug', 'capture', 'portscan', 'sandbox'] as const).map(t => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8, marginBottom: 16 }}>
+          {(['fuzz', 'debug', 'capture', 'portscan', 'sandbox', 'vm'] as const).map(t => (
             <button
               key={t}
               onClick={() => { setJobType(t); setFormData({}); }}
@@ -530,6 +530,40 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
                 <option value="host">Host (full host network access)</option>
                 <option value="none">None (no network)</option>
               </select>
+            </Field>
+            <Field label="Timeout (seconds, 0 = unlimited)">
+              <input type="number" value={formData.timeout ?? 0} onChange={e => update('timeout', Number(e.target.value))} style={inputStyle} />
+            </Field>
+          </>}
+
+          {jobType === 'vm' && <>
+            <Field label="Disk image (.qcow2, .img, .iso)" required>
+              <input value={formData.disk_image || ''} onChange={e => update('disk_image', e.target.value)}
+                placeholder="C:\VMs\ubuntu-22.04.qcow2" style={inputStyle} />
+            </Field>
+            <Field label="Architecture">
+              <select value={(formData as any).arch || 'x86_64'} onChange={e => update('arch', e.target.value)} style={inputStyle}>
+                <option value="x86_64">x86_64 (Intel/AMD 64-bit)</option>
+                <option value="i386">i386 (32-bit)</option>
+                <option value="aarch64">AArch64 (ARM 64-bit)</option>
+                <option value="arm">ARM (32-bit)</option>
+                <option value="mips">MIPS</option>
+                <option value="riscv64">RISC-V 64-bit</option>
+              </select>
+            </Field>
+            <Field label="Memory">
+              <input value={formData.memory || '2G'} onChange={e => update('memory', e.target.value)}
+                placeholder="1G, 2G, 4G" style={inputStyle} />
+            </Field>
+            <Field label="CPU cores">
+              <input type="number" value={formData.cpus ?? 2} onChange={e => update('cpus', Number(e.target.value))} style={inputStyle} />
+            </Field>
+            <Field label="Snapshot mode (discard changes on shutdown)">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={formData.snapshot_mode ?? false}
+                  onChange={e => update('snapshot_mode', e.target.checked)} />
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>Volatile — changes lost on shutdown</span>
+              </label>
             </Field>
             <Field label="Timeout (seconds, 0 = unlimited)">
               <input type="number" value={formData.timeout ?? 0} onChange={e => update('timeout', Number(e.target.value))} style={inputStyle} />
