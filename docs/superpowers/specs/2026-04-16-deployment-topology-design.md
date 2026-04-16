@@ -115,14 +115,14 @@ Tracked by `UNSYNCABLE_TABLES` constant in `server/sync/model.ts`.
 | Column | Type | Notes |
 |---|---|---|
 | `sync_id` | TEXT UNIQUE | ULID minted on desktop; canonical once server accepts |
-| `scope` | TEXT NOT NULL DEFAULT `'private'` | `private` / `team` / `pool` |
+| `sync_scope` | TEXT NOT NULL DEFAULT `'private'` | `private` / `team` / `pool`. Named `sync_scope` (not `scope`) to avoid collision with `session_state.scope`. |
 | `owner_user_id` | INTEGER | Creator. In solo mode = single hardcoded user (id=1) |
 | `updated_at_ms` | INTEGER NOT NULL | ms epoch; client write clock |
 | `server_updated_at_ms` | INTEGER | ms epoch; server write clock for ordering |
 | `tombstone` | INTEGER NOT NULL DEFAULT 0 | 1 = soft-deleted, retained so deletion syncs |
 | `sync_status` | TEXT NOT NULL DEFAULT `'local'` | `local` / `pending` / `synced` / `conflict` |
 
-Migrations backfill existing rows with ULIDs, `Date.now()`, `scope='private'`.
+Migrations backfill existing rows with ULIDs, `Date.now()`, `sync_scope='private'`.
 
 ### 5.3 New tables
 
