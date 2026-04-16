@@ -1,285 +1,157 @@
 # VulnForge
 
-AI-powered vulnerability research platform. Find, triage, and report security issues in open-source projects — with an autonomous multi-agent pipeline, MCP integration, and a plugin system.
+**AI-powered vulnerability research platform.** Find, triage, verify, exploit, and report security vulnerabilities in open-source and proprietary software — all from one app.
 
-```
-[Screenshot placeholder — run the app and capture src/assets/screenshot.png]
-```
+VulnForge combines 48 custom static analysis tools, 10 integrated security plugins, runtime analysis (fuzzing, debugging, network capture, sandboxed execution), historical intelligence (NVD sync, git bisect), and AI-powered investigation into a single platform.
+
+---
+
+## Features
+
+### Core Pipeline
+- **Hunt** — paste a Git URL or local path → auto-clone, select tools by language, scan, 5-tier FP filtering, AI verify, stage for review
+- **Pause/Resume** — pause mid-pipeline and resume later
+- **Batch mode** — scan multiple targets in parallel
+- **No-AI mode** — works without any AI provider; add AI later
+
+### Analysis Tools
+- **48 Python tools** — memory safety, crypto, protocol, concurrency, supply chain
+- **10 plugins** — Semgrep, Bandit, CodeQL, Trivy, Nuclei, Grype, OSV-Scanner, Safety, Nettacker, Garak
+- **CVE variant hunting** — 17 known CVE patterns searched across all targets
+- **Configuration auditing** — Dockerfile, CI/CD, .env, compiler flags, Kubernetes
+- **Attack surface mapping** — entry points, trust boundaries, pre-auth code
+- **Dependency reachability** — filters unreachable dependency vulns via call graph
+
+### Runtime & Dynamic Analysis
+- **Fuzzing** — libFuzzer + auto-harness generation + crash triage
+- **Debugging** — gdb breakpoint validation + core dump analysis
+- **Network** — tcpdump/tshark capture + nmap scanning
+- **Symbolic execution** — angr for crafted inputs
+- **Binary analysis** — radare2/rizin disassembly
+- **Docker sandboxes** — isolated containers with pause/resume, snapshots, resource monitoring, file transfer
+- **Memory forensics** — core dump stack/register extraction
+
+### Research Workspace
+- **Hypothesis journal** with kanban board (open → investigating → confirmed → disproved)
+- **Persistent notes** with markdown + YAML frontmatter
+- **Pluggable backends** — Local filesystem, Obsidian vault
+- **Quick capture** — Ctrl/Cmd+N from anywhere
+- **Server-side session** — investigation context survives restarts
+
+### Exploit Development
+- **PoC workbench** — write exploit code linked to findings
+- **Proof ladder** — pattern → manual → traced → PoC → weaponized
+- **8 exploit templates** — format string, buffer overflow, heap UAF, SQL injection, SSRF, etc.
+
+### AI Copilot
+- **Investigate mode** — interactive step-gated AI investigation
+- **Assumption extraction** — AI lists all implicit assumptions in a function
+- **Hypothesis auto-generation** — AI suggests research directions
+- **5 providers** — Claude, OpenAI, Gemini, Ollama, Claude CLI
+- **Auto-fallback** on rate limit exhaustion
+- **7 routing presets** — Smart Split, All Claude, All OpenAI, All Gemini, All Local, Budget, Claude CLI
+
+### Historical Intelligence
+- **NVD sync** — fetch CVEs, cross-reference dependencies
+- **Git bisect** — find the commit that introduced a bug
+- **Patch analysis** — extract patterns from security commits
+
+### Disclosure & Bounty Ops
+- **Vendor management** — contacts, platforms, response times
+- **SLA tracking** — on-track / warning / overdue indicators
+- **Bounty analytics** — total payouts, averages, per-program ROI
+
+### Compliance & Export
+- **SARIF 2.1** — GitHub/GitLab/Azure DevOps compatible
+- **CVE JSON 5.0** — for CNA submission
+- **Workspace backup** — full JSON dump
+- **Audit trail** — every action logged
+
+### Pro UX
+- **Command palette** (Ctrl/Cmd+K) — jump to any page
+- **Keyboard shortcuts** (?) — full cheat sheet
+- **Grouped navigation** — 18 pages in collapsible sidebar sections
+
+### MCP Server (70+ tools)
+External AI agents connect at `http://localhost:3001/mcp` for full platform access.
 
 ---
 
 ## Quick Start
 
 ```bash
-# Install dependencies
+# Prerequisites: Node.js 18+, Python 3.10+, Git
+# Optional: Docker (sandboxes), Ollama (local AI)
+
+git clone https://github.com/your-org/vulnforge.git
+cd vulnforge
 npm install
-
-# Seed the database with built-in tools and sample data
-npm run seed
-
-# Start both frontend (Vite :5173) and backend (Express :3001) in watch mode
 npm run dev
 ```
 
-Open http://localhost:5173 in your browser.
+Open http://localhost:5173. Backend runs on port 3001.
 
----
+### First Hunt
+1. Click **Hunt** → paste a GitHub URL → **Start Hunt**
+2. Watch: Clone → Analyze → Scan → Filter → Verify → Review
+3. Click **Review Findings** → Accept or Reject each
 
-## Features
-
-### Core Platform
-- **Findings database** — SQLite-backed vulnerability store with severity, CVSS, CWE, code snippets, and full audit trail
-- **Projects** — Import local paths or remote repos; track scan history and vuln counts per project
-- **Scanner** — Run any combination of the 13 built-in static analysis tools against a project; live terminal output via WebSocket; per-tool progress tracking
-- **Checklists** — OWASP and custom security checklists, linked directly to findings
-
-### AI Features
-- **AI Triage** — Structured JSON triage (severity, exploitability, false-positive risk, CVSS, CWE, tier A/B/C) via any configured provider
-- **Report Generation** — Four report types generated by AI:
-  - **Full Disclosure** — email or GitHub Advisory format matching the security-solver template
-  - **Email Body** — plain-text private disclosure email
-  - **GitHub Advisory** — structured for the GitHub Security Advisory form
-  - **Executive Summary** — plain-language briefing for non-technical stakeholders
-- **AI Agent** — Autonomous multi-step agent (`POST /api/ai/agent`) that breaks down a research goal into tool calls and executes them
-- **AI Chat** — Conversational interface on the AI page
-
-### Integration
-- **MCP Server** — Model Context Protocol server at `/mcp` (SSE transport); exposes all findings, projects, and scan control as MCP tools
-- **Plugin System** — Load external scanners or reporters via the Plugins page
-- **WebSocket** — Real-time scan output, completion events, and triage results pushed to the UI
+### Configure AI (optional)
+1. **AI** page → **Providers** tab → enable a provider + enter API key
+2. **Routing** tab → click **Smart Split** preset
 
 ---
 
 ## Architecture
 
 ```
-vulnforge/
-├── server/                 Express + WebSocket backend (Node.js, ESM)
-│   ├── index.ts            Entry point, route registration, WS init
-│   ├── db.ts               sql.js SQLite wrapper — all CRUD helpers
-│   ├── ws.ts               WebSocket broadcast hub
-│   ├── ai/
-│   │   ├── router.ts       Provider dispatcher (OpenAI / Claude / Ollama)
-│   │   ├── agent.ts        Autonomous multi-step agent loop
-│   │   ├── pipeline.ts     Batch triage pipeline for post-scan auto-triage
-│   │   ├── providers/
-│   │   │   ├── openai.ts   OpenAI SDK wrapper
-│   │   │   ├── claude.ts   Anthropic SDK wrapper
-│   │   │   └── ollama.ts   Ollama local inference
-│   │   └── prompts/
-│   │       ├── triage.ts   Structured triage prompt + JSON parser
-│   │       └── report.ts   Report generation prompts (4 types)
-│   ├── routes/             Express routers (vulnerabilities, scans, reports, …)
-│   ├── scanner/            Scan queue, tool runner, scan profiles
-│   └── mcp/                MCP server (SSE transport)
-│
-├── src/                    Vite + React 19 SPA
-│   ├── lib/
-│   │   ├── api.ts          Typed fetch wrappers for all API endpoints
-│   │   └── types.ts        Shared TypeScript interfaces
-│   ├── components/
-│   │   ├── ErrorBoundary.tsx  React class error boundary
-│   │   ├── Toast.tsx          Toast notification system
-│   │   ├── Modal.tsx          Accessible modal wrapper
-│   │   └── Badge.tsx          Severity / status badges
-│   └── pages/
-│       ├── Dashboard.tsx   Stats overview + recent findings
-│       ├── Findings.tsx    Sortable/filterable findings table
-│       ├── FindingDetail.tsx  Full finding view with 5 tabs
-│       ├── Scanner.tsx     Scan launcher with live terminal
-│       ├── Projects.tsx    Project management
-│       ├── Tools.tsx       Tool browser with docs
-│       ├── AIPage.tsx      AI chat interface
-│       ├── Checklists.tsx  Security checklist management
-│       ├── Plugins.tsx     Plugin browser and installer
-│       └── Settings.tsx    AI provider configuration
-│
-├── tools/                  13 Python static analysis tools
-├── plugins/                Plugin install directory
-├── checklists/             JSON checklist definitions
-└── vulnforge.db            SQLite database (auto-created)
+src/                         — React 19 + Vite (18 pages, inline styles)
+server/                      — Express + SQLite (sql.js + WASM)
+  ai/                        — Multi-provider routing, investigation
+  pipeline/                  — Autonomous pipeline + all analysis modules
+    runtime/                 — 10 executor types (fuzz, debug, network, sandbox, etc.)
+    notes/                   — Pluggable note backends
+    history/                 — NVD sync, patch analysis
+    export/                  — SARIF, CVE JSON, backup
+    ai/                      — Investigate mode, assumption extraction
+  scanner/                   — Scan queue, tool runner, parser, filter
+  plugins/                   — Semgrep, Trivy, CodeQL, etc.
+  mcp/                       — MCP server (70+ tools)
+  routes/                    — 12 REST route modules
+  data/                      — CVE patterns, exploit templates
+.claude/                     — Claude Code plugin (6 skills + MCP config)
 ```
 
-### Data flow
-
-```
-User action
-    → React component (src/pages/)
-    → api.ts fetch wrapper
-    → Express route (server/routes/)
-    → db.ts CRUD helper (sql.js SQLite)
-    → JSON response
-
-Scan execution
-    → POST /api/scans  { project_id, tools[], auto_triage }
-    → ScanQueue enqueue
-    → Tool subprocess (Python script in /tools/)
-    → stdout lines → WebSocket broadcast → React terminal
-    → Findings parsed → written to DB
-    → auto_triage → AI pipeline → triage:complete WS event → toast
-
-AI triage
-    → POST /api/ai/triage/:id  (202 Accepted)
-    → pipeline.triageFinding()
-    → routeAI() → active provider (OpenAI / Claude / Ollama)
-    → parseTriageResponse() → JSON
-    → updateVulnerability(ai_triage, ai_summary, cvss, cwe)
-    → WS triage:complete broadcast
-```
+### Database: 22 SQLite tables
+projects, vulnerabilities, scan_findings, pipeline_runs, runtime_jobs, fuzz_crashes, captures, notes, notes_providers, session_state, bisect_results, cve_intel, cve_project_matches, exploits, proof_ladder, vendors, disclosures, disclosure_events, sandbox_snapshots, routing_rules, audit_log, tools, plugins, ai_providers, checklists, checklist_items, reports, scans.
 
 ---
 
-## MCP Integration
+## Commands
 
-VulnForge exposes an MCP (Model Context Protocol) server at `http://localhost:3001/mcp` using SSE transport. This lets any MCP-compatible AI assistant (Claude Desktop, Cursor, etc.) query and control the platform.
-
-### Connecting Claude Desktop
-
-Add to `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "vulnforge": {
-      "url": "http://localhost:3001/mcp"
-    }
-  }
-}
-```
-
-### Available MCP tools
-
-The MCP server exposes the same capabilities as the REST API as callable tools, including listing findings, starting scans, running triage, and generating reports.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start frontend + backend (development) |
+| `npm run dev:server` | Backend only |
+| `npm run dev:client` | Frontend only |
+| `npm run build` | Production build |
 
 ---
 
-## Plugin System
+## MCP Server
 
-Plugins extend VulnForge with custom scanners, reporters, or integrations.
+External AI agents connect at `http://localhost:3001/mcp` (SSE + JSON-RPC).
 
-### Plugin manifest (`plugin.json`)
-
-```json
-{
-  "name": "my-scanner",
-  "version": "1.0.0",
-  "type": "scanner",
-  "description": "Custom pattern scanner",
-  "entry": "scanner.py",
-  "config_schema": {
-    "pattern": { "type": "string", "description": "Grep pattern" }
-  }
-}
-```
-
-### Plugin types
-
-| Type | Description |
-|------|-------------|
-| `scanner` | Python script that outputs findings as JSON to stdout |
-| `reporter` | Formats findings for external submission |
-| `integration` | Connects to external services (Jira, Slack, etc.) |
-
-### Installing a plugin
-
-Via the UI: Plugins page → paste a GitHub URL or local path.
-
-Via API:
-```bash
-curl -X POST http://localhost:3001/api/plugins \
-  -H 'Content-Type: application/json' \
-  -d '{"source_url": "https://github.com/org/my-scanner"}'
-```
+70+ tools covering: pipeline control, findings CRUD, notes/session, runtime jobs (fuzz/debug/capture/scan/sandbox), exploits/proof-ladder, disclosure/vendor management, CVE intel, investigation sessions, SARIF/CVE export, audit log.
 
 ---
 
-## AI Providers
+## Project Stats
 
-Configure providers on the Settings page. Only one provider is active at a time.
-
-| Provider | Models | Notes |
-|----------|--------|-------|
-| OpenAI | gpt-4o, gpt-4o-mini, o1, o3 | Requires `OPENAI_API_KEY` |
-| Claude (Anthropic) | claude-sonnet-4, claude-opus-4 | Requires `ANTHROPIC_API_KEY` |
-| Ollama | llama3.2, qwen2.5, mistral, … | Local inference, no key needed |
-
-Set keys either in Settings UI or via environment variables — the UI stores them in the local SQLite database.
-
----
-
-## API Reference
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/stats` | Platform statistics |
-| GET/POST | `/api/vulnerabilities` | List / create findings |
-| GET/PUT/DELETE | `/api/vulnerabilities/:id` | Single finding |
-| GET/POST | `/api/projects` | List / import projects |
-| GET/POST | `/api/scans` | List / start scans |
-| POST | `/api/scans/profile` | Start scan with a named profile |
-| GET | `/api/tools` | List analysis tools |
-| POST | `/api/ai/triage/:id` | Start AI triage for a finding (202) |
-| POST | `/api/ai/chat` | Conversational AI |
-| POST | `/api/ai/agent` | Run autonomous agent with a goal |
-| POST | `/api/reports/generate` | Generate a report (`disclosure`/`email`/`advisory`/`summary`) |
-| GET | `/api/reports` | List generated reports |
-| GET/PUT | `/api/ai/providers` | AI provider configuration |
-| GET | `/api/health` | Health check |
-
-WebSocket: `ws://localhost:3001/ws` — receives `scan:start`, `scan:output`, `scan:complete`, `scan:error`, `triage:complete`, `triage:error`, `queue:drain` events.
-
----
-
-## Development
-
-```bash
-# Backend only (auto-restarts on change)
-npm run dev:server
-
-# Frontend only (Vite HMR)
-npm run dev:client
-
-# Both together
-npm run dev
-
-# Production build
-npm run build
-
-# Seed / reset database
-npm run seed
-```
-
-### TypeScript compilation
-
-The project uses `tsx` for the server (no separate compile step in dev) and Vite for the frontend. Both share types through `src/lib/types.ts`.
-
-### Environment variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3001` | Backend HTTP port |
-| `OPENAI_API_KEY` | — | OpenAI API key (or set in Settings UI) |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key (or set in Settings UI) |
-
----
-
-## Built-in Analysis Tools
-
-| Tool | Category | Track Record |
-|------|----------|--------------|
-| `integer_overflow_scanner` | integer | Found jq CRITICAL |
-| `cross_arch_truncation` | integer | Found libarchive CRITICAL |
-| `uaf_detector` | memory | Per-function alloc/free lifecycle |
-| `realloc_dangling_scanner` | memory | Use-after-realloc detection |
-| `dangerous_patterns` | memory | Format strings, TOCTOU, off-by-one |
-| `signal_safety_checker` | concurrency | Found Redis + systemd |
-| `concurrency_auditor` | concurrency | Lock ordering, atomic races |
-| `timing_oracle_scanner` | crypto | memcmp timing oracles in auth paths |
-| `crypto_misuse_scanner` | crypto | Weak RNG, hardcoded keys |
-| `signed_unsigned_checker` | integer | Operator precedence bugs |
-| `parser_complexity_scorer` | parser | Ranks functions by bug probability |
-| `preauth_tracer` | recon | Maps pre-auth attack surface |
-| `supply_chain_scanner` | supply-chain | XZ-pattern maintainer risk |
+- **Frontend**: 18 pages, 55 modules, ~500KB bundle
+- **Backend**: 12 route modules, 22 DB tables, 70+ MCP tools
+- **Analysis**: 48 Python tools + 10 plugins + 17 CVE patterns + 15 config checks
+- **Runtime**: 10 executor types (libFuzzer, gdb, tcpdump, nmap, angr, radare2, core-dump, git-bisect, Docker sandbox, QEMU stub)
 
 ---
 

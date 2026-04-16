@@ -50,6 +50,7 @@ import { setupMcpServer } from './mcp/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+const HEADLESS = process.env.VULNFORGE_HEADLESS === '1' || process.argv.includes('--headless');
 
 async function main(): Promise<void> {
   // Init database
@@ -449,14 +450,15 @@ Be technical, precise, and actionable.`;
 
   // ── Start ─────────────────────────────────────────────────────────────
   server.listen(PORT, () => {
+    const mode = HEADLESS ? 'HEADLESS' : 'FULL';
     console.log(`
 =================================================
-  VulnForge Backend  |  port ${PORT}
+  VulnForge Backend  |  port ${PORT}  |  ${mode}
 =================================================
   API:       http://localhost:${PORT}/api
   WebSocket: ws://localhost:${PORT}/ws
   MCP:       http://localhost:${PORT}/mcp
-  Health:    http://localhost:${PORT}/api/health
+  Health:    http://localhost:${PORT}/api/health${HEADLESS ? '\n  Mode:      Headless (no UI served, API/WS/MCP only)' : ''}
 =================================================
 `);
   });
