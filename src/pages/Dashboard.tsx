@@ -4,15 +4,22 @@ import type { Stats, Vulnerability, Scan } from '@/lib/types';
 import { SeverityBadge, StatusBadge, CvssScore } from '@/components/Badge';
 import { useToast } from '@/components/Toast';
 
-function StatCard({ label, value, color }: { label: string; value: string | number; color: string }) {
+function StatCard({ label, value, color, onClick }: { label: string; value: string | number; color: string; onClick?: () => void }) {
   return (
-    <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 8,
-      padding: '18px 20px',
-      borderTop: `3px solid ${color}`,
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 8,
+        padding: '18px 20px',
+        borderTop: `3px solid ${color}`,
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'transform 0.1s, box-shadow 0.1s',
+      }}
+      onMouseEnter={e => { if (onClick) { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)'; } }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ''; (e.currentTarget as HTMLDivElement).style.boxShadow = ''; }}
+    >
       <div style={{ fontSize: 28, fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
       <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.6px', marginTop: 6 }}>{label}</div>
     </div>
@@ -149,22 +156,22 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       {/* Quick Hunt */}
       <QuickHunt onNavigate={onNavigate} />
 
-      {/* Stats cards */}
+      {/* Stats cards — clickable to navigate */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-        <StatCard label="Total Findings" value={loading ? '—' : (stats?.totalVulns ?? stats?.total ?? 0)} color="var(--text)" />
-        <StatCard label="Critical" value={loading ? '—' : (stats?.critical ?? 0)} color="var(--red)" />
-        <StatCard label="High" value={loading ? '—' : (stats?.high ?? 0)} color="var(--orange)" />
-        <StatCard label="Medium" value={loading ? '—' : (stats?.medium ?? 0)} color="var(--yellow)" />
-        <StatCard label="Verified" value={loading ? '—' : (stats?.verified ?? 0)} color="var(--green)" />
-        <StatCard label="Projects" value={loading ? '—' : (stats?.totalProjects ?? stats?.projects ?? 0)} color="var(--blue)" />
+        <StatCard label="Total Findings" value={loading ? '—' : (stats?.totalVulns ?? stats?.total ?? 0)} color="var(--text)" onClick={() => onNavigate('findings')} />
+        <StatCard label="Critical" value={loading ? '—' : (stats?.critical ?? 0)} color="var(--red)" onClick={() => onNavigate('findings')} />
+        <StatCard label="High" value={loading ? '—' : (stats?.high ?? 0)} color="var(--orange)" onClick={() => onNavigate('findings')} />
+        <StatCard label="Medium" value={loading ? '—' : (stats?.medium ?? 0)} color="var(--yellow)" onClick={() => onNavigate('findings')} />
+        <StatCard label="Verified" value={loading ? '—' : (stats?.verified ?? 0)} color="var(--green)" onClick={() => onNavigate('findings')} />
+        <StatCard label="Projects" value={loading ? '—' : (stats?.totalProjects ?? stats?.projects ?? 0)} color="var(--blue)" onClick={() => onNavigate('projects')} />
       </div>
 
-      {/* Feature summary row */}
+      {/* Feature summary row — clickable */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-        <StatCard label="Notes" value={featureCounts.notes} color="var(--blue)" />
-        <StatCard label="Runtime Jobs" value={featureCounts.runtimeJobs} color="var(--purple)" />
-        <StatCard label="Disclosures" value={featureCounts.disclosures} color="var(--orange)" />
-        <StatCard label="Pipelines" value={featureCounts.pipelines} color="var(--green)" />
+        <StatCard label="Notes" value={featureCounts.notes} color="var(--blue)" onClick={() => onNavigate('hypotheses')} />
+        <StatCard label="Runtime Jobs" value={featureCounts.runtimeJobs} color="var(--purple)" onClick={() => onNavigate('runtime')} />
+        <StatCard label="Disclosures" value={featureCounts.disclosures} color="var(--orange)" onClick={() => onNavigate('disclosure')} />
+        <StatCard label="Pipelines" value={featureCounts.pipelines} color="var(--green)" onClick={() => onNavigate('hunt')} />
       </div>
 
       {/* Two-column layout: severity distribution + recent activity */}

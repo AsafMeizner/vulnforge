@@ -7,6 +7,7 @@ import {
   deleteRuntimeJob,
   getRuntimeJobOutput,
   listCrashes,
+  generateHarness,
   type RuntimeJob,
   type FuzzCrash,
 } from '@/lib/api';
@@ -115,15 +116,33 @@ export default function Runtime() {
             Fuzzing, debugging, packet capture, port scans — all runtime tools unified.
           </p>
         </div>
-        <button
-          onClick={() => setNewJobOpen(true)}
-          style={{
-            background: 'var(--green)', color: '#000', border: 'none',
-            borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-          }}
-        >
-          + New Job
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={async () => {
+              const sig = prompt('Function signature (e.g. "int parse(uint8_t *data, size_t len)"):');
+              if (!sig) return;
+              try {
+                const result = await generateHarness(sig, 'c');
+                alert(`Generated harness:\n\n${result.harness_code}\n\nNotes: ${result.notes.join(', ')}`);
+              } catch (err: any) { toast(err.message, 'error'); }
+            }}
+            style={{
+              background: 'var(--purple)', color: '#fff', border: 'none',
+              borderRadius: 6, padding: '8px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Generate Harness
+          </button>
+          <button
+            onClick={() => setNewJobOpen(true)}
+            style={{
+              background: 'var(--green)', color: '#000', border: 'none',
+              borderRadius: 6, padding: '8px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            + New Job
+          </button>
+        </div>
       </div>
 
       {/* Sub-tabs */}
