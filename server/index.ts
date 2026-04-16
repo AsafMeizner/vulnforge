@@ -41,6 +41,7 @@ import aiInvestigateRouter from './routes/ai-investigate.js';
 
 // Auth + RBAC (Phase 14)
 import authRouter from './routes/auth.js';
+import authSessionRouter from './routes/auth-session.js';
 import { authMiddleware } from './auth/auth.js';
 
 // Teach Mode + Pattern Mining (Phase 15)
@@ -110,6 +111,17 @@ async function main(): Promise<void> {
 
   // ── Auth routes (BEFORE middleware — they handle their own auth) ────
   app.use('/api/auth', authRouter);
+  // Subsystem B — JWT session flow (coexists with legacy API-token auth above)
+  app.use('/api/session', authSessionRouter);
+
+  // Install the DB-backed RBAC checker once db is ready.
+  try {
+    const { installPermissionChecker } = await import('./auth/permissions.js');
+    const { hasPermissionInDb } = await import('./db.js');
+    installPermissionChecker(hasPermissionInDb);
+  } catch (e) {
+    console.warn('[auth] RBAC checker install failed:', e);
+  }
 
   // Health check + config (no auth needed)
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));

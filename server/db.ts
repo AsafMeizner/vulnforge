@@ -718,6 +718,69 @@ function createTables(): void {
     )
   `);
 
+  // Subsystem B — Auth (JWT refresh tokens) + RBAC (permissions)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token_hash TEXT NOT NULL,
+      device_id TEXT NOT NULL,
+      device_name TEXT DEFAULT '',
+      expires_at INTEGER NOT NULL,
+      revoked INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      last_used_at INTEGER,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)`);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_device ON refresh_tokens(device_id)`);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS permissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      role TEXT NOT NULL,
+      resource TEXT NOT NULL,
+      action TEXT NOT NULL,
+      UNIQUE(role, resource, action)
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS oidc_providers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE NOT NULL,
+      issuer_url TEXT NOT NULL,
+      client_id TEXT NOT NULL,
+      client_secret TEXT NOT NULL,
+      scopes TEXT DEFAULT 'openid email profile',
+      role_mapping_json TEXT DEFAULT '{}',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS pipeline_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sync_id TEXT UNIQUE NOT NULL,
+      project_id INTEGER,
+      requested_by_user_id INTEGER,
+      executor TEXT NOT NULL CHECK(executor IN ('local','server')),
+      status TEXT NOT NULL DEFAULT 'queued',
+      priority INTEGER NOT NULL DEFAULT 5,
+      stages_json TEXT DEFAULT '[]',
+      worker_id TEXT,
+      queued_at INTEGER NOT NULL,
+      claimed_at INTEGER,
+      finished_at INTEGER,
+      error TEXT,
+      FOREIGN KEY (project_id) REFERENCES projects(id),
+      FOREIGN KEY (requested_by_user_id) REFERENCES users(id)
+    )
+  `);
+  db.run(`CREATE INDEX IF NOT EXISTS idx_pipeline_jobs_status ON pipeline_jobs(status, priority)`);
+
   // Teach Mode + Pattern Mining (Phase 15)
   db.run(`
     CREATE TABLE IF NOT EXISTS teach_examples (
@@ -764,6 +827,7 @@ function createTables(): void {
   migrateSchema();
   backfillSyncColumns();
   seedDefaultNotesProvider();
+  seedDefaultPermissions();
   persistDb();
 }
 
@@ -776,6 +840,47 @@ function seedDefaultNotesProvider(): void {
       `INSERT INTO notes_providers (name, type, enabled, is_default, config) VALUES (?, ?, ?, ?, ?)`,
       ['local', 'local', 1, 1, JSON.stringify({ base_path: 'X:/vulnforge/data/notes' })]
     );
+  }
+}
+
+/**
+ * Seed RBAC defaults on first run. Idempotent — INSERT OR IGNORE uses
+ * the (role, resource, action) UNIQUE constraint to avoid dupes.
+ *
+ * Three starter roles:
+ *   admin    — full access everywhere
+ *   analyst  — day-to-day researcher: read/write findings + run pipelines + use integrations
+ *   viewer   — read-only observer
+ */
+function seedDefaultPermissions(): void {
+  const defaults: Array<[string, string, string]> = [
+    ['admin', '*', '*'],
+    // analyst
+    ['researcher', 'findings', 'read'],
+    ['researcher', 'findings', 'write'],
+    ['researcher', 'projects', 'read'],
+    ['researcher', 'projects', 'write'],
+    ['researcher', 'pipelines', 'read'],
+    ['researcher', 'pipelines', 'run'],
+    ['researcher', 'integrations', 'use'],
+    ['researcher', 'ai', 'use'],
+    ['researcher', 'plugins', 'read'],
+    ['researcher', 'notes', 'read'],
+    ['researcher', 'notes', 'write'],
+    // viewer
+    ['viewer', 'findings', 'read'],
+    ['viewer', 'projects', 'read'],
+    ['viewer', 'pipelines', 'read'],
+    ['viewer', 'notes', 'read'],
+    ['viewer', 'plugins', 'read'],
+  ];
+  for (const [role, resource, action] of defaults) {
+    try {
+      db.run(
+        `INSERT OR IGNORE INTO permissions (role, resource, action) VALUES (?, ?, ?)`,
+        [role, resource, action],
+      );
+    } catch { /* table may not exist in very old DB — migrateSchema creates it */ }
   }
 }
 
@@ -2471,5 +2576,105 @@ export function deleteSessionState(scope: string, scope_id: number | null, key?:
       db.run('DELETE FROM session_state WHERE scope = ? AND scope_id = ?', [scope, scope_id]);
     }
   }
+  persistDb();
+}
+
+// ── Subsystem B — Refresh tokens CRUD ──────────────────────────────────────
+
+export interface RefreshTokenRow {
+  id?: number;
+  user_id: number;
+  token_hash: string;
+  device_id: string;
+  device_name: string;
+  expires_at: number;
+  revoked: number;
+  created_at: number;
+  last_used_at: number | null;
+}
+
+export function insertRefreshToken(row: Omit<RefreshTokenRow, 'id'>): number {
+  return execRun(
+    `INSERT INTO refresh_tokens
+       (user_id, token_hash, device_id, device_name, expires_at, revoked, created_at, last_used_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [row.user_id, row.token_hash, row.device_id, row.device_name, row.expires_at,
+     row.revoked, row.created_at, row.last_used_at],
+  );
+}
+
+export function getRefreshTokensForDevice(device_id: string): RefreshTokenRow[] {
+  return execQuery(
+    `SELECT * FROM refresh_tokens WHERE device_id = ? AND revoked = 0
+     ORDER BY created_at DESC`,
+    [device_id],
+  ) as unknown as RefreshTokenRow[];
+}
+
+export function getRefreshTokensForUser(user_id: number): RefreshTokenRow[] {
+  return execQuery(
+    `SELECT * FROM refresh_tokens WHERE user_id = ? ORDER BY created_at DESC`,
+    [user_id],
+  ) as unknown as RefreshTokenRow[];
+}
+
+export function markRefreshTokenUsed(id: number, ts: number): void {
+  db.run(`UPDATE refresh_tokens SET last_used_at = ? WHERE id = ?`, [ts, id]);
+  persistDb();
+}
+
+export function revokeRefreshToken(id: number): void {
+  db.run(`UPDATE refresh_tokens SET revoked = 1 WHERE id = ?`, [id]);
+  persistDb();
+}
+
+export function revokeAllRefreshTokensForDevice(device_id: string): void {
+  db.run(`UPDATE refresh_tokens SET revoked = 1 WHERE device_id = ?`, [device_id]);
+  persistDb();
+}
+
+export function deleteExpiredRefreshTokens(now: number = Date.now()): number {
+  db.run(`DELETE FROM refresh_tokens WHERE expires_at < ? OR revoked = 1`, [now]);
+  persistDb();
+  return 0; // row count not reliable through sql.js
+}
+
+// ── Subsystem B — Permissions ──────────────────────────────────────────────
+
+export interface PermissionRow {
+  id?: number;
+  role: string;
+  resource: string;
+  action: string;
+}
+
+export function listPermissions(): PermissionRow[] {
+  return execQuery(`SELECT * FROM permissions ORDER BY role, resource, action`) as unknown as PermissionRow[];
+}
+
+export function hasPermissionInDb(role: string, resource: string, action: string): boolean {
+  const rows = execQuery(
+    `SELECT 1 FROM permissions WHERE role = ? AND
+       (resource = ? OR resource = '*') AND
+       (action = ? OR action = '*')
+     LIMIT 1`,
+    [role, resource, action],
+  );
+  return rows.length > 0;
+}
+
+export function grantPermission(role: string, resource: string, action: string): void {
+  db.run(
+    `INSERT OR IGNORE INTO permissions (role, resource, action) VALUES (?, ?, ?)`,
+    [role, resource, action],
+  );
+  persistDb();
+}
+
+export function revokePermission(role: string, resource: string, action: string): void {
+  db.run(
+    `DELETE FROM permissions WHERE role = ? AND resource = ? AND action = ?`,
+    [role, resource, action],
+  );
   persistDb();
 }
