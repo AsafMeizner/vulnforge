@@ -22,7 +22,7 @@ const DEFAULT_PROFILES: ScanProfile[] = [
   { id: 'memory', name: 'Memory Safety', tools: ['uaf_detector', 'realloc_dangling_scanner', 'cross_arch_truncation'], severity_threshold: 'High' },
 ];
 
-type SettingsTab = 'general' | 'tools' | 'profiles' | 'notes';
+type SettingsTab = 'general' | 'tools' | 'profiles' | 'notes' | 'advanced';
 
 export default function Settings() {
   const [tab, setTab] = useState<SettingsTab>('general');
@@ -96,6 +96,7 @@ export default function Settings() {
         <button style={tabStyle('tools')} onClick={() => setTab('tools')}>Tools</button>
         <button style={tabStyle('profiles')} onClick={() => setTab('profiles')}>Scan Profiles</button>
         <button style={tabStyle('notes')} onClick={() => setTab('notes')}>Note Backends</button>
+        <button style={tabStyle('advanced' as any)} onClick={() => setTab('advanced' as any)}>Advanced</button>
       </div>
 
       {/* General tab */}
@@ -255,6 +256,104 @@ export default function Settings() {
 
       {/* Note Backends tab */}
       {tab === 'notes' && <NoteBackendsSection />}
+
+      {/* Advanced tab */}
+      {tab === ('advanced' as any) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 600 }}>
+          <Section title="Scan Behavior">
+            <Field label="Scan Timeout (seconds per tool, 0 = unlimited)">
+              <input
+                type="number"
+                value={localStorage.getItem('vf_scan_timeout') || '300'}
+                onChange={e => localStorage.setItem('vf_scan_timeout', e.target.value)}
+                style={inputStyle}
+              />
+            </Field>
+            <Field label="Max Concurrent Scan Jobs">
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={localStorage.getItem('vf_max_concurrent') || '3'}
+                onChange={e => localStorage.setItem('vf_max_concurrent', e.target.value)}
+                style={inputStyle}
+              />
+            </Field>
+          </Section>
+
+          <Section title="Sandbox Defaults">
+            <Field label="Default Docker Memory Limit">
+              <input
+                value={localStorage.getItem('vf_sandbox_memory') || '512m'}
+                onChange={e => localStorage.setItem('vf_sandbox_memory', e.target.value)}
+                placeholder="512m, 1g, 2g"
+                style={inputStyle}
+              />
+            </Field>
+            <Field label="Default Docker CPU Limit">
+              <input
+                type="number"
+                step={0.5}
+                value={localStorage.getItem('vf_sandbox_cpu') || '2'}
+                onChange={e => localStorage.setItem('vf_sandbox_cpu', e.target.value)}
+                style={inputStyle}
+              />
+            </Field>
+            <Field label="Default Sandbox Timeout (seconds, 0 = unlimited)">
+              <input
+                type="number"
+                value={localStorage.getItem('vf_sandbox_timeout') || '0'}
+                onChange={e => localStorage.setItem('vf_sandbox_timeout', e.target.value)}
+                style={inputStyle}
+              />
+            </Field>
+          </Section>
+
+          <Section title="Pipeline Defaults">
+            <Field label="Auto-Triage After Scan">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={localStorage.getItem('vf_auto_triage') === 'true'}
+                  onChange={e => localStorage.setItem('vf_auto_triage', String(e.target.checked))}
+                  style={{ accentColor: 'var(--blue)' }}
+                />
+                <span style={{ color: 'var(--text)', fontSize: 13 }}>Automatically run AI triage on new findings</span>
+              </label>
+            </Field>
+            <Field label="Skip AI Stages When No Provider Enabled">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={localStorage.getItem('vf_noai_mode') !== 'false'}
+                  onChange={e => localStorage.setItem('vf_noai_mode', String(e.target.checked))}
+                  style={{ accentColor: 'var(--blue)' }}
+                />
+                <span style={{ color: 'var(--text)', fontSize: 13 }}>Allow pipeline to complete without AI (no-AI mode)</span>
+              </label>
+            </Field>
+          </Section>
+
+          <Section title="Data">
+            <div style={{ display: 'flex', gap: 8 }}>
+              <a href="/api/export/sarif" download style={{
+                padding: '8px 14px', background: 'var(--blue)', color: '#fff',
+                border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600,
+                textDecoration: 'none', cursor: 'pointer',
+              }}>Export SARIF</a>
+              <a href="/api/export/workspace" download style={{
+                padding: '8px 14px', background: 'var(--green)', color: '#000',
+                border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600,
+                textDecoration: 'none', cursor: 'pointer',
+              }}>Backup Workspace</a>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+              SARIF exports findings in a format compatible with GitHub Code Scanning, GitLab, and Azure DevOps.
+              Workspace backup creates a full JSON dump of all data for migration or disaster recovery.
+            </div>
+          </Section>
+        </div>
+      )}
     </div>
   );
 }

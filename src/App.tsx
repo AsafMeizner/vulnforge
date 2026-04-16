@@ -1,27 +1,38 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { ToastProvider } from '@/components/Toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import Dashboard from '@/pages/Dashboard';
-import Findings from '@/pages/Findings';
-import Scanner from '@/pages/Scanner';
-import Projects from '@/pages/Projects';
-import Tools from '@/pages/Tools';
-import Checklists from '@/pages/Checklists';
-import AIPage from '@/pages/AIPage';
-import Plugins from '@/pages/Plugins';
-import Settings from '@/pages/Settings';
-import Hunt from '@/pages/Hunt';
-import ReviewQueue from '@/pages/ReviewQueue';
-import HypothesisBoard from '@/pages/HypothesisBoard';
-import Runtime from '@/pages/Runtime';
-import History from '@/pages/History';
-import Exploits from '@/pages/Exploits';
-import Investigate from '@/pages/Investigate';
-import Disclosure from '@/pages/Disclosure';
-import Audit from '@/pages/Audit';
 import { QuickCapture } from '@/components/QuickCapture';
 import { CommandPalette, type Command } from '@/components/CommandPalette';
 import { ShortcutOverlay } from '@/components/ShortcutOverlay';
+
+// Eager-load the landing page; lazy-load everything else for code splitting
+import Dashboard from '@/pages/Dashboard';
+const Findings = lazy(() => import('@/pages/Findings'));
+const Scanner = lazy(() => import('@/pages/Scanner'));
+const Projects = lazy(() => import('@/pages/Projects'));
+const Tools = lazy(() => import('@/pages/Tools'));
+const Checklists = lazy(() => import('@/pages/Checklists'));
+const AIPage = lazy(() => import('@/pages/AIPage'));
+const Plugins = lazy(() => import('@/pages/Plugins'));
+const Settings = lazy(() => import('@/pages/Settings'));
+const Hunt = lazy(() => import('@/pages/Hunt'));
+const ReviewQueue = lazy(() => import('@/pages/ReviewQueue'));
+const HypothesisBoard = lazy(() => import('@/pages/HypothesisBoard'));
+const Runtime = lazy(() => import('@/pages/Runtime'));
+const History = lazy(() => import('@/pages/History'));
+const Exploits = lazy(() => import('@/pages/Exploits'));
+const Investigate = lazy(() => import('@/pages/Investigate'));
+const Disclosure = lazy(() => import('@/pages/Disclosure'));
+const Audit = lazy(() => import('@/pages/Audit'));
+
+// Loading fallback for lazy pages
+function PageLoader() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+      <div style={{ color: 'var(--muted)', fontSize: 13 }}>Loading...</div>
+    </div>
+  );
+}
 
 type Page = 'dashboard' | 'findings' | 'scanner' | 'projects' | 'tools' | 'checklists' | 'ai' | 'plugins' | 'settings' | 'hunt' | 'review' | 'hypotheses' | 'runtime' | 'history' | 'exploits' | 'investigate' | 'disclosure' | 'audit';
 
@@ -367,12 +378,14 @@ export default function App() {
           {/* Page content */}
           <div style={{ flex: 1, padding: 24, overflow: 'auto' }}>
             <ErrorBoundary>
-              <PageContent
-                page={page}
-                searchQuery={searchQuery}
-                navExtra={navExtra}
-                onNavigate={navigate}
-              />
+              <Suspense fallback={<PageLoader />}>
+                <PageContent
+                  page={page}
+                  searchQuery={searchQuery}
+                  navExtra={navExtra}
+                  onNavigate={navigate}
+                />
+              </Suspense>
             </ErrorBoundary>
           </div>
         </main>
