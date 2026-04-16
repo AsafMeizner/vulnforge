@@ -81,7 +81,7 @@ jobs:
         run: npm run test:coverage -- --coverage.reporter=text --coverage.reporter=html --coverage.reporter=lcov
       - name: upload coverage
         if: matrix.node == '20'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage/
