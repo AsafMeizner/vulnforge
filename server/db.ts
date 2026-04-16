@@ -2,6 +2,7 @@ import { createRequire } from 'module';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { ulid as __ulid } from './utils/ulid.js';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -964,9 +965,7 @@ function migrateSchema(): void {
  * Uses ulid() for sync_id so each row gets a sortable unique identifier.
  */
 function backfillSyncColumns(): void {
-  // Import here to avoid circular deps at module load time.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { ulid } = require('./utils/ulid.js') as typeof import('./utils/ulid.js');
+  const ulid = __ulid;
   const nowMs = Date.now();
 
   for (const table of SYNC_ENABLED_TABLES) {
