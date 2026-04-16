@@ -77,19 +77,70 @@ External AI agents connect at `http://localhost:3001/mcp` for full platform acce
 
 ---
 
-## Quick Start
+## Deployment modes
+
+VulnForge ships in two flavors from one codebase:
+
+| Mode | Who for | What it is |
+|---|---|---|
+| **Solo desktop** | Individual researchers | Download the installer. Frontend + server + MCP + SQLite all run locally. No network required. |
+| **Team server** | Small teams / companies | Run a shared server. Every member's desktop stays local-first (own SQLite + MCP) and **syncs** findings / projects / notes to the server over WebSocket. |
+
+In team mode the server can optionally host **shared AI providers** and **integrations** — keys live on the server, clients invoke them by name. Per-job scan routing lets light scans run on the laptop and heavy scans on beefy server workers.
+
+Full design: [`docs/architecture/deployment-topology.md`](docs/architecture/deployment-topology.md).
+
+---
+
+## Quick start
+
+### Path 1 — Solo desktop
 
 ```bash
-# Prerequisites: Node.js 18+, Python 3.10+, Git
-# Optional: Docker (sandboxes), Ollama (local AI)
+# Prerequisites: Node.js 20+, Python 3.10+, Git
 
 git clone https://github.com/your-org/vulnforge.git
 cd vulnforge
 npm install
-npm run dev
+npm run dev           # dev
+# or
+npm run build:desktop # produce an installer
 ```
 
-Open http://localhost:5173. Backend runs on port 3001.
+Open http://localhost:5173. Backend runs on port 3001. First launch shows a wizard — pick **Solo**.
+
+### Path 2 — Team server via Docker
+
+```bash
+cp .env.server.example .env.server
+# edit .env.server — set VULNFORGE_PUBLIC_URL, generate VULNFORGE_JWT_SECRET
+docker compose -f docker-compose.server.yml --env-file .env.server up -d
+```
+
+Check logs: `docker logs vulnforge-server` — copy the printed bootstrap token. On your desktop, first-launch wizard → **Team** → paste server URL + bootstrap token.
+
+### Path 3 — Team server bare metal
+
+```bash
+# From the server tarball on any Linux host
+tar xf vulnforge-server-<version>.tar.gz
+sudo ./scripts/install-server.sh
+# Windows equivalent:  .\scripts\install-server.ps1
+```
+
+The installer prompts for the public URL, generates secrets, creates a systemd service (or Windows service), runs migrations, prints the first-admin bootstrap token.
+
+---
+
+## Building artifacts
+
+```bash
+npm run build:desktop        # .exe / .dmg / .AppImage installers (dist/)
+npm run build:server:docker  # multi-arch Docker image vulnforge/server:<ver>
+npm run build:server:tar     # vulnforge-server-<ver>.tar.gz
+```
+
+Build details: [`docs/developer/building.md`](docs/developer/building.md).
 
 ### First Hunt
 1. Click **Hunt** → paste a GitHub URL → **Start Hunt**
@@ -131,10 +182,30 @@ projects, vulnerabilities, scan_findings, pipeline_runs, runtime_jobs, fuzz_cras
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start frontend + backend (development) |
+| `npm run dev` | Start frontend + backend (development, desktop mode) |
 | `npm run dev:server` | Backend only |
+| `npm run dev:server:team` | Backend in server mode (multi-user + worker pool) |
 | `npm run dev:client` | Frontend only |
-| `npm run build` | Production build |
+| `npm run build` | Production frontend build |
+| `npm run build:server` | Compile server TypeScript → `dist-server/` |
+| `npm run build:desktop` | Build desktop installers (all platforms available on current host) |
+| `npm run build:server:docker` | Build server Docker image (`--push` for multi-arch publish) |
+| `npm run build:server:tar` | Build bare-metal server tarball |
+| `npm run migrate` | Run DB migrations (idempotent) |
+
+---
+
+## Documentation
+
+All long-form docs live under [`docs/`](docs/):
+
+- **Architecture**: [overview](docs/architecture/overview.md) · [deployment topology](docs/architecture/deployment-topology.md) · [sync protocol](docs/architecture/sync-protocol.md) · [data model](docs/architecture/data-model.md)
+- **Operator**: [install (bare metal)](docs/operator/install-server.md) · [install (Docker)](docs/operator/install-docker.md) · [upgrade](docs/operator/upgrade.md) · [OIDC setup](docs/operator/oidc-setup.md) · [backup / restore](docs/operator/backup-restore.md)
+- **User**: [first launch](docs/user/first-launch.md) · [privacy scopes](docs/user/privacy-scopes.md) · [team-mode switching](docs/user/team-mode-switching.md)
+- **Developer**: [building](docs/developer/building.md) · [migrations](docs/developer/migrations.md) · [MCP tools](docs/developer/mcp-tools.md)
+- **Security**: [threat model](docs/security/threat-model.md) · [secret handling](docs/security/secret-handling.md) · [sync security](docs/security/sync-security.md)
+
+Design records of architectural decisions: [`docs/superpowers/specs/`](docs/superpowers/specs/).
 
 ---
 

@@ -1,0 +1,57 @@
+# VulnForge team server — docker-compose setup.
+#
+# Usage:
+#   cp .env.server.example .env.server
+#   edit .env.server — set VULNFORGE_PUBLIC_URL and VULNFORGE_JWT_SECRET
+#   docker compose -f docker-compose.server.yml --env-file .env.server up -d
+
+version: "3.9"
+
+services:
+  vulnforge-server:
+    image: vulnforge/server:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: vulnforge-server
+    restart: unless-stopped
+    ports:
+      - "${VULNFORGE_PORT:-3001}:3001"
+    environment:
+      VULNFORGE_MODE: server
+      VULNFORGE_HOST: 0.0.0.0
+      VULNFORGE_PORT: "3001"
+      VULNFORGE_DB_PATH: /data/vulnforge.db
+      VULNFORGE_PUBLIC_URL: "${VULNFORGE_PUBLIC_URL:-http://localhost:3001}"
+      VULNFORGE_JWT_SECRET: "${VULNFORGE_JWT_SECRET}"
+      VULNFORGE_BOOTSTRAP_TOKEN: "${VULNFORGE_BOOTSTRAP_TOKEN:-}"
+      VULNFORGE_ADMIN_EMAIL: "${VULNFORGE_ADMIN_EMAIL:-}"
+    volumes:
+      - vulnforge-data:/data
+    networks:
+      - vulnforge-net
+
+  # Optional nginx reverse proxy with Let's Encrypt.
+  # Uncomment the block below + configure nginx/ and certs/ on host.
+  #
+  # nginx:
+  #   image: nginx:1.27-alpine
+  #   container_name: vulnforge-proxy
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/conf.d:/etc/nginx/conf.d:ro
+  #     - ./nginx/certs:/etc/nginx/certs:ro
+  #   depends_on:
+  #     - vulnforge-server
+  #   networks:
+  #     - vulnforge-net
+
+volumes:
+  vulnforge-data:
+
+networks:
+  vulnforge-net:
+    driver: bridge

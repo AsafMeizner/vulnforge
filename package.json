@@ -7,10 +7,17 @@
   "scripts": {
     "dev": "concurrently \"vite\" \"tsx watch server/index.ts\"",
     "dev:server": "tsx watch server/index.ts",
+    "dev:server:team": "cross-env VULNFORGE_MODE=server tsx watch server/index.ts",
     "dev:client": "vite",
     "seed": "tsx seed.ts",
     "build": "vite build",
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:server:tar": "node scripts/build-server-tar.mjs",
+    "build:server:docker": "node scripts/build-server-docker.mjs",
+    "build:desktop": "node scripts/build-desktop.mjs",
+    "migrate": "node scripts/migrate.mjs",
     "start": "node dist/server/index.js",
+    "start:server": "node dist-server/server/index.js",
     "electron:dev": "concurrently \"vite\" \"tsx watch server/index.ts\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "vite build && electron-builder"
   },

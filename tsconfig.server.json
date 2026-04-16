@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "outDir": "dist-server",
+    "rootDir": ".",
+    "declaration": false,
+    "sourceMap": false,
+    "allowImportingTsExtensions": false,
+    "noEmitOnError": false
+  },
+  "include": ["server/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "dist-server",
+    "dist-tarball-stage",
+    "src",
+    "electron",
+    "**/*.test.ts",
+    "scripts"
+  ]
+}
