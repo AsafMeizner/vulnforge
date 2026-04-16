@@ -4,7 +4,7 @@
 # Produces a slim runtime image with no dev deps and no electron.
 
 # ── Stage 1: build ─────────────────────────────────────────────────────────
-FROM node:20-bullseye AS builder
+FROM node:25-bullseye AS builder
 WORKDIR /build
 
 # Install build deps separately for layer caching.
@@ -21,7 +21,7 @@ RUN npx tsc --project tsconfig.server.json || (echo "tsconfig.server.json missin
 RUN npm prune --omit=dev --ignore-scripts
 
 # ── Stage 2: runtime ───────────────────────────────────────────────────────
-FROM node:20-bullseye-slim
+FROM node:25-bullseye-slim
 WORKDIR /app
 
 # Install runtime system deps: Python for scan tools, git for project clones.
