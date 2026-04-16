@@ -590,6 +590,40 @@ export const generateHarness = (signature: string, language: string) =>
     body: JSON.stringify({ function_signature: signature, language }),
   });
 
+// ─── Sandbox extensions ────
+export const pauseSandbox = (id: string) =>
+  request<{ paused: boolean }>(`/runtime/${id}/pause`, { method: 'POST' });
+
+export const resumeSandbox = (id: string) =>
+  request<{ resumed: boolean }>(`/runtime/${id}/resume`, { method: 'POST' });
+
+export const createSandboxSnapshot = (id: string, name: string, description?: string) =>
+  request<{ id: number; name: string; tag: string }>(`/runtime/${id}/snapshot`, {
+    method: 'POST',
+    body: JSON.stringify({ name, description }),
+  });
+
+export const listSandboxSnapshots = (id: string) =>
+  request<{ data: any[]; total: number }>(`/runtime/${id}/snapshots`);
+
+export const getSandboxProcesses = (id: string) =>
+  request<{ data: Array<{ pid: string; user: string; command: string }>; total: number }>(`/runtime/${id}/processes`);
+
+export const getSandboxResources = (id: string) =>
+  request<{
+    cpu_percent: number;
+    memory_mb: number;
+    memory_limit_mb: number;
+    network_rx_bytes: number;
+    network_tx_bytes: number;
+  }>(`/runtime/${id}/resources`);
+
+export const uploadToSandbox = (id: string, hostPath: string, containerPath: string) =>
+  request<{ uploaded: boolean }>(`/runtime/${id}/upload`, {
+    method: 'POST',
+    body: JSON.stringify({ host_path: hostPath, container_path: containerPath }),
+  });
+
 // ─── Historical Intelligence (Theme 4) ─────────────────────────────────────
 
 export interface CveIntel {

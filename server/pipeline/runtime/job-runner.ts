@@ -60,6 +60,7 @@ export class RuntimeJobRunner {
       { path: './symexec/angr.js', exportName: 'AngrExecutor', label: 'angr' },
       { path: './memory/core-dump.js', exportName: 'CoreDumpExecutor', label: 'core-dump' },
       { path: './binary/radare2.js', exportName: 'Radare2Executor', label: 'radare2' },
+      { path: './sandbox/docker.js', exportName: 'DockerExecutor', label: 'docker-sandbox' },
     ];
 
     for (const mod of modules) {

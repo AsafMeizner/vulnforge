@@ -221,4 +221,152 @@ router.get('/:id/packets', async (req: Request, res: Response) => {
   }
 });
 
+// ── Sandbox-specific endpoints ────────────────────────────────────────────
+
+// POST /api/runtime/:id/pause - pause a sandbox container
+router.post('/:id/pause', async (req: Request, res: Response) => {
+  try {
+    const job = getRuntimeJobById(req.params.id);
+    if (!job) { res.status(404).json({ error: 'job not found' }); return; }
+    if (job.type !== 'sandbox') { res.status(400).json({ error: 'only sandbox jobs can be paused' }); return; }
+
+    const { updateRuntimeJob } = await import('../db.js');
+    updateRuntimeJob(req.params.id, { status: 'paused' });
+    // The executor polling loop will detect the status change and call docker pause
+    res.json({ paused: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/runtime/:id/resume - resume a paused sandbox
+router.post('/:id/resume', async (req: Request, res: Response) => {
+  try {
+    const job = getRuntimeJobById(req.params.id);
+    if (!job) { res.status(404).json({ error: 'job not found' }); return; }
+
+    const { updateRuntimeJob } = await import('../db.js');
+    updateRuntimeJob(req.params.id, { status: 'running' });
+    res.json({ resumed: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/runtime/:id/snapshot - create a named snapshot
+router.post('/:id/snapshot', async (req: Request, res: Response) => {
+  try {
+    const job = getRuntimeJobById(req.params.id);
+    if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
+
+    const stats = JSON.parse(job.stats || '{}');
+    if (!stats.container_id) { res.status(400).json({ error: 'no container running' }); return; }
+
+    const { name, description } = req.body;
+    if (!name) { res.status(400).json({ error: 'name required' }); return; }
+
+    const { dockerSnapshot } = await import('../pipeline/runtime/sandbox/introspect.js');
+    const { createSandboxSnapshot } = await import('../db.js');
+
+    const tag = await dockerSnapshot(stats.container_id, name);
+    const snapId = createSandboxSnapshot({
+      job_id: req.params.id,
+      name,
+      type: stats.sandbox_type || 'docker',
+      description,
+    });
+
+    res.json({ id: snapId, name, tag });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/runtime/:id/snapshots
+router.get('/:id/snapshots', (req: Request, res: Response) => {
+  try {
+    const { getSandboxSnapshots } = require('../db.js');
+    const snaps = getSandboxSnapshots(req.params.id);
+    res.json({ data: snaps, total: snaps.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/runtime/:id/processes - list running processes
+router.get('/:id/processes', async (req: Request, res: Response) => {
+  try {
+    const job = getRuntimeJobById(req.params.id);
+    if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
+
+    const stats = JSON.parse(job.stats || '{}');
+    if (!stats.container_id) { res.json({ data: [] }); return; }
+
+    const { dockerTop } = await import('../pipeline/runtime/sandbox/introspect.js');
+    const processes = await dockerTop(stats.container_id);
+    res.json({ data: processes, total: processes.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/runtime/:id/resources - live resource stats
+router.get('/:id/resources', async (req: Request, res: Response) => {
+  try {
+    const job = getRuntimeJobById(req.params.id);
+    if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
+
+    const stats = JSON.parse(job.stats || '{}');
+    if (!stats.container_id) { res.json({}); return; }
+
+    const { dockerStats: getStats } = await import('../pipeline/runtime/sandbox/introspect.js');
+    const live = await getStats(stats.container_id);
+    res.json(live);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/runtime/:id/upload - upload file into sandbox
+router.post('/:id/upload', async (req: Request, res: Response) => {
+  try {
+    const job = getRuntimeJobById(req.params.id);
+    if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
+
+    const stats = JSON.parse(job.stats || '{}');
+    if (!stats.container_id) { res.status(400).json({ error: 'no container' }); return; }
+
+    const { host_path, container_path } = req.body;
+    if (!host_path || !container_path) { res.status(400).json({ error: 'host_path and container_path required' }); return; }
+
+    const { dockerCopyIn } = await import('../pipeline/runtime/sandbox/introspect.js');
+    await dockerCopyIn(stats.container_id, host_path, container_path);
+    res.json({ uploaded: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/runtime/:id/download/:path - download file from sandbox
+router.get('/:id/download/*', async (req: Request, res: Response) => {
+  try {
+    const job = getRuntimeJobById(req.params.id);
+    if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
+
+    const stats = JSON.parse(job.stats || '{}');
+    if (!stats.container_id) { res.status(400).json({ error: 'no container' }); return; }
+
+    const containerPath = '/' + (req.params as any)[0]; // everything after /download/
+    const tmpPath = path.join(job.output_dir || '/tmp', `download-${Date.now()}`);
+
+    const { dockerCopyOut } = await import('../pipeline/runtime/sandbox/introspect.js');
+    await dockerCopyOut(stats.container_id, containerPath, tmpPath);
+    res.download(tmpPath, path.basename(containerPath), () => {
+      fs.unlink(tmpPath).catch(() => {});
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

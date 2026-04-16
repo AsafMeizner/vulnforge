@@ -5,7 +5,7 @@
  * RuntimeJobExecutor interface and share a unified lifecycle.
  */
 
-export type RuntimeJobType = 'fuzz' | 'debug' | 'capture' | 'portscan' | 'mitm';
+export type RuntimeJobType = 'fuzz' | 'debug' | 'capture' | 'portscan' | 'mitm' | 'sandbox' | 'symexec' | 'memory' | 'binary' | 'bisect';
 export type RuntimeJobStatus = 'queued' | 'starting' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
 
 export interface RuntimeJobSpec {
@@ -160,4 +160,61 @@ export interface PortScanResult {
     total_ports: number;
     open_ports: number;
   };
+}
+
+// ── Sandbox types ──────────────────────────────────────────────────────────
+
+export interface DockerSandboxConfig {
+  image: string;                // e.g. 'ubuntu:22.04', 'kalilinux/kali'
+  command?: string[];           // entrypoint override
+  memory_limit?: string;        // '512m', '2g'
+  cpu_limit?: number;           // CPU cores
+  network_mode?: 'bridge' | 'host' | 'none';
+  ports?: Record<string, string>; // { '8080': '80' } host:container
+  volumes?: Record<string, string>;
+  env?: Record<string, string>;
+  auto_capture_network?: boolean; // default true
+  auto_remove?: boolean;         // remove container on stop (default false)
+  timeout?: number;              // max runtime in seconds (0 = unlimited)
+  privileged?: boolean;
+}
+
+export interface QemuSandboxConfig {
+  disk_image: string;           // path to qcow2/raw image
+  memory?: string;              // '1G', '4G'
+  cpus?: number;
+  vnc_port?: number;            // auto-assigned if not set
+  qmp_port?: number;
+  ssh_port?: number;            // forwarded from guest 22
+  network?: 'user' | 'tap';
+  snapshot_mode?: boolean;      // -snapshot flag
+  timeout?: number;
+}
+
+export interface SandboxStats {
+  container_id?: string;        // Docker container ID
+  pid?: number;                 // QEMU process PID
+  sandbox_type: 'docker' | 'qemu';
+  image?: string;
+  cpu_percent?: number;
+  memory_mb?: number;
+  memory_limit_mb?: number;
+  network_rx_bytes?: number;
+  network_tx_bytes?: number;
+  processes_count?: number;
+  uptime_seconds?: number;
+  paused?: boolean;
+  snapshots_count?: number;
+  vnc_port?: number;
+  pcap_path?: string;
+}
+
+export interface SandboxSnapshotRow {
+  id?: number;
+  job_id: string;
+  name: string;
+  type: 'docker' | 'qemu';
+  created_at?: string;
+  size_bytes?: number;
+  description?: string;
 }

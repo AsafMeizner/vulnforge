@@ -12,7 +12,7 @@ import {
 } from '@/lib/api';
 import { useToast } from '@/components/Toast';
 
-type SubTab = 'all' | 'fuzz' | 'debug' | 'capture' | 'portscan';
+type SubTab = 'all' | 'fuzz' | 'debug' | 'capture' | 'portscan' | 'sandbox';
 
 const TAB_FILTERS: Record<SubTab, string | undefined> = {
   all: undefined,
@@ -20,6 +20,7 @@ const TAB_FILTERS: Record<SubTab, string | undefined> = {
   debug: 'debug',
   capture: 'capture',
   portscan: 'portscan',
+  sandbox: 'sandbox',
 };
 
 const TAB_LABELS: Record<SubTab, string> = {
@@ -28,6 +29,7 @@ const TAB_LABELS: Record<SubTab, string> = {
   debug: 'Debugging',
   capture: 'Network',
   portscan: 'Port Scans',
+  sandbox: 'Sandboxes',
 };
 
 function statusColor(status: string): string {
@@ -197,6 +199,22 @@ export default function Runtime() {
                     </td>
                     <td style={{ padding: '10px 14px' }}>
                       <div style={{ display: 'flex', gap: 6 }}>
+                        {job.type === 'sandbox' && job.status === 'running' && (
+                          <button onClick={async (e) => {
+                            e.stopPropagation();
+                            const { pauseSandbox } = await import('@/lib/api');
+                            await pauseSandbox(job.id);
+                            load();
+                          }} style={smallBtn('var(--blue)')}>Pause</button>
+                        )}
+                        {job.type === 'sandbox' && job.status === 'paused' && (
+                          <button onClick={async (e) => {
+                            e.stopPropagation();
+                            const { resumeSandbox } = await import('@/lib/api');
+                            await resumeSandbox(job.id);
+                            load();
+                          }} style={smallBtn('var(--green)')}>Resume</button>
+                        )}
                         {(job.status === 'running' || job.status === 'queued') && (
                           <button onClick={(e) => { e.stopPropagation(); handleStop(job.id); }}
                             style={smallBtn('var(--yellow)')}>Stop</button>
@@ -259,6 +277,16 @@ function StatsSummary({ job }: { job: RuntimeJob }) {
     return <>
       {stats.hit_breakpoint !== undefined ? (stats.hit_breakpoint ? 'breakpoint hit' : 'no hit') : '—'}
       {stats.signal ? ` · ${stats.signal}` : ''}
+    </>;
+  }
+
+  if (job.type === 'sandbox') {
+    return <>
+      {stats.image || stats.sandbox_type || 'docker'}
+      {stats.cpu_percent !== undefined ? ` · CPU ${stats.cpu_percent.toFixed(1)}%` : ''}
+      {stats.memory_mb ? ` · ${stats.memory_mb.toFixed(0)}MB` : ''}
+      {stats.paused ? ' · PAUSED' : ''}
+      {stats.uptime_seconds ? ` · ${Math.floor(stats.uptime_seconds / 60)}m` : ''}
     </>;
   }
 
@@ -361,7 +389,7 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   const update = (key: string, val: any) => setFormData(prev => ({ ...prev, [key]: val }));
 
-  const TOOL_MAP = { fuzz: 'libfuzzer', debug: 'gdb', capture: 'tcpdump', portscan: 'nmap' };
+  const TOOL_MAP: Record<string, string> = { fuzz: 'libfuzzer', debug: 'gdb', capture: 'tcpdump', portscan: 'nmap', sandbox: 'docker' };
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -389,8 +417,8 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
         <h3 style={{ margin: '0 0 16px', color: 'var(--text)', fontSize: 16 }}>New Runtime Job</h3>
 
         {/* Type selector */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-          {(['fuzz', 'debug', 'capture', 'portscan'] as const).map(t => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 16 }}>
+          {(['fuzz', 'debug', 'capture', 'portscan', 'sandbox'] as const).map(t => (
             <button
               key={t}
               onClick={() => { setJobType(t); setFormData({}); }}
@@ -477,6 +505,34 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             </Field>
             <Field label="Timing (0-5)">
               <input type="number" min={0} max={5} value={formData.timing ?? 3} onChange={e => update('timing', Number(e.target.value))} style={inputStyle} />
+            </Field>
+          </>}
+
+          {jobType === 'sandbox' && <>
+            <Field label="Docker image" required>
+              <input value={formData.image || 'ubuntu:22.04'} onChange={e => update('image', e.target.value)}
+                placeholder="ubuntu:22.04, kalilinux/kali, python:3.12" style={inputStyle} />
+            </Field>
+            <Field label="Command (optional)">
+              <input value={(formData.command || []).join(' ')} onChange={e => update('command', e.target.value.split(/\s+/).filter(Boolean))}
+                placeholder="sleep 3600 (default: image entrypoint)" style={inputStyle} />
+            </Field>
+            <Field label="Memory limit">
+              <input value={formData.memory_limit || '512m'} onChange={e => update('memory_limit', e.target.value)}
+                placeholder="512m, 1g, 2g" style={inputStyle} />
+            </Field>
+            <Field label="CPU limit">
+              <input type="number" step={0.5} value={formData.cpu_limit ?? 2} onChange={e => update('cpu_limit', Number(e.target.value) || undefined)} style={inputStyle} />
+            </Field>
+            <Field label="Network mode">
+              <select value={formData.network_mode || 'bridge'} onChange={e => update('network_mode', e.target.value)} style={inputStyle}>
+                <option value="bridge">Bridge (isolated, recommended)</option>
+                <option value="host">Host (full host network access)</option>
+                <option value="none">None (no network)</option>
+              </select>
+            </Field>
+            <Field label="Timeout (seconds, 0 = unlimited)">
+              <input type="number" value={formData.timeout ?? 0} onChange={e => update('timeout', Number(e.target.value))} style={inputStyle} />
             </Field>
           </>}
         </div>

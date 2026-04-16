@@ -2151,4 +2151,163 @@ export const mcpTools: MCPToolDef[] = [
       return { entries: log, total: log.length };
     },
   },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // SANDBOX / VM TOOLS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'start_sandbox',
+    description: 'Start a Docker sandbox container. Run anything safely in isolation with resource limits and automatic network capture.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        image: { type: 'string', description: 'Docker image (e.g. "ubuntu:22.04", "kalilinux/kali", "python:3.12")' },
+        command: { type: 'array', items: { type: 'string' }, description: 'Command to run' },
+        memory_limit: { type: 'string', description: 'e.g. "512m", "2g"' },
+        cpu_limit: { type: 'number' },
+        network_mode: { type: 'string', enum: ['bridge', 'host', 'none'] },
+        timeout: { type: 'number', description: 'Seconds (0 = unlimited)' },
+        project_id: { type: 'number' },
+        finding_id: { type: 'number' },
+      },
+      required: ['image'],
+    },
+    handler: async (args: any) => {
+      const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
+      const id = await runtimeJobRunner.start({
+        type: 'sandbox' as any, tool: 'docker',
+        config: {
+          image: args.image,
+          command: args.command,
+          memory_limit: args.memory_limit || '512m',
+          cpu_limit: args.cpu_limit,
+          network_mode: args.network_mode || 'bridge',
+          timeout: args.timeout || 0,
+        },
+        projectId: args.project_id,
+        findingId: args.finding_id,
+      });
+      return { id, status: 'queued' };
+    },
+  },
+
+  {
+    name: 'pause_sandbox',
+    description: 'Pause a running sandbox. Freezes all processes inside the container — instant, lossless, resumable.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const { updateRuntimeJob } = await import('../db.js');
+      updateRuntimeJob(args.id, { status: 'paused' });
+      return { paused: true };
+    },
+  },
+
+  {
+    name: 'resume_sandbox',
+    description: 'Resume a paused sandbox.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const { updateRuntimeJob } = await import('../db.js');
+      updateRuntimeJob(args.id, { status: 'running' });
+      return { resumed: true };
+    },
+  },
+
+  {
+    name: 'snapshot_sandbox',
+    description: 'Create a named snapshot of a running sandbox. You can restore to this point later.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string' },
+        description: { type: 'string' },
+      },
+      required: ['id', 'name'],
+    },
+    handler: async (args: any) => {
+      const job = getRuntimeJobById(args.id);
+      if (!job || job.type !== 'sandbox') throw new Error('sandbox job required');
+      const stats = JSON.parse(job.stats || '{}');
+      if (!stats.container_id) throw new Error('no container running');
+
+      const { dockerSnapshot } = await import('../pipeline/runtime/sandbox/introspect.js');
+      const { createSandboxSnapshot } = await import('../db.js');
+
+      const tag = await dockerSnapshot(stats.container_id, args.name);
+      const snapId = createSandboxSnapshot({ job_id: args.id, name: args.name, type: 'docker', description: args.description });
+      return { snapshot_id: snapId, name: args.name, tag };
+    },
+  },
+
+  {
+    name: 'upload_to_sandbox',
+    description: 'Copy a file from the host into a running sandbox container.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        host_path: { type: 'string' },
+        container_path: { type: 'string' },
+      },
+      required: ['id', 'host_path', 'container_path'],
+    },
+    handler: async (args: any) => {
+      const job = getRuntimeJobById(args.id);
+      if (!job) throw new Error('job not found');
+      const stats = JSON.parse(job.stats || '{}');
+      if (!stats.container_id) throw new Error('no container');
+
+      const { dockerCopyIn } = await import('../pipeline/runtime/sandbox/introspect.js');
+      await dockerCopyIn(stats.container_id, args.host_path, args.container_path);
+      return { uploaded: true };
+    },
+  },
+
+  {
+    name: 'list_sandbox_processes',
+    description: 'List running processes inside a sandbox container.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const job = getRuntimeJobById(args.id);
+      if (!job) throw new Error('job not found');
+      const stats = JSON.parse(job.stats || '{}');
+      if (!stats.container_id) return { processes: [] };
+
+      const { dockerTop } = await import('../pipeline/runtime/sandbox/introspect.js');
+      return { processes: await dockerTop(stats.container_id) };
+    },
+  },
+
+  {
+    name: 'get_sandbox_resources',
+    description: 'Get live CPU, memory, and network I/O stats for a sandbox container.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' } },
+      required: ['id'],
+    },
+    handler: async (args: any) => {
+      const job = getRuntimeJobById(args.id);
+      if (!job) throw new Error('job not found');
+      const stats = JSON.parse(job.stats || '{}');
+      if (!stats.container_id) return {};
+
+      const { dockerStats: getDockerStats } = await import('../pipeline/runtime/sandbox/introspect.js');
+      return await getDockerStats(stats.container_id);
+    },
+  },
 ];

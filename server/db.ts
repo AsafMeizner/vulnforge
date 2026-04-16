@@ -648,6 +648,20 @@ function createTables(): void {
     )
   `);
 
+  // Sandbox Snapshots (VM integration)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS sandbox_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      job_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      size_bytes INTEGER DEFAULT 0,
+      description TEXT,
+      FOREIGN KEY (job_id) REFERENCES runtime_jobs(id)
+    )
+  `);
+
   // Collaboration & Compliance (Themes 7+9)
   db.run(`
     CREATE TABLE IF NOT EXISTS audit_log (
@@ -1651,6 +1665,7 @@ export function updateRuntimeJob(id: string, updates: Partial<RuntimeJobRow>): v
 export function deleteRuntimeJob(id: string): void {
   db.run('DELETE FROM fuzz_crashes WHERE job_id = ?', [id]);
   db.run('DELETE FROM captures WHERE job_id = ?', [id]);
+  db.run('DELETE FROM sandbox_snapshots WHERE job_id = ?', [id]);
   db.run('DELETE FROM runtime_jobs WHERE id = ?', [id]);
   persistDb();
 }
@@ -1990,6 +2005,24 @@ export function getAuditLog(filters: { entity_type?: string; entity_id?: string;
     `SELECT * FROM audit_log ${where} ORDER BY ts DESC LIMIT ${limit}`,
     params
   ) as unknown as AuditLogRow[];
+}
+
+// ── Sandbox Snapshots CRUD ───────────────────────────────────────────────
+
+export function getSandboxSnapshots(jobId: string): any[] {
+  return execQuery('SELECT * FROM sandbox_snapshots WHERE job_id = ? ORDER BY created_at DESC', [jobId]) as any[];
+}
+
+export function createSandboxSnapshot(row: { job_id: string; name: string; type: string; size_bytes?: number; description?: string }): number {
+  return execRun(
+    `INSERT INTO sandbox_snapshots (job_id, name, type, size_bytes, description) VALUES (?, ?, ?, ?, ?)`,
+    [row.job_id, row.name, row.type, row.size_bytes ?? 0, row.description || null]
+  );
+}
+
+export function deleteSandboxSnapshot(id: number): void {
+  db.run('DELETE FROM sandbox_snapshots WHERE id = ?', [id]);
+  persistDb();
 }
 
 export function logAudit(entry: AuditLogRow): void {
