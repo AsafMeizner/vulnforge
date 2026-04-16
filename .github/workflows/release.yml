@@ -1,0 +1,152 @@
+name: Release
+
+# Triggered when a tag vX.Y.Z is pushed. Builds three artifacts —
+# desktop installers (win/mac/linux), server Docker image, and bare
+# server tarball — then attaches them to the GitHub Release.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.2.0). Must already exist.'
+        required: true
+
+permissions:
+  contents: write  # for creating/attaching releases
+  packages: write  # for pushing to GHCR
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── 1. Desktop installers on three OSes ──
+  desktop:
+    name: desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci --ignore-scripts
+      - name: build desktop
+        run: npm run build:desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+            release/*.zip
+            release/latest*.yml
+          if-no-files-found: warn
+          retention-days: 14
+
+  # ── 2. Server Docker image → GHCR ──
+  docker:
+    name: docker (server)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - name: compute tag
+        id: tag
+        run: |
+          VER="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "version=${VER#v}" >> $GITHUB_OUTPUT
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: build + push multi-arch
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.server
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/vulnforge-server:${{ steps.tag.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/vulnforge-server:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 3. Bare-metal server tarball ──
+  tarball:
+    name: server tarball
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci --ignore-scripts
+      - name: build tarball
+        run: npm run build:server:tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-tarball
+          path: vulnforge-server-*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  # ── 4. Create the GitHub Release + attach all artifacts ──
+  release:
+    name: github release
+    needs: [desktop, docker, tarball]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      - name: flatten artifacts
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( \
+            -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' -o \
+            -name '*.deb' -o -name '*.zip' -o -name '*.tar.gz' -o \
+            -name 'latest*.yml' \
+          \) -exec cp -v {} release-assets/ \;
+          ls -la release-assets/
+      - name: create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: release-assets/*
+          body: |
+            ## Downloads
+
+            - **Desktop installer** — pick the file that matches your OS below.
+            - **Server Docker image:** `ghcr.io/${{ github.repository_owner }}/vulnforge-server:${{ github.event.inputs.tag || github.ref_name }}`
+            - **Server tarball:** `vulnforge-server-*.tar.gz` — extract and run `sudo ./scripts/install-server.sh`.
+
+            See [docs/](https://github.com/${{ github.repository }}/tree/main/docs) for install guides.

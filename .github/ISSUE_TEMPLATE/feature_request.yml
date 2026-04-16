@@ -1,0 +1,51 @@
+name: Feature request
+description: Suggest a new capability or an improvement.
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the underlying user need, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would the feature work? Sketches, API shapes, UI notes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What else did you think about? What trade-offs did you weigh?
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Primary surface
+      options:
+        - Frontend UI
+        - Backend API
+        - Pipeline / analysis
+        - Runtime / dynamic analysis
+        - AI routing
+        - Integrations (Jira / Slack / etc.)
+        - MCP server
+        - Sync / team mode
+        - Docs
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: prior-art
+    attributes:
+      label: Prior art
+      options:
+        - label: I checked `docs/superpowers/specs/` for existing design discussions
+        - label: I searched open and closed issues

@@ -1,0 +1,80 @@
+name: Bug report
+description: Something behaves unexpectedly or crashes.
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please be as specific as you can — the more
+        grounded the repro, the faster the fix.
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      description: Which deployment mode are you running?
+      options:
+        - Solo desktop (Electron)
+        - Team server (Docker)
+        - Team server (bare metal)
+        - dev (`npm run dev`)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `git rev-parse --short HEAD` or the installer version string.
+      placeholder: "e.g. 0.1.0 / abcdef1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node version, browser (if UI bug), Docker version (if docker mode)
+      placeholder: |
+        OS: Ubuntu 24.04
+        Node: v20.15.0
+        Browser: Chrome 128
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Observed behavior. Paste logs / tracebacks verbatim.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered list. Include the specific project / URL if scan-related.
+      placeholder: |
+        1. npm run dev
+        2. Hunt → paste https://github.com/example/repo
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        `journalctl -u vulnforge-server`, browser console, or `server.log`.
+        Redact secrets first.
+      render: shell

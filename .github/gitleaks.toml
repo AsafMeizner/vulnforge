@@ -1,0 +1,24 @@
+# gitleaks — custom config for VulnForge.
+#
+# Extends the built-in default ruleset with allowlists for test fixtures and
+# brand/docs files that may contain strings matching default patterns
+# (e.g. bootstrap tokens in docs/operator/install-server.md examples).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures, docs examples, brand assets"
+paths = [
+    '''tests/'''                                    , # Test secrets are hand-built scrypt/bcrypt hashes
+    '''docs/operator/install-server\.md'''          , # Contains example bootstrap token output
+    '''docs/security/'''                            , # References secret storage patterns
+    '''public/brand/'''                             ,
+    '''.env\.server\.example$'''                    , # Placeholders only
+]
+# Ignore strings that are obviously example placeholders.
+regexes = [
+    '''your-org/vulnforge''',
+    '''live-test-bootstrap-token-hex-xyz''',
+    '''live-test-secret-at-least-32-characters-long-enough''',
+]
