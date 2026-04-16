@@ -43,6 +43,7 @@ import aiInvestigateRouter from './routes/ai-investigate.js';
 // Auth + RBAC (Phase 14)
 import authRouter from './routes/auth.js';
 import authSessionRouter from './routes/auth-session.js';
+import authOidcRouter from './routes/auth-oidc.js';
 import syncRouter from './routes/sync.js';
 import serverProxyRouter from './routes/server-proxy.js';
 import jobsRouter from './routes/jobs.js';
@@ -119,6 +120,7 @@ async function main(): Promise<void> {
   app.use('/api/auth', authRouter);
   // Subsystem B — JWT session flow (coexists with legacy API-token auth above)
   app.use('/api/session', authSessionRouter);
+  app.use('/api/auth/oidc', authOidcRouter);
 
   // Install the DB-backed RBAC checker once db is ready.
   try {

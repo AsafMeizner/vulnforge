@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # docs-lint needs history
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci --ignore-scripts
+      - name: docs-lint
+        env:
+          BASE_REF: ${{ github.base_ref && format('origin/{0}', github.base_ref) || 'origin/main' }}
+        run: node scripts/docs-lint.mjs
+      - name: typecheck server
+        run: npx tsc --noEmit -p tsconfig.server.json
+      - name: unit + integration tests
+        run: npm test
+      - name: build frontend
+        run: npm run build
+      - name: build server
+        run: npm run build:server
