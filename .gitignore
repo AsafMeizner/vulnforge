@@ -35,3 +35,9 @@ npm-debug.log*
 # Temp
 tmp/
 .tmp/
+
+# Local task tracking (private to devs + AI assistants, not for the repo)
+/todo/
+
+# Docs auto-generated reference output
+/docs/reference/
