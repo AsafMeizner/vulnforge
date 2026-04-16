@@ -65,7 +65,8 @@
     "appId": "com.vulnforge.app",
     "productName": "VulnForge",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "public/brand"
     },
     "files": [
       "dist/**/*",
@@ -74,13 +75,16 @@
       "node_modules/**/*"
     ],
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "public/brand/logo-square.png"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "public/brand/favicon.ico"
     },
     "linux": {
-      "target": "AppImage"
+      "target": "AppImage",
+      "icon": "public/brand/logo-square.png"
     }
   }
 }

@@ -312,11 +312,13 @@ export default function App() {
           flexShrink: 0,
         }}>
           {/* Brand */}
-          <div style={{ padding: '0 16px 20px', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
-            <h1 style={{ color: 'var(--blue)', fontSize: 17, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>
-              VulnForge
-            </h1>
-            <p style={{ color: 'var(--muted)', fontSize: 10, margin: '3px 0 0', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
+          <div style={{ padding: '4px 14px 16px', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
+            <img
+              src="/brand/logo-wide-white.svg"
+              alt="VulnForge"
+              style={{ display: 'block', width: '100%', height: 'auto', maxHeight: 44 }}
+            />
+            <p style={{ color: 'var(--muted)', fontSize: 10, margin: '4px 0 0', letterSpacing: '0.4px', textTransform: 'uppercase' }}>
               Security Research
             </p>
           </div>

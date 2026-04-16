@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="../assets/logo-wide-white.png#gh-dark-mode-only" alt="VulnForge" width="360">
+  <img src="../assets/logo-wide.png#gh-light-mode-only" alt="VulnForge" width="360">
+</p>
+
 # Architecture overview
 
 VulnForge is a multi-layer platform. Top to bottom:

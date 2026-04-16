@@ -1,6 +1,14 @@
-# VulnForge
+<p align="center">
+  <img src="docs/assets/logo-wide-white.png#gh-dark-mode-only" alt="VulnForge" width="560">
+  <img src="docs/assets/logo-wide.png#gh-light-mode-only" alt="VulnForge" width="560">
+</p>
 
-**AI-powered vulnerability research platform.** Find, triage, verify, exploit, and report security vulnerabilities in open-source and proprietary software — all from one app.
+<p align="center">
+  <strong>AI-powered vulnerability research platform.</strong><br>
+  Find, triage, verify, exploit, and report security vulnerabilities in open-source and proprietary software — all from one app.
+</p>
+
+---
 
 VulnForge combines 48 custom static analysis tools, 10 integrated security plugins, runtime analysis (fuzzing, debugging, network capture, sandboxed execution), historical intelligence (NVD sync, git bisect), and AI-powered investigation into a single platform.
 

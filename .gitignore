@@ -39,5 +39,9 @@ tmp/
 # Local task tracking (private to devs + AI assistants, not for the repo)
 /todo/
 
+# Brand source files (Affinity Designer + locks). Exported web-safe copies
+# live in /public/brand and /docs/assets — those ARE committed.
+/logo/
+
 # Docs auto-generated reference output
 /docs/reference/

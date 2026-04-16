@@ -1,0 +1,13 @@
+{
+  "name": "VulnForge",
+  "short_name": "VulnForge",
+  "description": "AI-powered vulnerability research platform.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f14",
+  "theme_color": "#0a66c2",
+  "icons": [
+    { "src": "/brand/logo-square.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any maskable" },
+    { "src": "/brand/logo-square.png", "type": "image/png", "sizes": "512x512", "purpose": "any" }
+  ]
+}

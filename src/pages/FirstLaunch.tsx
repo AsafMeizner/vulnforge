@@ -150,7 +150,12 @@ export default function FirstLaunch({ onFinished }: Props) {
 
   return (
     <div style={card}>
-      <h1 style={{ marginTop: 0 }}>Welcome to VulnForge</h1>
+      <img
+        src="/brand/logo-wide-white.svg"
+        alt="VulnForge"
+        style={{ display: 'block', width: '100%', maxWidth: 360, height: 'auto', margin: '0 auto 18px' }}
+      />
+      <h1 style={{ marginTop: 0, textAlign: 'center' }}>Welcome to VulnForge</h1>
 
       {step === 'choose' && (
         <>
