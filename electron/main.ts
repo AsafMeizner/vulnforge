@@ -20,6 +20,7 @@ import { fork } from 'child_process';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = process.env.NODE_ENV === 'development';
 const startHeadless = process.argv.includes('--headless') || process.env.VULNFORGE_HEADLESS === '1';
+const remoteServer = process.env.VULNFORGE_REMOTE_SERVER || ''; // e.g. 'http://192.168.1.50:3001'
 
 let mainWindow: BrowserWindow | null = null;
 let serverProcess: any = null;
@@ -190,10 +191,13 @@ function createTray() {
 // ── App lifecycle ────────────────────────────────────────────────────────
 
 app.on('ready', async () => {
-  startServer();
-
-  // Wait for server to be ready
-  await new Promise(resolve => setTimeout(resolve, 2500));
+  // Skip local server if connecting to a remote VulnForge server
+  if (!remoteServer) {
+    startServer();
+    await new Promise(resolve => setTimeout(resolve, 2500));
+  } else {
+    console.log(`[Electron] Connecting to remote server: ${remoteServer}`);
+  }
 
   createTray();
 

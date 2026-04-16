@@ -2418,6 +2418,112 @@ export const mcpTools: MCPToolDef[] = [
     },
   },
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // EXTERNAL INTEGRATIONS (Jira, Trello, Slack, GitHub, Linear)
+  // ═══════════════════════════════════════════════════════════════════════
+
+  {
+    name: 'list_integrations',
+    description: 'List configured external service integrations (Jira, Trello, Slack, GitHub, Linear) and available services.',
+    inputSchema: { type: 'object', properties: {} },
+    handler: async () => {
+      const { getIntegrations } = await import('../db.js');
+      const { listAvailableIntegrations } = await import('../integrations/registry.js');
+      return { configured: getIntegrations(), available: listAvailableIntegrations() };
+    },
+  },
+
+  {
+    name: 'create_ticket',
+    description: 'Create a ticket/issue in an external service (Jira, Trello, GitHub, Linear) linked to a VulnForge finding or disclosure.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        integration_id: { type: 'number', description: 'ID of the configured integration' },
+        finding_id: { type: 'number', description: 'Finding to create ticket from' },
+        disclosure_id: { type: 'number', description: 'Disclosure to create ticket from' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+      },
+      required: ['integration_id'],
+    },
+    handler: async (args: any) => {
+      const { getIntegrationById, createIntegrationTicket } = await import('../db.js');
+      const { getServiceIntegration } = await import('../integrations/registry.js');
+
+      const integration = getIntegrationById(args.integration_id);
+      if (!integration) throw new Error('Integration not found');
+      const service = getServiceIntegration(integration.name);
+      if (!service) throw new Error(`No service for ${integration.name}`);
+
+      let title = args.title || '';
+      let desc = args.description || '';
+      let sev: string | undefined;
+
+      if (args.finding_id) {
+        const vuln = getVulnerabilityById(args.finding_id);
+        if (vuln) { title = title || vuln.title; desc = desc || vuln.description || ''; sev = vuln.severity; }
+      }
+
+      const config = JSON.parse(integration.config || '{}');
+      const result = await service.createTicket({ title, description: desc, severity: sev }, config);
+      createIntegrationTicket({
+        integration_id: args.integration_id,
+        finding_id: args.finding_id,
+        disclosure_id: args.disclosure_id,
+        ticket_id: result.ticket_id,
+        ticket_url: result.url,
+      });
+      return result;
+    },
+  },
+
+  {
+    name: 'send_notification',
+    description: 'Send a notification to a messaging integration (Slack). Use for alerting on new findings, status changes, etc.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        integration_id: { type: 'number' },
+        message: { type: 'string' },
+      },
+      required: ['integration_id', 'message'],
+    },
+    handler: async (args: any) => {
+      const { getIntegrationById } = await import('../db.js');
+      const { getServiceIntegration } = await import('../integrations/registry.js');
+
+      const integration = getIntegrationById(args.integration_id);
+      if (!integration) throw new Error('Integration not found');
+      const service = getServiceIntegration(integration.name);
+      if (!service?.sendNotification) throw new Error(`${integration.name} does not support notifications`);
+
+      const config = JSON.parse(integration.config || '{}');
+      await service.sendNotification(args.message, config);
+      return { sent: true };
+    },
+  },
+
+  {
+    name: 'list_tickets',
+    description: 'List external tickets linked to VulnForge findings and disclosures.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        finding_id: { type: 'number' },
+        disclosure_id: { type: 'number' },
+      },
+    },
+    handler: async (args: any) => {
+      const { getIntegrationTickets } = await import('../db.js');
+      const tickets = getIntegrationTickets({
+        finding_id: args.finding_id,
+        disclosure_id: args.disclosure_id,
+      });
+      return { tickets, total: tickets.length };
+    },
+  },
+
   {
     name: 'get_vm_screenshot',
     description: 'Get the latest screenshot from a QEMU VM (VNC screen capture). Returns the file path. Future: will return base64 image for AI vision.',

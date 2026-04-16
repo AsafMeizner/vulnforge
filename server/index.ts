@@ -46,6 +46,9 @@ import { authMiddleware } from './auth/auth.js';
 // Teach Mode + Pattern Mining (Phase 15)
 import teachRouter from './routes/teach.js';
 
+// External Service Integrations
+import integrationsRouter from './routes/integrations.js';
+
 // Disclosure & Bounty Ops (Theme 5)
 import disclosureRouter from './routes/disclosure.js';
 
@@ -88,8 +91,12 @@ async function main(): Promise<void> {
   const app = express();
 
   // ── Middleware ────────────────────────────────────────────────────────
+  // CORS: configurable via VULNFORGE_CORS_ORIGIN env var (comma-separated) or defaults to localhost
+  const corsOrigins = process.env.VULNFORGE_CORS_ORIGIN
+    ? process.env.VULNFORGE_CORS_ORIGIN === '*' ? true : process.env.VULNFORGE_CORS_ORIGIN.split(',').map(s => s.trim())
+    : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'];
   app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+    origin: corsOrigins,
     credentials: true,
   }));
   app.use(express.json({ limit: '10mb' }));
@@ -104,8 +111,19 @@ async function main(): Promise<void> {
   // ── Auth routes (BEFORE middleware — they handle their own auth) ────
   app.use('/api/auth', authRouter);
 
-  // Health check (no auth needed)
+  // Health check + config (no auth needed)
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
+  app.get('/api/config', (_req, res) => res.json({
+    version: '1.0.0',
+    mode: HEADLESS ? 'headless' : 'full',
+    features: {
+      auth: true,
+      mcp: true,
+      websocket: true,
+      sandbox: true,
+      integrations: true,
+    },
+  }));
 
   // Apply auth middleware to ALL /api/* routes EXCEPT /api/auth
   app.use('/api', authMiddleware as any);
@@ -128,6 +146,7 @@ async function main(): Promise<void> {
   app.use('/api/exploits', exploitsRouter);
   app.use('/api/ai-investigate', aiInvestigateRouter);
   app.use('/api/teach', teachRouter);
+  app.use('/api/integrations', integrationsRouter);
   app.use('/api/disclosure', disclosureRouter);
   app.use('/api/export', exportRouter);
 
@@ -466,7 +485,8 @@ Be technical, precise, and actionable.`;
   console.log('[MCP] MCP server initialized at /mcp');
 
   // ── Start ─────────────────────────────────────────────────────────────
-  server.listen(PORT, () => {
+  const HOST = process.env.VULNFORGE_HOST || '0.0.0.0';
+  server.listen(PORT, HOST, () => {
     const mode = HEADLESS ? 'HEADLESS' : 'FULL';
     console.log(`
 =================================================

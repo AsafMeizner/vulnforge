@@ -6,8 +6,8 @@ import path from 'path';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const DB_PATH = 'X:/vulnforge/vulnforge.db';
-const WASM_PATH = 'X:/vulnforge/node_modules/sql.js/dist/sql-wasm.wasm';
+const DB_PATH = process.env.VULNFORGE_DB_PATH || path.join(process.cwd(), 'vulnforge.db');
+const WASM_PATH = process.env.VULNFORGE_WASM_PATH || path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm');
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -689,6 +689,35 @@ function createTables(): void {
     )
   `);
 
+  // External Service Integrations
+  db.run(`
+    CREATE TABLE IF NOT EXISTS integrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      enabled INTEGER DEFAULT 0,
+      config TEXT DEFAULT '{}',
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS integration_tickets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      integration_id INTEGER NOT NULL,
+      finding_id INTEGER,
+      disclosure_id INTEGER,
+      ticket_id TEXT NOT NULL,
+      ticket_url TEXT,
+      status TEXT,
+      last_synced TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (integration_id) REFERENCES integrations(id),
+      FOREIGN KEY (finding_id) REFERENCES vulnerabilities(id),
+      FOREIGN KEY (disclosure_id) REFERENCES disclosures(id)
+    )
+  `);
+
   // Teach Mode + Pattern Mining (Phase 15)
   db.run(`
     CREATE TABLE IF NOT EXISTS teach_examples (
@@ -733,6 +762,7 @@ function createTables(): void {
   `);
 
   migrateSchema();
+  backfillSyncColumns();
   seedDefaultNotesProvider();
   persistDb();
 }
@@ -749,9 +779,27 @@ function seedDefaultNotesProvider(): void {
   }
 }
 
+/**
+ * Tables that participate in multi-device sync (subsystem B).
+ * Every row gets the 7 sync columns below.
+ * Keep this list in sync with SYNCABLE_TABLES in server/sync/model.ts.
+ */
+const SYNC_ENABLED_TABLES = [
+  'projects',
+  'vulnerabilities',
+  'scan_findings',
+  'pipeline_runs',
+  'notes',
+  'session_state',
+  'reports',
+  'checklists',
+  'checklist_items',
+  'scans',
+] as const;
+
 /** Add columns to existing tables without breaking existing data. */
 function migrateSchema(): void {
-  const migrations = [
+  const migrations: string[] = [
     // Projects: clone support
     "ALTER TABLE projects ADD COLUMN clone_status TEXT DEFAULT 'ready'",
     "ALTER TABLE projects ADD COLUMN clone_error TEXT",
@@ -767,8 +815,74 @@ function migrateSchema(): void {
     "ALTER TABLE scan_findings ADD COLUMN impact TEXT DEFAULT ''",
     "ALTER TABLE scan_findings ADD COLUMN suggested_fix TEXT DEFAULT ''",
   ];
+
+  // Subsystem B: sync columns on every syncable table.
+  // `sync_scope` (not `scope`) because session_state already uses `scope`.
+  for (const table of SYNC_ENABLED_TABLES) {
+    migrations.push(
+      `ALTER TABLE ${table} ADD COLUMN sync_id TEXT`,
+      `ALTER TABLE ${table} ADD COLUMN sync_scope TEXT NOT NULL DEFAULT 'private'`,
+      `ALTER TABLE ${table} ADD COLUMN owner_user_id INTEGER`,
+      `ALTER TABLE ${table} ADD COLUMN updated_at_ms INTEGER`,
+      `ALTER TABLE ${table} ADD COLUMN server_updated_at_ms INTEGER`,
+      `ALTER TABLE ${table} ADD COLUMN tombstone INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE ${table} ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'local'`,
+    );
+  }
+
   for (const sql of migrations) {
     try { db.run(sql); } catch { /* column already exists — expected */ }
+  }
+
+  // Unique index on sync_id so two rows never collide.
+  for (const table of SYNC_ENABLED_TABLES) {
+    try {
+      db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${table}_sync_id ON ${table}(sync_id) WHERE sync_id IS NOT NULL`);
+    } catch { /* expected on older SQLite without partial indexes — falls back to plain index */
+      try { db.run(`CREATE INDEX IF NOT EXISTS idx_${table}_sync_id ON ${table}(sync_id)`); } catch {}
+    }
+  }
+}
+
+/**
+ * Backfill sync columns on rows that predate the migration.
+ * Runs once per startup; no-op after everything is populated.
+ * Uses ulid() for sync_id so each row gets a sortable unique identifier.
+ */
+function backfillSyncColumns(): void {
+  // Import here to avoid circular deps at module load time.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { ulid } = require('./utils/ulid.js') as typeof import('./utils/ulid.js');
+  const nowMs = Date.now();
+
+  for (const table of SYNC_ENABLED_TABLES) {
+    let rows: Record<string, any>[] = [];
+    try {
+      const stmt = db.prepare(`SELECT rowid AS rid FROM ${table} WHERE sync_id IS NULL OR sync_id = ''`);
+      while (stmt.step()) {
+        const vals = stmt.get();
+        rows.push({ rid: vals[0] });
+      }
+      stmt.free();
+    } catch {
+      // Table may not exist yet on a very old DB — skip gracefully.
+      continue;
+    }
+
+    for (const row of rows) {
+      const id = ulid();
+      try {
+        db.run(
+          `UPDATE ${table}
+             SET sync_id = ?,
+                 updated_at_ms = COALESCE(updated_at_ms, ?),
+                 sync_scope = COALESCE(sync_scope, 'private'),
+                 sync_status = COALESCE(sync_status, 'local')
+           WHERE rowid = ?`,
+          [id, nowMs, row.rid],
+        );
+      } catch { /* best-effort — skip bad rows */ }
+    }
   }
 }
 
@@ -1512,6 +1626,86 @@ export interface ApiTokenRow {
   name?: string;
   expires_at?: string;
   created_at?: string;
+}
+
+// ── External Integrations ─────────────────────────────────────────────────
+
+export interface IntegrationRow {
+  id?: number;
+  name: string;
+  type: string;       // ticketing | messaging
+  enabled?: number;
+  config?: string;     // JSON
+  created_at?: string;
+}
+
+export interface IntegrationTicketRow {
+  id?: number;
+  integration_id: number;
+  finding_id?: number;
+  disclosure_id?: number;
+  ticket_id: string;
+  ticket_url?: string;
+  status?: string;
+  last_synced?: string;
+  created_at?: string;
+}
+
+export function getIntegrations(): IntegrationRow[] {
+  return execQuery('SELECT * FROM integrations ORDER BY name') as unknown as IntegrationRow[];
+}
+
+export function getIntegrationById(id: number): IntegrationRow | null {
+  const rows = execQuery('SELECT * FROM integrations WHERE id = ?', [id]);
+  return rows[0] as IntegrationRow || null;
+}
+
+export function createIntegration(i: IntegrationRow): number {
+  return execRun(
+    'INSERT INTO integrations (name, type, enabled, config) VALUES (?, ?, ?, ?)',
+    [i.name, i.type, i.enabled ?? 0, i.config || '{}']
+  );
+}
+
+export function updateIntegration(id: number, updates: Partial<IntegrationRow>): void {
+  const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(`UPDATE integrations SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
+}
+
+export function deleteIntegration(id: number): void {
+  db.run('DELETE FROM integration_tickets WHERE integration_id = ?', [id]);
+  db.run('DELETE FROM integrations WHERE id = ?', [id]);
+  persistDb();
+}
+
+export function getIntegrationTickets(filters: { finding_id?: number; disclosure_id?: number; integration_id?: number } = {}): IntegrationTicketRow[] {
+  const conds: string[] = [];
+  const params: any[] = [];
+  if (filters.finding_id !== undefined) { conds.push('finding_id = ?'); params.push(filters.finding_id); }
+  if (filters.disclosure_id !== undefined) { conds.push('disclosure_id = ?'); params.push(filters.disclosure_id); }
+  if (filters.integration_id !== undefined) { conds.push('integration_id = ?'); params.push(filters.integration_id); }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+  return execQuery(`SELECT * FROM integration_tickets ${where} ORDER BY created_at DESC`, params) as unknown as IntegrationTicketRow[];
+}
+
+export function createIntegrationTicket(t: IntegrationTicketRow): number {
+  return execRun(
+    'INSERT INTO integration_tickets (integration_id, finding_id, disclosure_id, ticket_id, ticket_url, status) VALUES (?, ?, ?, ?, ?, ?)',
+    [t.integration_id, t.finding_id ?? null, t.disclosure_id ?? null, t.ticket_id, t.ticket_url || null, t.status || null]
+  );
+}
+
+export function updateIntegrationTicket(id: number, updates: Partial<IntegrationTicketRow>): void {
+  const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
+  if (fields.length === 0) return;
+  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const values = fields.map(f => (updates as any)[f]);
+  db.run(`UPDATE integration_tickets SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
 }
 
 // ── Teach Mode + Pattern Mining (Phase 15) ───────────────────────────────
