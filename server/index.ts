@@ -6,6 +6,7 @@ import path from 'path';
 
 import { initDb } from './db.js';
 import { initWebSocket } from './ws.js';
+import { initSyncWebSocket } from './sync/ws.js';
 
 // Routes
 import vulnerabilitiesRouter from './routes/vulnerabilities.js';
@@ -492,6 +493,7 @@ Be technical, precise, and actionable.`;
 
   // ── WebSocket ─────────────────────────────────────────────────────────
   initWebSocket(server);
+  initSyncWebSocket(server);
   console.log('[WS] WebSocket server initialized at /ws');
 
   // ── MCP server via SSE at /mcp ────────────────────────────────────────
