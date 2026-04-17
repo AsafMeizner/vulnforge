@@ -254,7 +254,7 @@ ${JSON.stringify(findingSummaries, null, 2)}`;
           } else {
             // Record that AI reviewed and approved this finding
             updateScanFinding(finding.id, {
-              ai_filter_reason: `Stage 3 AI: KEPT — ${d.reason}`,
+              ai_filter_reason: `Stage 3 AI: KEPT - ${d.reason}`,
             });
           }
         }

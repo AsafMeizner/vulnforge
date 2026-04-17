@@ -1,14 +1,14 @@
 /**
- * Teach Mode — learns from user decisions on findings.
+ * Teach Mode - learns from user decisions on findings.
  *
  * When a user confirms, rejects, or marks a finding as FP, this module:
  * 1. Records the decision + reasoning as a teach_example
  * 2. Extracts a grep pattern from the finding for future variant hunting
  * 3. Stores the pattern in learned_patterns for automatic use in future scans
  *
- * Pattern Mining — extracts reusable search patterns from confirmed findings.
+ * Pattern Mining - extracts reusable search patterns from confirmed findings.
  *
- * Auto-PoC Validation — takes an exploit from the workbench, runs it in a
+ * Auto-PoC Validation - takes an exploit from the workbench, runs it in a
  * sandbox, and checks if it produces the expected outcome.
  */
 import {
@@ -162,7 +162,7 @@ export async function runLearnedPatterns(
         });
       }
     } catch {
-      // grep returns 1 for no matches — that's fine
+      // grep returns 1 for no matches - that's fine
     }
   }
 

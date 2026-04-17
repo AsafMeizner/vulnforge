@@ -90,7 +90,7 @@ export const SemgrepIntegration = {
           raw: r,
         });
       }
-    } catch { /* malformed JSON — ignore */ }
+    } catch { /* malformed JSON - ignore */ }
     return findings;
   },
 

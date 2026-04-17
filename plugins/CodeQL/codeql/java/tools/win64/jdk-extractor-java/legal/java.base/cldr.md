@@ -47,7 +47,7 @@ authorization of the copyright holder.
 
 SPDX-License-Identifier: Unicode-3.0
 
-————————————
+------------
 
 Unicode® Copyright and Terms of Use
 For the general privacy policy governing access to this site, see the  Unicode Privacy Policy.

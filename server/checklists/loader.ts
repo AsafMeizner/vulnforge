@@ -1,5 +1,5 @@
 /**
- * Checklist loader — reads JSON files from the project-root /checklists/
+ * Checklist loader - reads JSON files from the project-root /checklists/
  * directory and upserts them into the database.
  */
 import { readFileSync, readdirSync, existsSync } from 'fs';
@@ -107,7 +107,7 @@ export async function loadAllChecklists(): Promise<number> {
     inserted++;
   }
 
-  console.log(`[ChecklistLoader] Done — ${inserted} new checklists loaded`);
+  console.log(`[ChecklistLoader] Done - ${inserted} new checklists loaded`);
   return inserted;
 }
 

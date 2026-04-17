@@ -4,8 +4,8 @@ contact_links:
   - name: Security vulnerability
     url: https://github.com/AsafMeizner/vulnforge/security/advisories/new
     about: |
-      For security issues, please file a private advisory — do NOT open a
+      For security issues, please file a private advisory - do NOT open a
       public issue. Follow VulnForge's own disclosure practices.
   - name: Documentation question
     url: https://github.com/AsafMeizner/vulnforge/tree/main/docs
-    about: Check the docs tree before filing — most operator/user questions are covered.
+    about: Check the docs tree before filing - most operator/user questions are covered.

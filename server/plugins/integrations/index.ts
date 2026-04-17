@@ -39,7 +39,7 @@ export interface PluginRunResult {
  * that expose configurable sub-options.
  */
 export interface PluginIntegration {
-  /** Canonical catalog name — must match PLUGIN_CATALOG[].name (lowercased) */
+  /** Canonical catalog name - must match PLUGIN_CATALOG[].name (lowercased) */
   name: string;
   /** Installs the tool into installDir */
   install: (installDir: string) => Promise<void>;

@@ -1,5 +1,5 @@
 /**
- * Client-side sync engine — mirrors server/sync/repo.ts from the desktop's
+ * Client-side sync engine - mirrors server/sync/repo.ts from the desktop's
  * perspective. Talks to the team server over WebSocket (primary) with REST
  * fallback.
  *
@@ -12,7 +12,7 @@
  *   - Reconnect uses exponential backoff (1s → 30s).
  *
  * Persistence: outbox + cursors stored via localStorage. The actual row
- * data lives in the desktop's own SQLite — this engine only moves deltas
+ * data lives in the desktop's own SQLite - this engine only moves deltas
  * across the wire. Keeping it storage-agnostic means the same file works
  * in Electron renderer AND in a plain web build.
  */
@@ -195,7 +195,7 @@ export class SyncClient {
         this.opts.onBatchApplied?.(msg.table, msg.rows ?? [], msg.next_cursor ?? 0);
         if (msg.done) {
           // Check whether all tables report done; switch to 'live' once so.
-          // For simplicity we flip to live on any batch done=true — caller
+          // For simplicity we flip to live on any batch done=true - caller
           // that wants a tighter signal can inspect its own cursors.
           this.setStatus('live');
         }
@@ -216,7 +216,7 @@ export class SyncClient {
         this.markOutboxConflict(msg.sync_id, 'server rejected');
         break;
       case 'pong':
-        // heartbeat ack — nothing to do
+        // heartbeat ack - nothing to do
         break;
       case 'error':
         console.warn('[sync] server error:', msg.error);

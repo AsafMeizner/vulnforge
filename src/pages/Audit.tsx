@@ -103,8 +103,8 @@ export default function Audit() {
                       fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
                     }}>{e.action}</span>
                   </td>
-                  <td style={{ ...tdStyle, color: 'var(--muted)' }}>{e.entity_type || '—'}</td>
-                  <td style={{ ...tdStyle, color: 'var(--muted)', fontFamily: 'monospace' }}>{e.entity_id || '—'}</td>
+                  <td style={{ ...tdStyle, color: 'var(--muted)' }}>{e.entity_type || '-'}</td>
+                  <td style={{ ...tdStyle, color: 'var(--muted)', fontFamily: 'monospace' }}>{e.entity_id || '-'}</td>
                   <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 10, maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {e.details || ''}
                   </td>

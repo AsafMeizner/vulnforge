@@ -1,6 +1,7 @@
 ## XHTML™ 1.1 - Module-based XHTML - Second Edition
 
 ### W3C Document license
+
 <pre>
 From: https://www.w3.org/copyright/document-license-2023
 
@@ -38,9 +39,9 @@ PROVIDED that all such works include the notice below. HOWEVER, the publication
 of derivative works of this document for use as a technical specification is
 expressly prohibited.
 
-In addition, "Code Components" —Web IDL in sections clearly marked as Web IDL;
+In addition, "Code Components" -Web IDL in sections clearly marked as Web IDL;
 and W3C-defined markup (HTML, CSS, etc.) and computer programming language code
-clearly marked as code examples— are licensed under the W3C Software License.
+clearly marked as code examples- are licensed under the W3C Software License.
 
 The notice is:
 

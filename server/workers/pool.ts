@@ -2,11 +2,11 @@
  * Worker pool manager. Starts N scan-worker child processes in server mode,
  * supervises them, and exposes helpers to enqueue jobs from the API layer.
  *
- * In desktop mode this module is a no-op — desktop jobs run inline in
+ * In desktop mode this module is a no-op - desktop jobs run inline in
  * the existing pipeline code, same as before.
  *
  * Note: worker processes are launched via child_process.spawn with an
- * argv ARRAY (no shell). This is the safe form — no injection surface.
+ * argv ARRAY (no shell). This is the safe form - no injection surface.
  */
 import { cpus } from 'os';
 import path from 'path';
@@ -37,7 +37,7 @@ let started = false;
 export function startWorkerPool(cfg: PoolConfig = {}): void {
   if (started) return;
   if (!isServerMode()) {
-    console.log('[pool] not in server mode — worker pool disabled');
+    console.log('[pool] not in server mode - worker pool disabled');
     return;
   }
   // Require the compiled worker script before spawning. In dev (tsx) the
@@ -45,13 +45,13 @@ export function startWorkerPool(cfg: PoolConfig = {}): void {
   // set VULNFORGE_WORKERS=0 or run `npm run build:server` to enable.
   const scriptPath = path.resolve(__dirname, 'scan-worker.js');
   if (!existsSync(scriptPath)) {
-    console.log(`[pool] compiled scan-worker.js not found at ${scriptPath} — worker pool disabled (run 'npm run build:server' for server-executor jobs)`);
+    console.log(`[pool] compiled scan-worker.js not found at ${scriptPath} - worker pool disabled (run 'npm run build:server' for server-executor jobs)`);
     return;
   }
   const cores = Math.max(1, cpus().length - 1);
   const count = Math.max(0, cfg.worker_count ?? Number(process.env.VULNFORGE_WORKERS || cores));
   if (count === 0) {
-    console.log('[pool] worker count is 0 — pool disabled');
+    console.log('[pool] worker count is 0 - pool disabled');
     return;
   }
   const fairness = cfg.fairness_cap ?? Math.max(1, Math.floor(count / 2));
@@ -66,7 +66,7 @@ export function startWorkerPool(cfg: PoolConfig = {}): void {
 function startWorker(index: number, fairness: number): void {
   const workerId = `worker-${index}-${ulid()}`;
   const scriptPath = path.resolve(__dirname, 'scan-worker.js');
-  // argv ARRAY form — no shell invocation, no injection surface.
+  // argv ARRAY form - no shell invocation, no injection surface.
   const child = cp.spawn(process.execPath, [scriptPath], {
     env: {
       ...process.env,

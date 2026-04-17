@@ -532,7 +532,7 @@ export const mcpTools: MCPToolDef[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════
-  // PIPELINE TOOLS — autonomous scan pipeline operations
+  // PIPELINE TOOLS - autonomous scan pipeline operations
   // ═══════════════════════════════════════════════════════════════════════
 
   {
@@ -612,7 +612,7 @@ export const mcpTools: MCPToolDef[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════
-  // SCAN FINDINGS TOOLS — manage staged findings before acceptance
+  // SCAN FINDINGS TOOLS - manage staged findings before acceptance
   // ═══════════════════════════════════════════════════════════════════════
 
   {
@@ -752,7 +752,7 @@ export const mcpTools: MCPToolDef[] = [
 
   {
     name: 'import_project_url',
-    description: 'Clone a Git repository and import it as a project. Returns immediately with the project ID — cloning happens asynchronously.',
+    description: 'Clone a Git repository and import it as a project. Returns immediately with the project ID - cloning happens asynchronously.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -776,7 +776,7 @@ export const mcpTools: MCPToolDef[] = [
       } as any);
       updateProject(projectId, { clone_status: 'cloning' } as any);
 
-      // Async clone — don't await in handler
+      // Async clone - don't await in handler
       cloneRepo(url, { branch: args.branch, depth: args.depth || 1 }).then(async (result: any) => {
         const meta = detectProjectMeta(result.localPath);
         const deps = extractDependencies(result.localPath);
@@ -936,7 +936,7 @@ export const mcpTools: MCPToolDef[] = [
         status: {
           type: 'string',
           enum: ['open', 'investigating', 'confirmed', 'disproved', 'obsolete'],
-          description: 'Status — primarily for hypotheses',
+          description: 'Status - primarily for hypotheses',
         },
         project_id: { type: 'number', description: 'Associated project ID' },
         finding_ids: {
@@ -1153,7 +1153,7 @@ export const mcpTools: MCPToolDef[] = [
             snippet = markdown.substring(start, end).replace(/\s+/g, ' ').trim();
           }
         } catch {
-          // provider read failed — fall back to title-only match
+          // provider read failed - fall back to title-only match
         }
 
         if (titleHit || contentHit) {
@@ -1249,7 +1249,7 @@ export const mcpTools: MCPToolDef[] = [
   // ── get_session_state ───────────────────────────────────────────────────
   {
     name: 'get_session_state',
-    description: 'Get saved session state — the user\'s last investigation context, filters, active items, etc.',
+    description: 'Get saved session state - the user\'s last investigation context, filters, active items, etc.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1319,7 +1319,7 @@ export const mcpTools: MCPToolDef[] = [
   // ── get_active_context ──────────────────────────────────────────────────
   {
     name: 'get_active_context',
-    description: 'Get the user\'s most recent research context — current project, finding, open hypothesis. Use this to pick up where they left off.',
+    description: 'Get the user\'s most recent research context - current project, finding, open hypothesis. Use this to pick up where they left off.',
     inputSchema: {
       type: 'object',
       properties: {},
@@ -1370,7 +1370,7 @@ export const mcpTools: MCPToolDef[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════
-  // RUNTIME ANALYSIS TOOLS (Theme 3) — fuzzing, debugging, network
+  // RUNTIME ANALYSIS TOOLS (Theme 3) - fuzzing, debugging, network
   // ═══════════════════════════════════════════════════════════════════════
 
   {
@@ -1645,7 +1645,7 @@ export const mcpTools: MCPToolDef[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════
-  // HISTORICAL INTELLIGENCE TOOLS (Theme 4) — CVE intel, bisect, patch analysis
+  // HISTORICAL INTELLIGENCE TOOLS (Theme 4) - CVE intel, bisect, patch analysis
   // ═══════════════════════════════════════════════════════════════════════
 
   {
@@ -1776,7 +1776,7 @@ export const mcpTools: MCPToolDef[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════
-  // EXPLOIT DEVELOPMENT TOOLS (Theme 2) — PoC workbench, proof ladder
+  // EXPLOIT DEVELOPMENT TOOLS (Theme 2) - PoC workbench, proof ladder
   // ═══════════════════════════════════════════════════════════════════════
 
   {
@@ -1867,7 +1867,7 @@ export const mcpTools: MCPToolDef[] = [
 
   {
     name: 'get_proof_ladder',
-    description: 'Get the proof ladder for a finding — tracks progress from pattern -> manual -> traced -> poc -> weaponized.',
+    description: 'Get the proof ladder for a finding - tracks progress from pattern -> manual -> traced -> poc -> weaponized.',
     inputSchema: {
       type: 'object',
       properties: { finding_id: { type: 'number' } },
@@ -1897,7 +1897,7 @@ export const mcpTools: MCPToolDef[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════
-  // AI COPILOT TOOLS (Theme 8) — investigate mode, assumption extraction
+  // AI COPILOT TOOLS (Theme 8) - investigate mode, assumption extraction
   // ═══════════════════════════════════════════════════════════════════════
 
   {
@@ -1982,7 +1982,7 @@ export const mcpTools: MCPToolDef[] = [
 
   {
     name: 'extract_assumptions',
-    description: 'Ask the AI to read a function and list all its implicit assumptions (input validation, state, bounds, invariants). Useful for formal review — you can then mark which assumptions are actually enforced by callers.',
+    description: 'Ask the AI to read a function and list all its implicit assumptions (input validation, state, bounds, invariants). Useful for formal review - you can then mark which assumptions are actually enforced by callers.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2018,7 +2018,7 @@ export const mcpTools: MCPToolDef[] = [
   },
 
   // ═══════════════════════════════════════════════════════════════════════
-  // ADVANCED RUNTIME TOOLS (Theme 3C/3E/3F) — symbolic, memory, binary
+  // ADVANCED RUNTIME TOOLS (Theme 3C/3E/3F) - symbolic, memory, binary
   // ═══════════════════════════════════════════════════════════════════════
 
   {
@@ -2194,7 +2194,7 @@ export const mcpTools: MCPToolDef[] = [
 
   {
     name: 'pause_sandbox',
-    description: 'Pause a running sandbox. Freezes all processes inside the container — instant, lossless, resumable.',
+    description: 'Pause a running sandbox. Freezes all processes inside the container - instant, lossless, resumable.',
     inputSchema: {
       type: 'object',
       properties: { id: { type: 'string' } },

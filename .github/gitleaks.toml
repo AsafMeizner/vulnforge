@@ -1,4 +1,4 @@
-# gitleaks — custom config for VulnForge.
+# gitleaks - custom config for VulnForge.
 #
 # Extends the built-in default ruleset with allowlists for test fixtures and
 # brand/docs files that may contain strings matching default patterns

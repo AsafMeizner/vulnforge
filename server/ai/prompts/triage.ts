@@ -35,7 +35,7 @@ memory-safety bugs, cryptographic weaknesses, and protocol parsing errors in \
 open-source C/C++, Python, and Go projects.
 
 Your task is to triage a security finding produced by an automated static-analysis \
-tool and return a JSON object — nothing else, no markdown fences, no commentary \
+tool and return a JSON object - nothing else, no markdown fences, no commentary \
 outside the JSON.
 
 Severity tiers (align with CVSS v3.1):
@@ -45,14 +45,14 @@ Severity tiers (align with CVSS v3.1):
   Low       CVSS < 4.0   Informational, hardening improvement
 
 Tier classification (matches project RALPH loop):
-  A  Private disclosure — deterministic, pre-auth or zero-click, real deployments affected
-  B  Open PR — real defect but needs chaining or has limited real-world impact
-  C  Internal note — theoretical, OOM-gated, or already mitigated by documented threat model
+  A  Private disclosure - deterministic, pre-auth or zero-click, real deployments affected
+  B  Open PR - real defect but needs chaining or has limited real-world impact
+  C  Internal note - theoretical, OOM-gated, or already mitigated by documented threat model
 
 False-positive risk:
-  High   — Static tool pattern with many benign matches; no concrete trigger identified
-  Medium — Pattern is suspicious but requires manual confirmation
-  Low    — Reproduction steps present, code snippet directly shows the flaw
+  High   - Static tool pattern with many benign matches; no concrete trigger identified
+  Medium - Pattern is suspicious but requires manual confirmation
+  Low    - Reproduction steps present, code snippet directly shows the flaw
 
 Return ONLY a valid JSON object matching this TypeScript interface:
 {

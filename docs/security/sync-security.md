@@ -14,21 +14,21 @@ Multi-device sync introduces failure modes regular single-user apps don't have. 
 
 The server, not the client, decides what syncs.
 
-- `UNSYNCABLE_TABLES` list rejected at the sync repo layer — even admin can't push/pull them.
+- `UNSYNCABLE_TABLES` list rejected at the sync repo layer - even admin can't push/pull them.
 - Rows with `sync_scope='private'` rejected on push; pool-scoped rows rejected on standard push (must use `/api/pool/push`).
-- `userCanSeeRow()` in the pull path filters by scope even though the SQL already filtered — defense in depth.
+- `userCanSeeRow()` in the pull path filters by scope even though the SQL already filtered - defense in depth.
 
 ### 3. Conflict resolution
 
 - Server clock is authoritative. Client-provided `updated_at_ms` is informational only.
-- Rows with incoming `updated_at_ms <= server_updated_at_ms` are rejected with `sync:conflict` — callers resolve explicitly, never silently.
-- Field-merge whitelist is narrow (4 columns across 3 tables) and each merge is a deterministic commutative operation — no data is lost to the merge itself.
+- Rows with incoming `updated_at_ms <= server_updated_at_ms` are rejected with `sync:conflict` - callers resolve explicitly, never silently.
+- Field-merge whitelist is narrow (4 columns across 3 tables) and each merge is a deterministic commutative operation - no data is lost to the merge itself.
 
 ### 4. RBAC at route level
 
 - Every sync route calls `assertPermission(req, resource, action)`.
 - Per-table resource mapping in `server/routes/sync.ts::toResource()`.
-- Permissions are DB rows — rotatable without redeploy.
+- Permissions are DB rows - rotatable without redeploy.
 
 ### 5. Rate limits
 
@@ -40,11 +40,11 @@ The server, not the client, decides what syncs.
 
 ### T1: Malicious client pushes a private row
 
-*Blocked at* `pushRows()`:
+_Blocked at_ `pushRows()`:
 
 ```typescript
 if (incoming.sync_scope && !isTeamSyncScope(incoming.sync_scope)) {
-  continue;  // silently drop
+  continue; // silently drop
 }
 ```
 
@@ -52,16 +52,16 @@ Private rows never enter the server DB even if a client tries.
 
 ### T2: Replay of an old refresh token
 
-*Blocked at* `/api/session/refresh`:
+_Blocked at_ `/api/session/refresh`:
 
 The refresh row is found by `device_id` + hash match. If the raw token doesn't match any active row for that device_id, **all refresh tokens for that device_id are revoked** as a defensive signal that the device is either compromised or a replay is in progress.
 
 ### T3: Concurrent edits clobber each other
 
-*Resolution via* `resolveConflict()`:
+_Resolution via_ `resolveConflict()`:
 
 - Row-level: later `updated_at_ms` wins (server clock tiebreak).
-- Field-level merge for whitelist fields (notes, merged_tools, status, checked) — both users' work survives.
+- Field-level merge for whitelist fields (notes, merged_tools, status, checked) - both users' work survives.
 - Non-whitelist fields: last writer wins. Document this in user-facing UI so there are no surprises.
 
 ### T4: Tombstone resurrection
@@ -74,17 +74,17 @@ Rate limiter (50 writes/sec/user) + push batch size limit (500 rows) + WebSocket
 
 ### T6: Leaky capability manifest
 
-Server-proxied AI + integrations expose *names* and *actions* only — never secrets. RBAC gates who sees which capabilities. A `viewer`-role client sees an empty manifest for both lists even if the server has them configured.
+Server-proxied AI + integrations expose _names_ and _actions_ only - never secrets. RBAC gates who sees which capabilities. A `viewer`-role client sees an empty manifest for both lists even if the server has them configured.
 
 ### T7: Pool submission leaks identity
 
 `anonymizeForPool()` runs server-side BEFORE the row hits the pool tables. `owner_user_id` stripped, URLs reduced to scheme+host+path, paths reduced to basename. Client can preview the anonymized form before committing.
 
-Clients cannot bypass anonymization by crafting a custom request — the pool endpoint is the only write path into the pool tables, and it always runs the anonymizer.
+Clients cannot bypass anonymization by crafting a custom request - the pool endpoint is the only write path into the pool tables, and it always runs the anonymizer.
 
 ## Audit
 
-Every auth event (login success/fail, refresh accepted/rejected, logout, device revocation) writes to `audit_log`. Admins read via the admin UI or via a SELECT — currently not streamed to an external SIEM (operator's choice to add — see [`../operator/monitoring.md`](../operator/monitoring.md) when we write it).
+Every auth event (login success/fail, refresh accepted/rejected, logout, device revocation) writes to `audit_log`. Admins read via the admin UI or via a SELECT - currently not streamed to an external SIEM (operator's choice to add - see [`../operator/monitoring.md`](../operator/monitoring.md) when we write it).
 
 ## Incident response checklist
 
@@ -94,4 +94,4 @@ On suspected breach:
 2. Revoke all refresh tokens: `UPDATE refresh_tokens SET revoked = 1`.
 3. Review `audit_log` for login + role-change events in the window.
 4. If plugin compromise suspected, `systemctl stop vulnforge-server` + review `plugins/` for unexpected binaries.
-5. Notify affected users via external channel (email/Slack) — the platform itself might be untrusted during IR.
+5. Notify affected users via external channel (email/Slack) - the platform itself might be untrusted during IR.

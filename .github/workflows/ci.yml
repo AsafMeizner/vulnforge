@@ -5,7 +5,7 @@ on:
   push:
     branches: [main]
 
-# Cancel in-flight runs for the same ref (e.g. rapid pushes) — keeps CI quick.
+# Cancel in-flight runs for the same ref (e.g. rapid pushes) - keeps CI quick.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  # ── 1. Docs lint — fastest, runs first, blocks everything else ──
+  # ── 1. Docs lint - fastest, runs first, blocks everything else ──
   docs-lint:
     name: docs-lint
     runs-on: ubuntu-latest
@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0 # docs-lint diffs against base
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: "20"
       - name: docs-lint
         env:
           BASE_REF: ${{ github.base_ref && format('origin/{0}', github.base_ref) || 'origin/main' }}
@@ -43,8 +43,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
       - run: npm ci --ignore-scripts
       - name: typecheck ${{ matrix.target }}
         run: |
@@ -62,13 +62,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['20', '22']
+        node: ["20", "22"]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
-          cache: 'npm'
+          cache: "npm"
       - run: npm ci --ignore-scripts
       - name: vitest
         run: npm test
@@ -96,8 +96,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
       - run: npm ci --ignore-scripts
       - name: build frontend
         run: npm run build
@@ -112,8 +112,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
       - run: npm ci --ignore-scripts
       - name: npm audit (prod deps only)
         # Fail the job only on critical vulns in PROD deps. Dev-dep noise stays informational.

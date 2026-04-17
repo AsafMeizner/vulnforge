@@ -1,14 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VulnForge — AI-powered vulnerability research</title>
-  <meta name="description" content="VulnForge — AI-powered vulnerability research platform. Find, triage, verify, and report security vulnerabilities in open-source projects.">
-  <meta name="theme-color" content="#0a66c2">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VulnForge - AI-powered vulnerability research</title>
+    <meta
+      name="description"
+      content="VulnForge - AI-powered vulnerability research platform. Find, triage, verify, and report security vulnerabilities in open-source projects."
+    />
+    <meta name="theme-color" content="#0a66c2" />
 
-  <!--
-    Favicons — theme-aware.
+    <!--
+    Favicons - theme-aware.
     Modern browsers (Safari, Firefox, Chrome 96+) pick the <link> whose
     `media` query matches at page load. The tiny inline script below
     additionally re-syncs when the user toggles OS/browser theme mid-session
@@ -17,41 +20,67 @@
     Default (light): normal logo. Dark: white logo.
     ICO fallback is theme-agnostic; it's for old browsers only.
   -->
-  <link rel="icon" type="image/svg+xml" href="/brand/logo-square.svg"        media="(prefers-color-scheme: light)" id="favicon-light">
-  <link rel="icon" type="image/svg+xml" href="/brand/logo-square-white.svg"  media="(prefers-color-scheme: dark)"  id="favicon-dark">
-  <link rel="icon" type="image/png" sizes="512x512" href="/brand/logo-square.png"       media="(prefers-color-scheme: light)">
-  <link rel="icon" type="image/png" sizes="512x512" href="/brand/logo-square-white.png" media="(prefers-color-scheme: dark)">
-  <link rel="apple-touch-icon" href="/brand/logo-square.png">
-  <link rel="shortcut icon" href="/brand/favicon.ico">
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="/brand/logo-square.svg"
+      media="(prefers-color-scheme: light)"
+      id="favicon-light"
+    />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="/brand/logo-square-white.svg"
+      media="(prefers-color-scheme: dark)"
+      id="favicon-dark"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="512x512"
+      href="/brand/logo-square.png"
+      media="(prefers-color-scheme: light)"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="512x512"
+      href="/brand/logo-square-white.png"
+      media="(prefers-color-scheme: dark)"
+    />
+    <link rel="apple-touch-icon" href="/brand/logo-square.png" />
+    <link rel="shortcut icon" href="/brand/favicon.ico" />
 
-  <link rel="manifest" href="/manifest.webmanifest">
-  <script>
-    // Live favicon sync on OS/browser theme change.
-    (function () {
-      var mq = window.matchMedia('(prefers-color-scheme: dark)');
-      function sync() {
-        var dark = mq.matches;
-        var href = dark ? '/brand/logo-square-white.svg' : '/brand/logo-square.svg';
-        // Build a single dynamic <link> so browsers that ignore `media` swap too.
-        var live = document.getElementById('favicon-live');
-        if (!live) {
-          live = document.createElement('link');
-          live.id = 'favicon-live';
-          live.rel = 'icon';
-          live.type = 'image/svg+xml';
-          document.head.appendChild(live);
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      // Live favicon sync on OS/browser theme change.
+      (function () {
+        var mq = window.matchMedia("(prefers-color-scheme: dark)");
+        function sync() {
+          var dark = mq.matches;
+          var href = dark
+            ? "/brand/logo-square-white.svg"
+            : "/brand/logo-square.svg";
+          // Build a single dynamic <link> so browsers that ignore `media` swap too.
+          var live = document.getElementById("favicon-live");
+          if (!live) {
+            live = document.createElement("link");
+            live.id = "favicon-live";
+            live.rel = "icon";
+            live.type = "image/svg+xml";
+            document.head.appendChild(live);
+          }
+          // Cache-bust so the tab icon redraws on swap.
+          live.href = href + "?v=" + (dark ? "d" : "l");
         }
-        // Cache-bust so the tab icon redraws on swap.
-        live.href = href + '?v=' + (dark ? 'd' : 'l');
-      }
-      sync();
-      if (mq.addEventListener) mq.addEventListener('change', sync);
-      else if (mq.addListener)  mq.addListener(sync);
-    })();
-  </script>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-</body>
+        sync();
+        if (mq.addEventListener) mq.addEventListener("change", sync);
+        else if (mq.addListener) mq.addListener(sync);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

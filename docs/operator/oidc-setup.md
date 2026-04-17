@@ -37,7 +37,7 @@ GitHub's OAuth is OAuth 2.0, not strictly OIDC, so the adapter uses the legacy O
 
 ## Role mapping
 
-Every provider row has a `role_mapping_json` field — maps upstream `groups` (or email domain) to VulnForge roles.
+Every provider row has a `role_mapping_json` field - maps upstream `groups` (or email domain) to VulnForge roles.
 
 ```json
 {
@@ -46,17 +46,17 @@ Every provider row has a `role_mapping_json` field — maps upstream `groups` (o
   },
   "groups": {
     "vuln-admins": "admin",
-    "vuln-team":   "researcher"
+    "vuln-team": "researcher"
   },
   "default": "viewer"
 }
 ```
 
-On callback, VulnForge checks `groups` first, then `email_domain`, then `default`. Users without a mapping default to `viewer` (read-only) — always safer than admin-by-default.
+On callback, VulnForge checks `groups` first, then `email_domain`, then `default`. Users without a mapping default to `viewer` (read-only) - always safer than admin-by-default.
 
 ## Desktop login flow
 
-The desktop opens the system browser for the OIDC dance (never an embedded webview — safer, respects SSO cookies). Server's callback displays a one-time code, user pastes into desktop, desktop exchanges via `POST /api/auth/oidc/exchange` for the JWT pair.
+The desktop opens the system browser for the OIDC dance (never an embedded webview - safer, respects SSO cookies). Server's callback displays a one-time code, user pastes into desktop, desktop exchanges via `POST /api/auth/oidc/exchange` for the JWT pair.
 
 ## Disabling password login
 

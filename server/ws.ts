@@ -113,7 +113,7 @@ export function broadcastToJob(jobId: string, msg: object): void {
   const subs = subscriptions.get(jobId);
 
   if (!subs || subs.size === 0) {
-    // No targeted subscribers — broadcast globally
+    // No targeted subscribers - broadcast globally
     broadcast(msg);
     return;
   }

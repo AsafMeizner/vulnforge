@@ -1,6 +1,6 @@
 # VulnForge Pro Roadmap
 
-**Goal**: Turn VulnForge from a static-analysis dashboard into a full professional vulnerability research copilot — covering hypothesis tracking, exploit development, runtime analysis, disclosure ops, and AI-assisted investigation.
+**Goal**: Turn VulnForge from a static-analysis dashboard into a full professional vulnerability research copilot - covering hypothesis tracking, exploit development, runtime analysis, disclosure ops, and AI-assisted investigation.
 
 **Approach**: Decompose into 9 themed sub-projects. Each theme goes through its own cycle: **brainstorm → spec → plan → implement → ship**. Themes are mostly independent and can be built in any order, but dependencies below suggest an optimal sequence.
 
@@ -9,7 +9,8 @@
 ## Themes
 
 ### Theme 1: Research Workspace
-Captures the *mental model* a researcher builds. Everything else hooks into this.
+
+Captures the _mental model_ a researcher builds. Everything else hooks into this.
 
 - **Hypothesis journal**: write down hunches ("parseHeader probably has a UAF"), link to code locations, track status (open → investigating → confirmed → disproved)
 - **Persistent notes**: timestamped, markdown, linked to files/findings/projects
@@ -23,13 +24,14 @@ Captures the *mental model* a researcher builds. Everything else hooks into this
 ---
 
 ### Theme 2: Exploit Development Loop
+
 Takes findings from "theoretically exploitable" to working PoC without leaving the app.
 
 - **PoC workbench**: in-app Monaco editor for writing exploit code (Python/C), tied to a finding
 - **Proof ladder tracking** (UI): per finding, track advancement through tiers, show evidence for each tier
 - **Crash minimizer**: reduce large crashing inputs to minimal triggers
 - **Reproduction harness generator**: from a finding, scaffold a standalone test that triggers the bug
-- **Exploit template library**: format string, ROP, heap feng shui, type confusion, deserialization — pick template, fill in blanks
+- **Exploit template library**: format string, ROP, heap feng shui, type confusion, deserialization - pick template, fill in blanks
 - **Symbolic constraint extraction**: for a target buffer write, extract the constraints symbolically (links to Theme 3C)
 
 **Dependencies**: Theme 1 (proof ladder lives in workspace), Theme 3B (debugger for PoC validation)
@@ -38,9 +40,11 @@ Takes findings from "theoretically exploitable" to working PoC without leaving t
 ---
 
 ### Theme 3: Runtime & Dynamic Analysis
+
 The biggest delta vs. pure static analysis. Split into 6 sub-themes that share infrastructure (tool runner, output storage, UI patterns) but can ship independently.
 
 #### 3A: Fuzzing
+
 - AFL++, libFuzzer, Honggfuzz integration
 - Auto-harness generation from function signatures (LLM-assisted)
 - Corpus management (add, minimize, replay)
@@ -48,6 +52,7 @@ The biggest delta vs. pure static analysis. Split into 6 sub-themes that share i
 - Crash triage (dedupe, exploitability classification)
 
 #### 3B: Debugger
+
 - gdb/lldb/cdb CLI wrappers
 - Breakpoint-based PoC validation ("break at this line, check register state, verify crash")
 - Core dump parsing (ELF/PE/Mach-O)
@@ -55,13 +60,15 @@ The biggest delta vs. pure static analysis. Split into 6 sub-themes that share i
 - pwndbg/gef integration for enhanced output
 
 #### 3C: Symbolic Execution
+
 - angr for x86/ARM binaries
 - KLEE for C/C++ source
 - Constraint solver hooks (Z3)
-- "Reach this branch" automation — generate crafted inputs
+- "Reach this branch" automation - generate crafted inputs
 - Integration with Theme 2 exploit workbench
 
 #### 3D: Network Analysis
+
 - Packet capture: tcpdump / tshark with display filter support
 - HTTPS MITM: mitmproxy integration with session replay
 - Port/service scanning: nmap wrapper with result storage
@@ -70,12 +77,14 @@ The biggest delta vs. pure static analysis. Split into 6 sub-themes that share i
 - Protocol fuzzing: boofuzz integration
 
 #### 3E: Memory Forensics
+
 - Process memory dump: gcore (Linux), cdb minidump (Windows)
 - Heap analyzer: parse glibc heap, detect UAF/double-free, show chunk layout
 - Leak detection: find pointers to freed memory
 - Stack trace reconstruction from core dumps
 
 #### 3F: Binary Analysis
+
 - Disassembly: radare2 / rizin
 - Decompilation: Ghidra headless mode
 - Binary diffing: radiff2 / BinDiff-style for 1-day hunting
@@ -88,6 +97,7 @@ The biggest delta vs. pure static analysis. Split into 6 sub-themes that share i
 ---
 
 ### Theme 4: Historical Intelligence
+
 Finds regressions, hunts variants, learns from history.
 
 - **Git bisect wrapper**: given a finding, auto-bisect to find the commit that introduced it
@@ -103,6 +113,7 @@ Finds regressions, hunts variants, learns from history.
 ---
 
 ### Theme 5: Disclosure & Bounty Ops
+
 Manages the business side of vuln research.
 
 - **Vendor relationship manager**: contacts, preferred formats, typical response times
@@ -118,6 +129,7 @@ Manages the business side of vuln research.
 ---
 
 ### Theme 6: Pro UX Overhaul
+
 Makes the platform a daily driver for researchers who live in their editor.
 
 - **VSCode extension**: navigate findings from editor, jump to line, mark FP
@@ -134,6 +146,7 @@ Makes the platform a daily driver for researchers who live in their editor.
 ---
 
 ### Theme 7: Collaboration & Compliance
+
 Enterprise/team features.
 
 - **Multi-workspace**: separate workspaces for different employers/programs
@@ -150,9 +163,10 @@ Enterprise/team features.
 ---
 
 ### Theme 8: AI Copilot Upgrade
+
 Evolves the AI from triage bot to true pair-researcher.
 
-- **Investigate mode**: pick a finding, AI walks through it with you — shows evidence, proposes next steps, you approve each action (replaces the one-shot agent with an interactive loop)
+- **Investigate mode**: pick a finding, AI walks through it with you - shows evidence, proposes next steps, you approve each action (replaces the one-shot agent with an interactive loop)
 - **Hypothesis auto-generation**: feed codebase to LLM, get prioritized list of "places to investigate"
 - **Assumption extraction**: LLM reads a function and lists its assumptions (non-null inputs, bounds, invariants); user marks which are enforced
 - **Teach mode**: when you confirm a bug, walk the reasoning with the AI and save it as a training example
@@ -165,7 +179,8 @@ Evolves the AI from triage bot to true pair-researcher.
 ---
 
 ### Theme 9: Polish & Infrastructure
-Not a single big feature — a collection of reliability and DX improvements.
+
+Not a single big feature - a collection of reliability and DX improvements.
 
 - **Docker reproducible environments**: per-project containerized build/run
 - **Pre-built vulnerable target images**: DVWA, WebGoat, juice-shop, known-CVE-vulnerable binaries
@@ -184,19 +199,20 @@ Not a single big feature — a collection of reliability and DX improvements.
 
 ## Build Order
 
-| Cycle | Themes | Approx. effort | Rationale |
-|-------|--------|----------------|-----------|
-| **1** | Theme 1 | Medium | Data model everything else depends on |
-| **2** | Theme 3A + 3B + 3D | Large | Highest delta in new bugs; prerequisite for Theme 2 |
-| **3** | Theme 4 | Medium | Immediate value on every finding, independent |
-| **4** | Theme 2 | Large | Needs Theme 1 + 3B as foundation |
-| **5** | Theme 8 | Medium-Large | Needs data from 1-4 to be truly useful |
-| **6** | Theme 3C + 3E + 3F | Large | Specialist runtime features complementing 3A/3B |
-| **7** | Theme 6 | Large | Pro UX shipped once core is solid |
-| **8** | Theme 5 | Medium | Only matters with mature finding flow |
-| **9** | Theme 7 + 9 | Large | Team/polish once single-user is excellent |
+| Cycle | Themes             | Approx. effort | Rationale                                           |
+| ----- | ------------------ | -------------- | --------------------------------------------------- |
+| **1** | Theme 1            | Medium         | Data model everything else depends on               |
+| **2** | Theme 3A + 3B + 3D | Large          | Highest delta in new bugs; prerequisite for Theme 2 |
+| **3** | Theme 4            | Medium         | Immediate value on every finding, independent       |
+| **4** | Theme 2            | Large          | Needs Theme 1 + 3B as foundation                    |
+| **5** | Theme 8            | Medium-Large   | Needs data from 1-4 to be truly useful              |
+| **6** | Theme 3C + 3E + 3F | Large          | Specialist runtime features complementing 3A/3B     |
+| **7** | Theme 6            | Large          | Pro UX shipped once core is solid                   |
+| **8** | Theme 5            | Medium         | Only matters with mature finding flow               |
+| **9** | Theme 7 + 9        | Large          | Team/polish once single-user is excellent           |
 
 Each cycle produces:
+
 - A design spec in `docs/superpowers/specs/YYYY-MM-DD-<theme>-design.md`
 - An implementation plan alongside
 - Code, tests, and a commit
@@ -205,8 +221,8 @@ Each cycle produces:
 
 ## Meta principles
 
-1. **Integrate, don't reimplement** — every runtime tool is a CLI wrapper + parser + storage
-2. **Small, independent units** — each sub-feature should be usable without the rest
-3. **No-AI fallback** — the platform must work without any AI provider (already true)
-4. **Offline-first** — don't assume network, don't require cloud
-5. **Import/export everything** — no vendor lock-in, SARIF/CVE-JSON as native formats
+1. **Integrate, don't reimplement** - every runtime tool is a CLI wrapper + parser + storage
+2. **Small, independent units** - each sub-feature should be usable without the rest
+3. **No-AI fallback** - the platform must work without any AI provider (already true)
+4. **Offline-first** - don't assume network, don't require cloud
+5. **Import/export everything** - no vendor lock-in, SARIF/CVE-JSON as native formats

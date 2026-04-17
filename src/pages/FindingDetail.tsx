@@ -355,7 +355,7 @@ export default function FindingDetail({ vulnId, onClose }: FindingDetailProps) {
     const timeout = setTimeout(() => {
       clearInterval(interval);
       setTriaging(false);
-      toast('Triage is running in background — reload to see result', 'info');
+      toast('Triage is running in background - reload to see result', 'info');
     }, 60_000);
     return () => { clearInterval(interval); clearTimeout(timeout); };
   }, [triaging, vulnId, vuln?.ai_triage, toast]);
@@ -399,7 +399,7 @@ export default function FindingDetail({ vulnId, onClose }: FindingDetailProps) {
     setTriaging(true);
     try {
       await triggerAITriage(vuln.id);
-      toast('AI triage started — results will appear shortly', 'info');
+      toast('AI triage started - results will appear shortly', 'info');
     } catch (err) {
       setTriaging(false);
       toast(`Triage failed: ${err instanceof Error ? err.message : err}`, 'error');
@@ -588,7 +588,7 @@ Question: `;
         }}
       />
 
-      {/* Slide-over panel — 70% width */}
+      {/* Slide-over panel - 70% width */}
       <div style={{
         flex: '0 0 70%',
         background: 'var(--surface)',
@@ -649,7 +649,7 @@ Question: `;
                     </h2>
                   )}
                 </div>
-                {/* CVSS score — prominent */}
+                {/* CVSS score - prominent */}
                 <div style={{ textAlign: 'center', flexShrink: 0, minWidth: 56 }}>
                   <div style={{ fontSize: 32, fontWeight: 800, lineHeight: 1 }}>
                     <CvssScore score={vuln.cvss} />
@@ -700,7 +700,7 @@ Question: `;
                   </span>
                 )}
 
-                {/* Action buttons — right side */}
+                {/* Action buttons - right side */}
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexShrink: 0 }}>
                   {editing ? (
                     <>
@@ -861,19 +861,19 @@ Question: `;
                       {suggestingFix ? <><Spinner size={12} /> Generating...</> : 'AI Suggest Fix'}
                     </button>
                     <button
-                      onClick={() => toast('Apply Fix: coming soon — will apply the diff to the file', 'info')}
+                      onClick={() => toast('Apply Fix: coming soon - will apply the diff to the file', 'info')}
                       style={actionBtn('var(--surface-2)')}
                     >
                       Apply Fix
                     </button>
                     <button
-                      onClick={() => toast('Create PR: coming soon — will create a git branch + commit + PR', 'info')}
+                      onClick={() => toast('Create PR: coming soon - will create a git branch + commit + PR', 'info')}
                       style={actionBtn('var(--surface-2)')}
                     >
                       Create PR
                     </button>
                     <button
-                      onClick={() => toast('Run Tests: coming soon — will run relevant tests after fix', 'info')}
+                      onClick={() => toast('Run Tests: coming soon - will run relevant tests after fix', 'info')}
                       style={actionBtn('var(--surface-2)')}
                     >
                       Run Tests
@@ -1183,7 +1183,7 @@ Question: `;
                       <div style={{ flex: 1, overflow: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 100 }}>
                         {chatMessages.length === 0 ? (
                           <div style={{ color: 'var(--muted)', fontSize: 12, fontStyle: 'italic' }}>
-                            Ask anything about this vulnerability — exploitability, fix approaches, similar CVEs...
+                            Ask anything about this vulnerability - exploitability, fix approaches, similar CVEs...
                           </div>
                         ) : (
                           chatMessages.map((m, i) => (

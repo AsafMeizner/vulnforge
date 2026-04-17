@@ -3,7 +3,7 @@
  * Idempotent schema migration runner. Safe to re-run on every deploy.
  *
  * Reuses initDb() because every CREATE is `IF NOT EXISTS` and every ALTER
- * is wrapped in try/catch — running it against an already-up-to-date DB
+ * is wrapped in try/catch - running it against an already-up-to-date DB
  * is a no-op.
  *
  * Usage:

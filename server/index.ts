@@ -121,9 +121,9 @@ async function main(): Promise<void> {
     next();
   });
 
-  // ── Auth routes (BEFORE middleware — they handle their own auth) ────
+  // ── Auth routes (BEFORE middleware - they handle their own auth) ────
   app.use('/api/auth', authRouter);
-  // Subsystem B — JWT session flow (coexists with legacy API-token auth above)
+  // Subsystem B - JWT session flow (coexists with legacy API-token auth above)
   app.use('/api/session', authSessionRouter);
   app.use('/api/auth/oidc', authOidcRouter);
 
@@ -178,7 +178,7 @@ async function main(): Promise<void> {
   app.use('/api/jobs', jobsRouter);
   app.use('/api/pool', poolRouter);
 
-  // Start the worker pool — no-op in desktop mode.
+  // Start the worker pool - no-op in desktop mode.
   try { startWorkerPool(); } catch (e: any) {
     console.warn('[pool] startup failed:', e.message);
   }
@@ -210,7 +210,7 @@ async function main(): Promise<void> {
     }
   });
 
-  // AI triage endpoint — single vuln by DB id
+  // AI triage endpoint - single vuln by DB id
   app.post('/api/ai/triage/:id', async (req, res) => {
     try {
       const { triageFinding } = await import('./ai/pipeline.js');
@@ -254,7 +254,7 @@ async function main(): Promise<void> {
     }
   });
 
-  // POST /api/ai/suggest-fix — AI-generated fix for a vulnerability
+  // POST /api/ai/suggest-fix - AI-generated fix for a vulnerability
   app.post('/api/ai/suggest-fix', async (req, res) => {
     try {
       const { routeAI } = await import('./ai/router.js');
@@ -315,7 +315,7 @@ Respond with ONLY a JSON object in this exact format (no markdown fences):
     }
   });
 
-  // POST /api/ai/deep-analyze — thorough analysis with full context
+  // POST /api/ai/deep-analyze - thorough analysis with full context
   app.post('/api/ai/deep-analyze', async (req, res) => {
     try {
       const { routeAI } = await import('./ai/router.js');
@@ -360,14 +360,14 @@ Existing AI triage:
 ${vuln.ai_triage || 'None'}
 
 Provide a DEEP, THOROUGH analysis covering:
-1. Exploitability — exact conditions, prerequisites, trigger path
-2. Real-world impact — what an attacker can actually achieve, affected deployments
-3. Root cause — the precise programming error and why it exists
-4. Verification methodology — how to definitively confirm this is a real vulnerability
-5. Fix strategy — specific code changes needed, including edge cases
+1. Exploitability - exact conditions, prerequisites, trigger path
+2. Real-world impact - what an attacker can actually achieve, affected deployments
+3. Root cause - the precise programming error and why it exists
+4. Verification methodology - how to definitively confirm this is a real vulnerability
+5. Fix strategy - specific code changes needed, including edge cases
 6. Similar CVEs or known variants of this bug class
-7. Disclosure strategy — recommended approach (private, coordinated, public)
-8. Final verdict — Tier A (private disclosure), B (open PR), or C (internal note) with reasoning
+7. Disclosure strategy - recommended approach (private, coordinated, public)
+8. Final verdict - Tier A (private disclosure), B (open PR), or C (internal note) with reasoning
 
 Be technical, precise, and actionable.`;
 
@@ -402,7 +402,7 @@ Be technical, precise, and actionable.`;
     }
   });
 
-  // GET /api/ai/models — full model registry
+  // GET /api/ai/models - full model registry
   app.get('/api/ai/models', async (_req, res) => {
     try {
       const { MODEL_REGISTRY } = await import('./ai/models.js');
@@ -412,7 +412,7 @@ Be technical, precise, and actionable.`;
     }
   });
 
-  // GET /api/ai/routing — current routing rules
+  // GET /api/ai/routing - current routing rules
   app.get('/api/ai/routing', async (_req, res) => {
     try {
       const { getRoutingRules } = await import('./ai/routing.js');
@@ -422,7 +422,7 @@ Be technical, precise, and actionable.`;
     }
   });
 
-  // PUT /api/ai/routing — replace routing rules (persisted to DB)
+  // PUT /api/ai/routing - replace routing rules (persisted to DB)
   app.put('/api/ai/routing', async (req, res) => {
     try {
       const { persistRules } = await import('./ai/routing.js');
@@ -438,7 +438,7 @@ Be technical, precise, and actionable.`;
     }
   });
 
-  // GET /api/ai/routing/presets — list available presets
+  // GET /api/ai/routing/presets - list available presets
   app.get('/api/ai/routing/presets', async (_req, res) => {
     try {
       const { ROUTING_PRESETS } = await import('./ai/routing.js');
@@ -454,7 +454,7 @@ Be technical, precise, and actionable.`;
     }
   });
 
-  // POST /api/ai/routing/presets/:name — apply a preset
+  // POST /api/ai/routing/presets/:name - apply a preset
   app.post('/api/ai/routing/presets/:name', async (req, res) => {
     try {
       const { ROUTING_PRESETS, persistRules } = await import('./ai/routing.js');
@@ -514,7 +514,7 @@ Be technical, precise, and actionable.`;
   initWebSocket(server);
   initSyncWebSocket(server);
 
-  // Single upgrade-handler dispatches by path — avoids the ws library's
+  // Single upgrade-handler dispatches by path - avoids the ws library's
   // "first WSS grabs every upgrade" conflict when two WSS instances share
   // one HTTP server.
   server.on('upgrade', (req, socket, head) => {

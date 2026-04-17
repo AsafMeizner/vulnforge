@@ -24,7 +24,7 @@ feeds directly into the review checklist in .github/copilot-instructions.md.
 - [ ] I updated `docs/` (or `README.md`) if I touched `server/sync/`,
       `server/auth/`, `server/integrations/`, `server/workers/`,
       `server/deployment/`, `electron/`, `Dockerfile.server`, or
-      `scripts/install-server.*` — **or** I added `[skip-docs]` to the
+      `scripts/install-server.*` - **or** I added `[skip-docs]` to the
       commit body with a good reason
 - [ ] I ran the live app locally to spot-check the change (not just tests)
 

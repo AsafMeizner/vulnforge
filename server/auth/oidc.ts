@@ -1,5 +1,5 @@
 /**
- * OIDC scaffolding — OAuth 2.0 / OpenID Connect flow for team-server SSO.
+ * OIDC scaffolding - OAuth 2.0 / OpenID Connect flow for team-server SSO.
  *
  * This file is the adapter. Actual provider rows live in `oidc_providers`
  * table. Admin configures providers there via the Settings UI.
@@ -132,7 +132,7 @@ export async function discoverProvider(provider: OidcProviderRow): Promise<OidcD
   if (!resp.ok) throw new Error(`discovery failed ${resp.status} ${wellKnown}`);
   const data = await resp.json() as OidcDiscovery;
   if (!data.authorization_endpoint || !data.token_endpoint) {
-    throw new Error(`discovery incomplete — missing endpoints`);
+    throw new Error(`discovery incomplete - missing endpoints`);
   }
   discoveryCache.set(provider.issuer_url, { at: Date.now(), data });
   return data;
@@ -216,7 +216,7 @@ export async function handleCallback(
         const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as { sub?: string; email?: string };
         if (payload.sub) sub = payload.sub;
         if (payload.email) email = payload.email;
-      } catch { /* malformed — fall through */ }
+      } catch { /* malformed - fall through */ }
     }
   }
   if (!email && tokens.access_token && discovery.userinfo_endpoint) {

@@ -5,7 +5,7 @@ import { mcpTools } from './tools.js';
 // Compatible with MCP protocol over HTTP/SSE transport
 
 export function setupMcpServer(app: Express): void {
-  // SSE endpoint — clients connect here to receive MCP messages
+  // SSE endpoint - clients connect here to receive MCP messages
   app.get('/mcp', (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');

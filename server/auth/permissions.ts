@@ -1,5 +1,5 @@
 /**
- * RBAC check — ask the `permissions` table whether a (role, resource, action)
+ * RBAC check - ask the `permissions` table whether a (role, resource, action)
  * triple is authorized. Admin short-circuits. Solo-mode short-circuits.
  *
  * Usage in a route:

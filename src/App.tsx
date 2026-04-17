@@ -390,20 +390,20 @@ export default function App() {
         </main>
       </div>
 
-      {/* Global QuickCapture — opened via Ctrl/Cmd+N from anywhere */}
+      {/* Global QuickCapture - opened via Ctrl/Cmd+N from anywhere */}
       <QuickCapture
         open={quickCaptureOpen}
         onClose={() => setQuickCaptureOpen(false)}
       />
 
-      {/* Command palette — Ctrl/Cmd+K */}
+      {/* Command palette - Ctrl/Cmd+K */}
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         commands={buildCommands(setQuickCaptureOpen, setShortcutOverlayOpen, navigate)}
       />
 
-      {/* Shortcut overlay — ? key */}
+      {/* Shortcut overlay - ? key */}
       <ShortcutOverlay
         open={shortcutOverlayOpen}
         onClose={() => setShortcutOverlayOpen(false)}
@@ -463,7 +463,7 @@ function buildCommands(
   ];
 }
 
-// ── NavSidebar — collapsible grouped navigation ─────────────────────────
+// ── NavSidebar - collapsible grouped navigation ─────────────────────────
 
 function NavSidebar({ groups, page, onNav }: { groups: NavGroup[]; page: Page; onNav: (p: Page) => void }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(

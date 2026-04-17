@@ -40,11 +40,11 @@ tmp/
 /todo/
 
 # Brand source files (Affinity Designer + locks). Exported web-safe copies
-# live in /public/brand and /docs/assets — those ARE committed.
+# live in /public/brand and /docs/assets - those ARE committed.
 /logo/
 
 # Plugin installs (external repos cloned by the plugin manager at runtime).
-# Manifests in plugins/<Tool>/manifest.json ARE committed — just not the binaries.
+# Manifests in plugins/<Tool>/manifest.json ARE committed - just not the binaries.
 /plugins/OWASP-Nettacker/
 
 # Docs auto-generated reference output

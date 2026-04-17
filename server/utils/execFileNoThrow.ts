@@ -1,5 +1,5 @@
 /**
- * execFileNoThrow — safe structured wrapper around child_process.execFile.
+ * execFileNoThrow - safe structured wrapper around child_process.execFile.
  *
  * Passes arguments as an array (no shell string concatenation), preventing
  * shell-injection even when individual values contain shell metacharacters.
@@ -21,7 +21,7 @@ export interface ExecResult {
 export interface ExecOptions {
   /** Working directory for the child process */
   cwd?: string;
-  /** Timeout in milliseconds (default: 300 000 — 5 minutes) */
+  /** Timeout in milliseconds (default: 300 000 - 5 minutes) */
   timeout?: number;
   /** Additional environment variables merged onto process.env */
   env?: Record<string, string>;
@@ -37,7 +37,7 @@ export interface ExecOptions {
 
 /**
  * Execute `file` with `args` without a shell by default.
- * Returns structured output — never throws.
+ * Returns structured output - never throws.
  */
 export async function execFileNoThrow(
   file: string,

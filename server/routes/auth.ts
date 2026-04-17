@@ -21,7 +21,7 @@ import {
 
 const router = Router();
 
-// ── POST /api/auth/setup — initial admin user creation ───────────────────
+// ── POST /api/auth/setup - initial admin user creation ───────────────────
 
 router.post('/setup', async (req: Request, res: Response) => {
   try {
@@ -56,7 +56,7 @@ router.post('/setup', async (req: Request, res: Response) => {
   }
 });
 
-// ── POST /api/auth/login — authenticate and get token ────────────────────
+// ── POST /api/auth/login - authenticate and get token ────────────────────
 
 router.post('/login', async (req: Request, res: Response) => {
   try {
@@ -85,13 +85,13 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-// ── GET /api/auth/me — current user info ─────────────────────────────────
+// ── GET /api/auth/me - current user info ─────────────────────────────────
 
 router.get('/me', (req: AuthenticatedRequest, res: Response) => {
   res.json({ user: req.user || null, multi_user: countUsers() > 0 });
 });
 
-// ── GET /api/auth/status — auth system status ────────────────────────────
+// ── GET /api/auth/status - auth system status ────────────────────────────
 
 router.get('/status', (_req: Request, res: Response) => {
   try {
@@ -181,7 +181,7 @@ router.post('/tokens', (req: AuthenticatedRequest, res: Response) => {
       name: req.body?.name || 'api-token',
       expires_at: req.body?.expires_at,
     });
-    res.status(201).json({ id, token, message: 'Save this token — it will not be shown again.' });
+    res.status(201).json({ id, token, message: 'Save this token - it will not be shown again.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

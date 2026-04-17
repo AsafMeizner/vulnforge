@@ -1,5 +1,5 @@
 /**
- * NVD / GHSA Sync — fetch recent CVE data and cross-reference against
+ * NVD / GHSA Sync - fetch recent CVE data and cross-reference against
  * imported project dependencies.
  *
  * Uses the NVD 2.0 API (no API key required for low-rate queries).

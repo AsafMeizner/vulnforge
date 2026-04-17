@@ -1,5 +1,5 @@
 /**
- * Checklist verifier — cross-references checklist items against the
+ * Checklist verifier - cross-references checklist items against the
  * vulnerability database to determine which items have been covered.
  *
  * An item is considered "passed" if at least one vulnerability record in the

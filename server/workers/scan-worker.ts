@@ -95,7 +95,7 @@ export class ScanWorker {
       cols.forEach((c: string, i: number) => { row[c] = vals[i]; });
       findStmt.free();
 
-      // Fairness check — optional, enabled by fairnessCap>0
+      // Fairness check - optional, enabled by fairnessCap>0
       if (this.fairnessCap > 0 && row.requested_by_user_id) {
         const countStmt = db.prepare(
           `SELECT COUNT(*) FROM pipeline_jobs
@@ -142,7 +142,7 @@ export class ScanWorker {
       // avoid pulling the pipeline stack into test contexts.
       const pipelineModule = await import('../pipeline/orchestrator.js').catch(() => null);
       if (!pipelineModule) {
-        throw new Error('pipeline orchestrator not found — compiled bundle incomplete');
+        throw new Error('pipeline orchestrator not found - compiled bundle incomplete');
       }
 
       const stages = safeParseStages(job.stages_json);
@@ -188,7 +188,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));
 }
 
-// Standalone entrypoint — compiled worker runs as its own process.
+// Standalone entrypoint - compiled worker runs as its own process.
 if (process.argv[1]?.endsWith('scan-worker.js') || process.argv[1]?.endsWith('scan-worker.ts')) {
   (async () => {
     await initDb();

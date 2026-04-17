@@ -147,7 +147,7 @@ async function runPipelineAsync(
     if (state === 'cancelled') return true;
     if (state === 'paused') {
       updatePipelineRun(pipelineId, { status: 'paused' });
-      emit('Paused', 'Pipeline paused — resume from the Hunt page or API', getPipelineRun(pipelineId)?.progress || 0);
+      emit('Paused', 'Pipeline paused - resume from the Hunt page or API', getPipelineRun(pipelineId)?.progress || 0);
       return true;
     }
     return false;
@@ -237,7 +237,7 @@ async function runPipelineAsync(
   // Import scan queue dynamically to avoid circular deps
   const { scanQueue } = await import('../scanner/queue.js');
 
-  // Enqueue all tools — enqueue(projectId, projectPath, toolNames[], autoTriage)
+  // Enqueue all tools - enqueue(projectId, projectPath, toolNames[], autoTriage)
   const scanJobIds: string[] = [];
   for (const toolName of selection.tools) {
     try {
@@ -470,17 +470,17 @@ function abortPipeline(pipelineId: string, state: 'run' | 'paused' | 'cancelled'
   // Defensive no-op: callers check shouldStop() before hitting abort, but
   // typing-wise checkState() can return 'run' too. Treat 'run' as a bug.
   if (state === 'run') {
-    console.warn(`[orchestrator] abortPipeline called with state='run' (pipelineId=${pipelineId}) — skipping`);
+    console.warn(`[orchestrator] abortPipeline called with state='run' (pipelineId=${pipelineId}) - skipping`);
     return;
   }
   if (state === 'paused') {
-    // Paused — keep status as 'paused', don't set completedAt (it's resumable)
+    // Paused - keep status as 'paused', don't set completedAt (it's resumable)
     updatePipelineRun(pipelineId, { status: 'paused' });
     broadcastProgress('pipeline', pipelineId, {
       step: 'Paused',
       detail: 'Pipeline paused. Resume anytime from Hunt page.',
       progress: getPipelineRun(pipelineId)?.progress || 0,
-      status: 'running', // Not 'error' — it's still alive
+      status: 'running', // Not 'error' - it's still alive
     });
   } else {
     updatePipelineRun(pipelineId, {
@@ -572,7 +572,7 @@ export function cancelPipeline(pipelineId: string): boolean {
   return false;
 }
 
-/** Pause a running pipeline — preserves progress for later resume. */
+/** Pause a running pipeline - preserves progress for later resume. */
 export function pausePipeline(pipelineId: string): boolean {
   const active = activePipelines.get(pipelineId);
   if (active) {

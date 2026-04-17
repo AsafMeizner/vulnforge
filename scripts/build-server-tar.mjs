@@ -11,7 +11,7 @@
  *   README-server.md  quickstart
  *   systemd/          optional unit file
  *
- * All child processes use spawnSync with an argv array — no shell,
+ * All child processes use spawnSync with an argv array - no shell,
  * no injection surface. Inputs here are all constants from this file
  * and the top-level package.json, but belt-and-braces anyway.
  */

@@ -554,7 +554,7 @@ export default function Plugins() {
         body: JSON.stringify({ name }),
       });
       if (res.status === 422) {
-        // Missing dependencies — show install commands
+        // Missing dependencies - show install commands
         const body = await res.json();
         setMissingDeps({ deps: body.missingDeps, commands: body.installCommands, pluginName: name });
         setInstallError(null);
@@ -587,7 +587,7 @@ export default function Plugins() {
           if (!prev) return null;
           const remaining = prev.deps.filter(d => d !== dep);
           if (remaining.length === 0) {
-            // All deps installed — retry plugin install
+            // All deps installed - retry plugin install
             setTimeout(() => handleInstall(prev.pluginName), 500);
             return null;
           }
@@ -959,7 +959,7 @@ export default function Plugins() {
                         {isInstalling && installProgress && (
                           <div style={{ flex: '1 1 100%', marginTop: 6 }}>
                             <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 3 }}>
-                              {installProgress.step}{installProgress.detail ? ` — ${installProgress.detail}` : ''}
+                              {installProgress.step}{installProgress.detail ? ` - ${installProgress.detail}` : ''}
                             </div>
                             <div style={{ height: 4, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
                               <div style={{

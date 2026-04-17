@@ -74,7 +74,7 @@ describe('sync-repo integration', () => {
     }, { sync_scope: 'team', owner_user_id: 1 });
     pushRows({ table: 'notes', user, rows: [row] });
 
-    // Now push the same sync_id with an older updated_at_ms — must reject
+    // Now push the same sync_id with an older updated_at_ms - must reject
     const stale = { ...row, updated_at_ms: row.updated_at_ms - 1_000_000, title: 'stale' };
     const outcome = pushRows({ table: 'notes', user, rows: [stale] });
     expect(outcome.rejected.length).toBe(1);

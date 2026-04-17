@@ -1,5 +1,5 @@
 /**
- * fix-ai.ts — Enable claude_cli as default provider, disable claude API
+ * fix-ai.ts - Enable claude_cli as default provider, disable claude API
  * Run: npx tsx fix-ai.ts
  */
 import initSqlJs from 'sql.js';

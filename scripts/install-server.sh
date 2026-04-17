@@ -21,8 +21,8 @@ command -v node >/dev/null || fail "Node.js not installed. Install Node ≥ 20 f
 node_major=$(node -v | sed 's/v\([0-9]*\).*/\1/')
 [[ $node_major -ge 20 ]] || fail "Node $node_major < 20. Upgrade required."
 
-command -v python3 >/dev/null || warn "python3 missing — scanner tools will fail."
-command -v git     >/dev/null || warn "git missing — project clones will fail."
+command -v python3 >/dev/null || warn "python3 missing - scanner tools will fail."
+command -v git     >/dev/null || warn "git missing - project clones will fail."
 
 log "Node: $(node -v)"
 log "Target install dir: $INSTALL_DIR"

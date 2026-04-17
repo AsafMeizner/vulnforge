@@ -1,13 +1,13 @@
 /**
- * Pool-scope routes — opt-in, anonymized, cross-organization findings pool.
+ * Pool-scope routes - opt-in, anonymized, cross-organization findings pool.
  *
  * Pool data flows through THIS endpoint, not regular sync. Rows are
  * anonymized SERVER-SIDE via anonymizeForPool() in sync/model.ts before
- * insertion — the client cannot bypass the anonymizer by crafting a
+ * insertion - the client cannot bypass the anonymizer by crafting a
  * direct insert path, because there isn't one.
  *
- *   POST /api/pool/push         — anonymize + insert into pool_<table>
- *   GET  /api/pool/snapshot     — read current pool contents (1h cache)
+ *   POST /api/pool/push         - anonymize + insert into pool_<table>
+ *   GET  /api/pool/snapshot     - read current pool contents (1h cache)
  *
  * Pool tables are separate per syncable table (pool_projects,
  * pool_vulnerabilities, pool_scan_findings, pool_notes). Created lazily.
@@ -31,7 +31,7 @@ function ensurePoolTable(table: string): void {
   if (ensuredPoolTables.has(table)) return;
   const db = getDb();
   const poolName = `pool_${table}`;
-  // Simple generic shape — we store rows as JSON blobs keyed by the
+  // Simple generic shape - we store rows as JSON blobs keyed by the
   // source row's sync_id. Avoids mirroring every column and keeps the
   // pool schema evolution-proof.
   db.run(

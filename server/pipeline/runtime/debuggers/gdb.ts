@@ -1,5 +1,5 @@
 /**
- * gdb Executor — non-interactive breakpoint and core dump analysis via
+ * gdb Executor - non-interactive breakpoint and core dump analysis via
  * `gdb --batch -ex ...`. Interactive MI sessions are deferred.
  */
 import cp from 'child_process';
@@ -67,7 +67,7 @@ export class GdbExecutor implements RuntimeJobExecutor {
       stdout = res.stdout;
       stderr = res.stderr;
     } catch (err: any) {
-      // gdb often exits non-zero after program crashes — that's OK
+      // gdb often exits non-zero after program crashes - that's OK
       stdout = err.stdout || '';
       stderr = err.stderr || '';
       error = err;

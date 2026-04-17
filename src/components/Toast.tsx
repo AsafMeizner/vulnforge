@@ -9,7 +9,7 @@ interface ToastItem {
 type ToastType = ToastItem['type'];
 
 interface ToastContextValue {
-  // Single union signature — accepts either (type, message) or (message, type?).
+  // Single union signature - accepts either (type, message) or (message, type?).
   // Historical call sites use both orders; detect at runtime via isToastType().
   toast: (a: string, b?: string) => void;
 }

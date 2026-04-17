@@ -101,7 +101,7 @@ export const CodeQLIntegration = {
     const createOutput = createResult.stdout + createResult.stderr;
 
     if (!createResult.ok) {
-      console.warn('[CodeQL] Database create reported errors — attempting analysis anyway');
+      console.warn('[CodeQL] Database create reported errors - attempting analysis anyway');
     }
 
     console.log('[CodeQL] Running analysis...');

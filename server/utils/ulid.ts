@@ -1,5 +1,5 @@
 /**
- * ULID — Universally Unique Lexicographically Sortable Identifier.
+ * ULID - Universally Unique Lexicographically Sortable Identifier.
  *
  * 26-char Crockford Base32 string. First 10 chars encode a 48-bit ms-precision
  * timestamp (sortable by generation time), last 16 chars are cryptographically
@@ -13,7 +13,7 @@
  */
 import { randomBytes } from 'crypto';
 
-const ENCODING = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford — no I, L, O, U
+const ENCODING = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'; // Crockford - no I, L, O, U
 const ENCODING_LEN = ENCODING.length;
 const TIME_LEN = 10;
 const RANDOM_LEN = 16;

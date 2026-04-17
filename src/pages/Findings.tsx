@@ -285,7 +285,7 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
                       <td style={{ padding: '9px 14px' }}><SeverityBadge severity={v.severity} /></td>
                       <td style={{ padding: '9px 14px' }}><CvssScore score={v.cvss} /></td>
                       <td style={{ padding: '9px 14px' }}><StatusBadge status={v.status} /></td>
-                      <td style={{ padding: '9px 14px', color: 'var(--muted)', fontSize: 11, fontFamily: 'monospace' }}>{v.method ?? '—'}</td>
+                      <td style={{ padding: '9px 14px', color: 'var(--muted)', fontSize: 11, fontFamily: 'monospace' }}>{v.method ?? '-'}</td>
                       <td style={{ padding: '9px 14px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{relativeTime(v.found_at)}</td>
                     </tr>
                   );

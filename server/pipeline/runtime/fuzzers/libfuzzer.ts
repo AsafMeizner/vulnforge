@@ -1,5 +1,5 @@
 /**
- * libFuzzer Executor — runs a libFuzzer-compiled harness binary and streams
+ * libFuzzer Executor - runs a libFuzzer-compiled harness binary and streams
  * stats + crashes into VulnForge.
  *
  * libFuzzer writes to stderr by default. We parse lines like:
@@ -139,7 +139,7 @@ export class LibFuzzerExecutor implements RuntimeJobExecutor {
       for (const line of lines) processLine(line);
     });
 
-    // Cancellation polling — check every 500ms
+    // Cancellation polling - check every 500ms
     const stopCheckInterval = setInterval(() => {
       if (ctx.shouldStop() && !child.killed) {
         child.kill('SIGTERM');
@@ -162,9 +162,9 @@ export class LibFuzzerExecutor implements RuntimeJobExecutor {
           data: { exit_code: code, signal },
         });
 
-        // libFuzzer exits non-zero on crash — that's expected, not a failure
+        // libFuzzer exits non-zero on crash - that's expected, not a failure
         if (signal && signal !== 'SIGTERM' && signal !== 'SIGKILL') {
-          // Crashed signal came from libFuzzer itself — still OK
+          // Crashed signal came from libFuzzer itself - still OK
           resolve();
         } else {
           resolve();
@@ -191,7 +191,7 @@ export class LibFuzzerExecutor implements RuntimeJobExecutor {
       const stat = await fs.stat(inputPath);
       inputSize = stat.size;
     } catch {
-      // Input file may not exist if path parsing failed — just use 0
+      // Input file may not exist if path parsing failed - just use 0
     }
 
     // Detect signal from trace if not already found

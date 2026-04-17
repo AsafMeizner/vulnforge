@@ -2,7 +2,7 @@
   "name": "Semgrep",
   "version": "latest",
   "type": "scanner",
-  "description": "Lightweight static analysis — find bugs with custom rules",
+  "description": "Lightweight static analysis - find bugs with custom rules",
   "install_command": "pip install semgrep",
   "run_command": "semgrep --config auto {target} --json -o {output}",
   "parse_output": "json",

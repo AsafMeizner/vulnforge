@@ -110,7 +110,7 @@ export async function triageFinding(vulnId: number): Promise<void> {
 
 /**
  * Triage multiple vulnerabilities sequentially (to avoid hammering the AI
- * provider with parallel requests). Failures are logged and skipped — the
+ * provider with parallel requests). Failures are logged and skipped - the
  * function does not throw if individual triages fail.
  */
 export async function triageAll(vulnIds: number[]): Promise<void> {

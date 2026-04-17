@@ -26,7 +26,7 @@ npm run build:server:docker -- --push # multi-arch + push to registry
 
 Tags: `vulnforge/server:<package-version>` and `:latest`.
 
-Under the hood: `Dockerfile.server` is multi-stage — Node 20 builder compiles TypeScript, runtime stage is `node:20-bullseye-slim` + Python 3 + git. Non-root user `vulnforge` (uid 1001). Volume at `/data`.
+Under the hood: `Dockerfile.server` is multi-stage - Node 20 builder compiles TypeScript, runtime stage is `node:20-bullseye-slim` + Python 3 + git. Non-root user `vulnforge` (uid 1001). Volume at `/data`.
 
 ## Server bare tarball
 
@@ -44,7 +44,7 @@ Admin runs `tar xf ... && sudo ./scripts/install-server.sh` on the target host. 
 npm run build:server
 ```
 
-Produces `dist-server/` — handy for running the server directly without Electron:
+Produces `dist-server/` - handy for running the server directly without Electron:
 
 ```bash
 VULNFORGE_MODE=server node dist-server/server/index.js
@@ -52,20 +52,20 @@ VULNFORGE_MODE=server node dist-server/server/index.js
 
 ## Prerequisites by artifact
 
-| Artifact | Node | Python | Docker | Platform binaries |
-|---|---|---|---|---|
-| Desktop installer | 20+ | — | — | electron-builder per target |
-| Server Docker | 20+ | auto (in image) | 24+ | buildx for multi-arch |
-| Server tarball | 20+ | — | — | `tar` + any OS |
+| Artifact          | Node | Python          | Docker | Platform binaries           |
+| ----------------- | ---- | --------------- | ------ | --------------------------- |
+| Desktop installer | 20+  | -               | -      | electron-builder per target |
+| Server Docker     | 20+  | auto (in image) | 24+    | buildx for multi-arch       |
+| Server tarball    | 20+  | -               | -      | `tar` + any OS              |
 
 ## CI templates
 
 Put these in `.github/workflows/` if you use GitHub Actions:
 
-- `build-desktop.yml` — matrix `ubuntu-latest`, `macos-latest`, `windows-latest` → artifacts uploaded.
-- `build-server.yml` — Linux runner → Docker image pushed to GHCR or Docker Hub + tarball attached to release.
+- `build-desktop.yml` - matrix `ubuntu-latest`, `macos-latest`, `windows-latest` → artifacts uploaded.
+- `build-server.yml` - Linux runner → Docker image pushed to GHCR or Docker Hub + tarball attached to release.
 
-(Leaving those as exercises — every team's CI story differs; hook into your preferred runner.)
+(Leaving those as exercises - every team's CI story differs; hook into your preferred runner.)
 
 ## Troubleshooting
 
@@ -75,7 +75,7 @@ Put these in `.github/workflows/` if you use GitHub Actions:
 npm install --ignore-scripts bcryptjs jsonwebtoken  # or whatever you need
 ```
 
-Electron's postinstall needs `node` on PATH in the spawned shell — sometimes nested shells lose it. `--ignore-scripts` skips it.
+Electron's postinstall needs `node` on PATH in the spawned shell - sometimes nested shells lose it. `--ignore-scripts` skips it.
 
 ### Docker build runs out of memory
 
@@ -83,4 +83,4 @@ Multi-stage build needs ~2 GB. Bump Docker Desktop memory, or use the tarball pa
 
 ### TypeScript build errors that don't happen in `npm run dev`
 
-`tsconfig.server.json` runs tsc strict-ish. `tsx` is looser. If dev works but `npm run build:server` fails, the type error is real — fix it rather than loosening the config.
+`tsconfig.server.json` runs tsc strict-ish. `tsx` is looser. If dev works but `npm run build:server` fails, the type error is real - fix it rather than loosening the config.

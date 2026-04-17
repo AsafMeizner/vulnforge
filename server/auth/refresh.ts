@@ -1,5 +1,5 @@
 /**
- * Refresh tokens — 30-day opaque strings that can be traded for a fresh
+ * Refresh tokens - 30-day opaque strings that can be traded for a fresh
  * access token. One row per logged-in device.
  *
  * Security model:
@@ -17,10 +17,10 @@ import bcrypt from 'bcryptjs';
 import { ulid } from '../utils/ulid.js';
 
 export const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const REFRESH_BCRYPT_COST = 6; // low cost — tokens already have 256 bits of entropy
+const REFRESH_BCRYPT_COST = 6; // low cost - tokens already have 256 bits of entropy
 
 /**
- * Refresh-token row shape — imported from db.ts to keep the two CRUD
+ * Refresh-token row shape - imported from db.ts to keep the two CRUD
  * surfaces aligned. Re-exported here so callers can pick either module.
  */
 export type { RefreshTokenRow } from '../db.js';
@@ -50,10 +50,10 @@ export async function verifyRefreshToken(raw: string, hash: string): Promise<boo
 
 /**
  * Classify a refresh attempt outcome. Callers persist the result.
- *   'ok'            — rotate: issue new pair, invalidate old.
- *   'expired'       — row exists but past expires_at.
- *   'revoked'       — row revoked=1; do NOT re-issue; audit log.
- *   'not-found'     — raw token has no match. Possible replay of pre-rotation
+ *   'ok'            - rotate: issue new pair, invalidate old.
+ *   'expired'       - row exists but past expires_at.
+ *   'revoked'       - row revoked=1; do NOT re-issue; audit log.
+ *   'not-found'     - raw token has no match. Possible replay of pre-rotation
  *                     token → caller should flag the device_id for audit.
  */
 export type RefreshOutcome = 'ok' | 'expired' | 'revoked' | 'not-found';

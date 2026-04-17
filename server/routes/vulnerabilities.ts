@@ -101,7 +101,7 @@ router.put('/:id', (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/vulnerabilities/:id/verify  — toggle verified flag
+// PUT /api/vulnerabilities/:id/verify  - toggle verified flag
 router.put('/:id/verify', (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);
@@ -116,7 +116,7 @@ router.put('/:id/verify', (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/vulnerabilities/:id/false-positive  — mark as false positive
+// PUT /api/vulnerabilities/:id/false-positive  - mark as false positive
 router.put('/:id/false-positive', (req: Request, res: Response) => {
   try {
     const id = Number(req.params.id);

@@ -1,5 +1,5 @@
 /**
- * Assumption Extractor — ask the AI to read a function and list its
+ * Assumption Extractor - ask the AI to read a function and list its
  * implicit assumptions (input non-null, bounds, invariants, etc.) so
  * researchers can manually mark which are enforced by callers.
  */
@@ -28,18 +28,18 @@ export interface AssumptionReport {
 const SYSTEM_PROMPT = `You are a formal verification expert. Given a source code function, list ALL the implicit assumptions the function makes about its inputs and state.
 
 For each assumption, categorize it:
-- "input"     — assumptions about input parameters (non-null, valid range, etc.)
-- "state"     — assumptions about global/object state
-- "invariant" — assumptions that should hold before and after the function
-- "bounds"    — assumptions about sizes, lengths, array indices
-- "ordering"  — assumptions about event/call ordering (thread safety, initialization)
+- "input"     - assumptions about input parameters (non-null, valid range, etc.)
+- "state"     - assumptions about global/object state
+- "invariant" - assumptions that should hold before and after the function
+- "bounds"    - assumptions about sizes, lengths, array indices
+- "ordering"  - assumptions about event/call ordering (thread safety, initialization)
 - "other"
 
 Rate the severity of each assumption being violated:
-- "critical" — violation = memory corruption, RCE, auth bypass
-- "high"     — violation = crash, data corruption, significant logic error
-- "medium"   — violation = wrong result, graceful failure
-- "low"      — violation = minor issue, recoverable
+- "critical" - violation = memory corruption, RCE, auth bypass
+- "high"     - violation = crash, data corruption, significant logic error
+- "medium"   - violation = wrong result, graceful failure
+- "low"      - violation = minor issue, recoverable
 
 Return ONLY a JSON object:
 {
@@ -51,7 +51,7 @@ Return ONLY a JSON object:
 
 Be exhaustive but precise. Each assumption should be a single, testable statement.`;
 
-/** Read a function's source from a file (heuristic — find the line with function_name). */
+/** Read a function's source from a file (heuristic - find the line with function_name). */
 export function extractFunctionSource(
   filePath: string,
   functionName: string,
@@ -159,7 +159,7 @@ export async function extractAssumptions(
 }
 
 /**
- * Hypothesis auto-generator — read a project's top files and ask the AI
+ * Hypothesis auto-generator - read a project's top files and ask the AI
  * to brainstorm a prioritized list of "places to investigate".
  */
 export async function generateHypotheses(

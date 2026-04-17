@@ -14,19 +14,19 @@ Include:
 - Affected version (git SHA or tag).
 - Deployment mode (solo desktop, team-server Docker, team-server
   bare-metal).
-- Reproduction steps — exact request/response, curl snippet, or test
+- Reproduction steps - exact request/response, curl snippet, or test
   harness is ideal.
-- Impact — what an attacker can achieve.
+- Impact - what an attacker can achieve.
 
 ## Response timeline
 
 As a solo-maintained project today, commitments are best-effort:
 
-| Stage | Target |
-|---|---|
-| First acknowledgement | ≤ 3 business days |
-| Triage + severity rating | ≤ 7 business days |
-| Fix or mitigation | Depends on severity; critical issues prioritized over feature work |
+| Stage                    | Target                                                             |
+| ------------------------ | ------------------------------------------------------------------ |
+| First acknowledgement    | ≤ 3 business days                                                  |
+| Triage + severity rating | ≤ 7 business days                                                  |
+| Fix or mitigation        | Depends on severity; critical issues prioritized over feature work |
 
 ## Scope
 
@@ -42,8 +42,8 @@ In-scope:
 
 Out of scope:
 
-- Third-party plugins (Semgrep, Trivy, etc.) — report upstream.
-- Bugs in Node / SQLite / bcryptjs / jsonwebtoken — report upstream.
+- Third-party plugins (Semgrep, Trivy, etc.) - report upstream.
+- Bugs in Node / SQLite / bcryptjs / jsonwebtoken - report upstream.
 - Issues reproducible only in heavily modified forks.
 
 ## Hall of fame

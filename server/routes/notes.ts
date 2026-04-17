@@ -93,7 +93,7 @@ async function hydrateNote(row: NoteRow): Promise<Record<string, unknown>> {
       base.content = noteContent.markdown;
     }
   } catch (err: any) {
-    // Provider unreachable — return DB row with empty content; don't fail the whole request
+    // Provider unreachable - return DB row with empty content; don't fail the whole request
     console.warn(`[notes] hydrateNote failed for id=${row.id}:`, err.message);
   }
 
@@ -523,7 +523,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       }
     }
 
-    // Build DB updates — only fields explicitly provided in the request
+    // Build DB updates - only fields explicitly provided in the request
     const updates: Partial<NoteRow> = {};
     if (typeof title === 'string') updates.title = title;
     if (typeof type === 'string') updates.type = type;

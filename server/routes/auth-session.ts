@@ -1,14 +1,14 @@
 /**
- * Session-based auth — JWT access tokens + rotating refresh tokens.
+ * Session-based auth - JWT access tokens + rotating refresh tokens.
  *
  * Mounted at /api/session/* to coexist with the legacy /api/auth/*
  * API-token flow from phase 14/15.
  *
- *   POST /api/session/login      — password → access+refresh+device_id
- *   POST /api/session/refresh    — rotate refresh; returns new pair
- *   POST /api/session/logout     — revoke device's refresh tokens
- *   POST /api/session/bootstrap  — first-admin setup on fresh server install
- *   GET  /api/session/me         — whoami (requires access token)
+ *   POST /api/session/login      - password → access+refresh+device_id
+ *   POST /api/session/refresh    - rotate refresh; returns new pair
+ *   POST /api/session/logout     - revoke device's refresh tokens
+ *   POST /api/session/bootstrap  - first-admin setup on fresh server install
+ *   GET  /api/session/me         - whoami (requires access token)
  *
  * Verifies existing scrypt password hashes transparently and upgrades
  * them to bcrypt on successful login (see verifyPasswordAny).
@@ -106,7 +106,7 @@ router.post('/login', async (req: Request, res: Response) => {
       try {
         const newHash = await hashBcrypt(password);
         updateUserPassword(user.id, newHash);
-      } catch { /* non-fatal — user can log in now, upgrade next time */ }
+      } catch { /* non-fatal - user can log in now, upgrade next time */ }
     }
 
     const device_id = mintDeviceId();

@@ -1,10 +1,10 @@
 /**
- * Authentication module — password hashing, token generation, middleware.
+ * Authentication module - password hashing, token generation, middleware.
  *
  * Uses Node's built-in crypto.scrypt for password hashing (no external deps).
  * Tokens are random hex strings stored in the api_tokens table.
  *
- * Auth is OPTIONAL — if no users exist in the DB, all requests pass through
+ * Auth is OPTIONAL - if no users exist in the DB, all requests pass through
  * (single-user mode). Once the first user is created, auth is enforced.
  */
 import crypto from 'crypto';
@@ -57,14 +57,14 @@ export function generateToken(): string {
 /**
  * Legacy name kept for backward compatibility with phase 14/15 routes.
  * Delegates to the Express Request augmentation in server/auth/middleware.ts
- * (`AuthedUser` shape) — `username` and `device_id` are optional there
+ * (`AuthedUser` shape) - `username` and `device_id` are optional there
  * because the JWT-session flow and the API-token flow populate different
  * fields. Routes that read `req.user.username` must `?? ''` or guard.
  */
 export type AuthenticatedRequest = Request;
 
 /**
- * Auth middleware — checks for Bearer token or session.
+ * Auth middleware - checks for Bearer token or session.
  * If no users exist (fresh install), all requests pass through.
  *
  * Bearer token resolution order (added subsystem B13.4):
@@ -115,13 +115,13 @@ export function authMiddleware(req: AuthenticatedRequest, _res: Response, next: 
     }
   }
 
-  // No valid auth — allow read-only anonymous; write routes gate via RBAC.
+  // No valid auth - allow read-only anonymous; write routes gate via RBAC.
   req.user = { id: 0, username: 'anonymous', role: 'viewer' };
   next();
 }
 
 /**
- * Role guard — use after authMiddleware to require a minimum role.
+ * Role guard - use after authMiddleware to require a minimum role.
  */
 export function requireRole(...roles: string[]) {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {

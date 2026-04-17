@@ -1,5 +1,5 @@
 /**
- * Password hashing — bcrypt with cost 12.
+ * Password hashing - bcrypt with cost 12.
  *
  * Cost 12 is a sensible 2026 default: ~300ms to hash on modern hardware,
  * making brute-force attack by an adversary with a leaked hash dump
@@ -35,7 +35,7 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
   }
 }
 
-/** Cheap check — does a stored value look like a bcrypt hash? */
+/** Cheap check - does a stored value look like a bcrypt hash? */
 export function isBcryptHash(value: unknown): boolean {
   return typeof value === 'string' && /^\$2[aby]\$\d{2}\$/.test(value);
 }
@@ -49,11 +49,11 @@ export function isScryptHash(value: unknown): boolean {
 }
 
 /**
- * Unified verify — handles both bcrypt (new) and scrypt (legacy) hashes.
+ * Unified verify - handles both bcrypt (new) and scrypt (legacy) hashes.
  * Used during the migration window so existing phase-14/15 users can
  * still log in via the new JWT session flow.
  *
- * Returns { ok, needs_upgrade } — if the stored hash is scrypt and verify
+ * Returns { ok, needs_upgrade } - if the stored hash is scrypt and verify
  * passed, caller should re-hash with bcrypt and persist.
  */
 export async function verifyPasswordAny(

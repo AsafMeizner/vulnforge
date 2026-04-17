@@ -16,7 +16,7 @@ cd vulnforge
 # 1. Copy the example env file
 cp .env.server.example .env.server
 
-# 2. Edit .env.server — at minimum set:
+# 2. Edit .env.server - at minimum set:
 #    VULNFORGE_PUBLIC_URL=https://your-host
 #    VULNFORGE_JWT_SECRET=$(openssl rand -base64 48)
 #    VULNFORGE_BOOTSTRAP_TOKEN=$(openssl rand -hex 24)
@@ -90,6 +90,6 @@ docker run --rm -v vulnforge-data:/data -v $(pwd):/backup alpine \
   tar czf /backup/vulnforge-$(date +%F).tgz /data
 ```
 
-Restore is the inverse — stop the service, wipe the volume, extract.
+Restore is the inverse - stop the service, wipe the volume, extract.
 
 See [`backup-restore.md`](backup-restore.md) for details and automation.

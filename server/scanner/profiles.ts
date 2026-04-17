@@ -1,7 +1,7 @@
 // ── Scan profiles ──────────────────────────────────────────────────────────
 //
 // A profile groups a curated set of tools under a friendly name. The 'full'
-// profile intentionally has an empty tools array — the route handler expands
+// profile intentionally has an empty tools array - the route handler expands
 // it to every enabled tool at request time.
 
 export interface ScanProfile {
@@ -40,7 +40,7 @@ export const PROFILES: Record<string, ScanProfile> = {
   full: {
     name: 'Full Scan',
     description: 'All enabled tools (takes longer)',
-    tools: [], // empty means all enabled tools — resolved at route level
+    tools: [], // empty means all enabled tools - resolved at route level
   },
 
   protocol: {

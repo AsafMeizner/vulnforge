@@ -3,7 +3,7 @@
  *
  * Lets the user:
  *   - See current mode (solo / team) + server URL + device id
- *   - Switch solo ↔ team (with confirmation — no data loss either way)
+ *   - Switch solo ↔ team (with confirmation - no data loss either way)
  *   - Set default row scope for new rows (private / team / pool)
  *   - Revoke team-server session (logout from server while staying in team mode)
  *   - See outbox size + current WS status
@@ -123,11 +123,11 @@ export default function DeploymentSettings({
         <>
           <div style={row}>
             <div style={label}>Server URL</div>
-            <div><code>{settings.team_server_url ?? '—'}</code></div>
+            <div><code>{settings.team_server_url ?? '-'}</code></div>
           </div>
           <div style={row}>
             <div style={label}>Device ID</div>
-            <div><code style={{ fontSize: 12 }}>{settings.team_server_device_id ?? '—'}</code></div>
+            <div><code style={{ fontSize: 12 }}>{settings.team_server_device_id ?? '-'}</code></div>
           </div>
           <div style={row}>
             <div style={label}>Sync status</div>
@@ -150,7 +150,7 @@ export default function DeploymentSettings({
             <div style={label}>Outbox</div>
             <div>
               {outboxSize === 0 ? '0 pending pushes' : `${outboxSize} pending`}
-              {outboxSize > 0 && <span style={{ color: '#888', marginLeft: 8 }}>— will flush on reconnect</span>}
+              {outboxSize > 0 && <span style={{ color: '#888', marginLeft: 8 }}>- will flush on reconnect</span>}
             </div>
           </div>
         </>

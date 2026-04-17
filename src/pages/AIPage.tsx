@@ -82,7 +82,7 @@ export default function AIPage() {
   const loadModelRegistry = useCallback(async () => {
     try {
       const data = await getAIModels();
-      // Cast to the expected shape — the registry values are static strings
+      // Cast to the expected shape - the registry values are static strings
       setModelRegistry(data as Record<string, { models: ModelInfo[] }>);
     } catch {
       // non-critical
@@ -430,7 +430,7 @@ export default function AIPage() {
                       <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{p.name}</div>
                       {!isEditing && (
                         <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                          Model: <code style={{ color: 'var(--blue)' }}>{p.model || '—'}</code>
+                          Model: <code style={{ color: 'var(--blue)' }}>{p.model || '-'}</code>
                           {p.api_key && <span style={{ marginLeft: 12 }}>API Key: <code style={{ color: 'var(--green)' }}>••••••••</code></span>}
                           {p.base_url && <span style={{ marginLeft: 12 }}>URL: <code style={{ color: 'var(--muted)' }}>{p.base_url}</code></span>}
                         </div>
@@ -483,7 +483,7 @@ export default function AIPage() {
 
                   {isEditing && (
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                      {/* Model — dropdown (or text fallback) */}
+                      {/* Model - dropdown (or text fallback) */}
                       <div>
                         <label style={fieldLabel}>Model</label>
                         {availableModels.length > 0 ? (
@@ -492,7 +492,7 @@ export default function AIPage() {
                             onChange={e => setProviderEdits(prev => ({ ...prev, [p.id]: { ...prev[p.id], model: e.target.value } }))}
                             style={selectStyle}
                           >
-                            <option value="">— select model —</option>
+                            <option value="">- select model -</option>
                             {availableModels.map(m => (
                               <option key={m.id} value={m.id}>{m.name} ({m.tier})</option>
                             ))}
@@ -507,7 +507,7 @@ export default function AIPage() {
                         )}
                       </div>
 
-                      {/* API key — hidden for Ollama and Claude CLI */}
+                      {/* API key - hidden for Ollama and Claude CLI */}
                       {!isOllama && !isClaudeCLI && (
                         <div>
                           <label style={fieldLabel}>API Key</label>
@@ -530,7 +530,7 @@ export default function AIPage() {
                         </div>
                       )}
 
-                      {/* Base URL — for Ollama and custom endpoints */}
+                      {/* Base URL - for Ollama and custom endpoints */}
                       {(isOllama || p.base_url !== undefined) && (
                         <div style={{ gridColumn: isOllama ? '1 / -1' : undefined }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
@@ -686,7 +686,7 @@ export default function AIPage() {
                               onChange={e => updateRule(idx, 'model', e.target.value)}
                               style={selectStyle}
                             >
-                              <option value="">— select —</option>
+                              <option value="">- select -</option>
                               {ruleModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                             </select>
                           ) : (

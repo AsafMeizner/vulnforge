@@ -86,7 +86,7 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // ── POST /api/session ──────────────────────────────────────────────────────
-// Body: { scope, scope_id?, key, value } — upsert a single key
+// Body: { scope, scope_id?, key, value } - upsert a single key
 
 router.post('/', (req: Request, res: Response) => {
   try {
@@ -162,7 +162,7 @@ router.delete('/', (req: Request, res: Response) => {
 });
 
 // ── POST /api/session/clear ────────────────────────────────────────────────
-// Body: { scope, scope_id? } — remove all keys for the given scope
+// Body: { scope, scope_id? } - remove all keys for the given scope
 
 router.post('/clear', (req: Request, res: Response) => {
   try {

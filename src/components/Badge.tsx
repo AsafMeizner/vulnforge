@@ -54,7 +54,7 @@ export function StatusBadge({ status }: { status: VulnStatus }) {
 export function CvssScore({ score }: { score: number | string | null | undefined }) {
   const num = typeof score === 'string' ? parseFloat(score) : score;
   if (num === null || num === undefined || isNaN(num) || num === 0) {
-    return <span style={{ color: 'var(--muted)' }}>—</span>;
+    return <span style={{ color: 'var(--muted)' }}>-</span>;
   }
   let color = 'var(--muted)';
   if (num >= 9.0) color = 'var(--red)';

@@ -1,5 +1,5 @@
 /**
- * Patch Analyzer — parses unified diffs to identify security-relevant
+ * Patch Analyzer - parses unified diffs to identify security-relevant
  * changes and extract grep patterns for variant hunting.
  */
 import cp from 'child_process';
@@ -102,7 +102,7 @@ export function analyzePatch(diff: string): PatchAnalysis {
           if (!indicators.includes(name)) indicators.push(name);
           categoryCounts[category] = (categoryCounts[category] || 0) + 1;
 
-          // Derive a grep pattern from this snippet — keep significant identifiers
+          // Derive a grep pattern from this snippet - keep significant identifiers
           const pattern = snippet.trim().replace(/\s+/g, ' ').slice(0, 80);
           if (!variantPatterns.includes(pattern) && variantPatterns.length < 10) {
             variantPatterns.push(pattern);

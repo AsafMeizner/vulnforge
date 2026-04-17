@@ -1,8 +1,8 @@
-# VulnForge team server — docker-compose setup.
+# VulnForge team server - docker-compose setup.
 #
 # Usage:
 #   cp .env.server.example .env.server
-#   edit .env.server — set VULNFORGE_PUBLIC_URL and VULNFORGE_JWT_SECRET
+#   edit .env.server - set VULNFORGE_PUBLIC_URL and VULNFORGE_JWT_SECRET
 #   docker compose -f docker-compose.server.yml --env-file .env.server up -d
 
 version: "3.9"

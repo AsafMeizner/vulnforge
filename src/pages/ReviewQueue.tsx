@@ -38,7 +38,7 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
         setFindings(findingsRes.data);
         setPipeline(pipelineRes);
       } else {
-        // No specific pipeline — show ALL pending scan findings across all pipelines
+        // No specific pipeline - show ALL pending scan findings across all pipelines
         const { getScanFindings } = await import('@/lib/api');
         const res = await getScanFindings({ status: 'pending' });
         setFindings(res.data);
@@ -117,7 +117,7 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
     }
   };
 
-  // Removed the "No Pipeline Selected" blocker — ReviewQueue now loads all pending findings when no pipelineId is set
+  // Removed the "No Pipeline Selected" blocker - ReviewQueue now loads all pending findings when no pipelineId is set
 
   if (loading) {
     return (
@@ -281,12 +281,12 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
                   </td>
                   <td style={tdStyle}>
                     <span style={{ color: 'var(--muted)', fontFamily: 'monospace', fontSize: 11 }}>
-                      {f.file ? `${f.file}:${f.line_start || '?'}` : '—'}
+                      {f.file ? `${f.file}:${f.line_start || '?'}` : '-'}
                     </span>
                   </td>
                   <td style={tdStyle}>
                     <span style={{ color: 'var(--muted)', fontSize: 12 }}>
-                      {f.merged_tools || f.tool_name || '—'}
+                      {f.merged_tools || f.tool_name || '-'}
                     </span>
                   </td>
                   <td style={tdStyle}><CvssScore score={f.cvss} /></td>

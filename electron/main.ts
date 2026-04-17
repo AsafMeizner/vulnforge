@@ -8,8 +8,8 @@
  * - Auto-start option
  *
  * Usage:
- *   npm run electron:dev   — dev mode (Vite + Electron)
- *   npm run electron:build — package as .exe/.dmg/.AppImage
+ *   npm run electron:dev   - dev mode (Vite + Electron)
+ *   npm run electron:build - package as .exe/.dmg/.AppImage
  */
 
 import { app, BrowserWindow, shell, Tray, Menu, nativeImage } from 'electron';
@@ -136,7 +136,7 @@ function createTray() {
   }
 
   tray = new Tray(icon);
-  tray.setToolTip('VulnForge — Vulnerability Research Platform');
+  tray.setToolTip('VulnForge - Vulnerability Research Platform');
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -210,7 +210,7 @@ app.on('ready', async () => {
 });
 
 app.on('window-all-closed', () => {
-  // Don't quit — keep running in tray
+  // Don't quit - keep running in tray
   // On macOS this is standard behavior
 });
 

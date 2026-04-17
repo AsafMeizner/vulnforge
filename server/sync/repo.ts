@@ -1,8 +1,8 @@
 /**
- * Sync repository — DB access for the sync protocol.
+ * Sync repository - DB access for the sync protocol.
  *
  * All queries here operate only on SYNCABLE_TABLES. Anything else
- * is rejected via isSyncable() guard — never let a caller sync
+ * is rejected via isSyncable() guard - never let a caller sync
  * refresh_tokens or ai_providers by accident.
  *
  * Pull: paginated, cursor-based, per-table.
@@ -60,7 +60,7 @@ export function pullTable(args: PullArgs): PullResult {
   const hasMore = rows.length > limit;
   const batch = hasMore ? rows.slice(0, limit) : rows;
 
-  // Defense in depth — filter via scope-aware check even though WHERE already excluded non-team
+  // Defense in depth - filter via scope-aware check even though WHERE already excluded non-team
   const visible = batch.filter(r => userCanSeeRow(r, args.user));
 
   const cursor = visible.length
@@ -133,7 +133,7 @@ export function pushRows(args: PushArgs): PushOutcome {
         [...values, rowToWrite.sync_id],
       );
     } else {
-      // INSERT — drop id so AUTOINCREMENT assigns
+      // INSERT - drop id so AUTOINCREMENT assigns
       const insertRow: Record<string, any> = { ...rowToWrite };
       delete insertRow.id;
       const keys = Object.keys(insertRow);
@@ -172,12 +172,12 @@ export function allCursors(since = 0, user: { user_id: number; role: string }): 
       result[table] = since;
     }
   }
-  // Touch user ref to silence unused-param warning — may be used later for per-user cursors
+  // Touch user ref to silence unused-param warning - may be used later for per-user cursors
   void user;
   return result;
 }
 
-/** Apply a tombstone sweep — hard-delete rows tombstoned > retainDays ago. */
+/** Apply a tombstone sweep - hard-delete rows tombstoned > retainDays ago. */
 export function gcTombstones(retainDays: number = 30): number {
   const cutoff = Date.now() - retainDays * 24 * 60 * 60 * 1000;
   const db = getDb();

@@ -13,9 +13,10 @@ API keys you paste into your desktop. Keys stay on your machine and never sync. 
 In team mode, your company's server can expose its own pool of providers. Keys live on the server; clients invoke by name without ever seeing them.
 
 Examples of why a company would do this:
-- **Cost control** — everyone uses one metered API key instead of individual expense reports.
-- **Privacy** — scan output gets routed through a local on-prem Ollama instead of a third-party API.
-- **Capability pooling** — expensive Claude Opus calls go through a team budget; cheaper triage work uses the server's local model.
+
+- **Cost control** - everyone uses one metered API key instead of individual expense reports.
+- **Privacy** - scan output gets routed through a local on-prem Ollama instead of a third-party API.
+- **Capability pooling** - expensive Claude Opus calls go through a team budget; cheaper triage work uses the server's local model.
 
 Server providers appear prefixed in your picker:
 
@@ -28,8 +29,8 @@ Server: team-deep         ← invoked via server proxy
 
 ## Controls for users
 
-- **AI → Providers** tab — manage your local providers.
-- **AI → Routing** tab — assign tasks to specific providers (local or server).
+- **AI → Providers** tab - manage your local providers.
+- **AI → Routing** tab - assign tasks to specific providers (local or server).
 - You can mix freely: `triage → Server: team-triage` and `deep-analysis → Local: claude-opus`.
 
 ## Controls for admins (server mode)
@@ -40,7 +41,7 @@ Settings → AI → **Team providers** (admin-only):
 - Set allowed task tags per provider.
 - Enable/disable the capability manifest globally (`capability_manifest_enabled`).
 
-If the manifest is disabled, clients see an empty server-provider list — it looks like solo-mode for AI purposes even while sync still works.
+If the manifest is disabled, clients see an empty server-provider list - it looks like solo-mode for AI purposes even while sync still works.
 
 ## Per-request proxying
 
@@ -53,13 +54,13 @@ Server → streams response back over the same request
 Desktop → treats it like a local call
 ```
 
-Request is attached to `req.user.id` server-side so audits show *who* asked. You see latency proportional to upstream + network — typically 1-3 s slower than a local call but with centralized control.
+Request is attached to `req.user.id` server-side so audits show _who_ asked. You see latency proportional to upstream + network - typically 1-3 s slower than a local call but with centralized control.
 
 ## What never leaves your device
 
 - Your local provider API keys.
 - Local model weights (Ollama).
-- The content of `private`-scoped findings — those are never eligible for server-proxied AI calls in the first place (routing rules respect scope).
+- The content of `private`-scoped findings - those are never eligible for server-proxied AI calls in the first place (routing rules respect scope).
 
 ## Fallback chains
 

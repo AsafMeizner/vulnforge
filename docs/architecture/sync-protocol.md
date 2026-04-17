@@ -42,7 +42,7 @@ One per syncable table. Value = the row's `server_updated_at_ms` column. The cli
 3. Server validates token → sends `capabilities` manifest.
 4. Client sends `sync:hello` with per-table cursors.
 5. Server streams `sync:batch` messages for each table until all tables report `done=true`.
-6. Server transitions to live mode — emits `sync:upsert` / `sync:delete` for server-side writes.
+6. Server transitions to live mode - emits `sync:upsert` / `sync:delete` for server-side writes.
 7. Client writes accumulate; flushed via `sync:push` batches (≤500 rows, ≤100ms windows).
 
 ## Conflict resolution
@@ -56,18 +56,18 @@ Server compares incoming `updated_at_ms` to the stored `server_updated_at_ms`:
 
 Before the row-level decision, the server applies **field-level merges** for a narrow whitelist (see `server/sync/model.ts::FIELD_MERGE`):
 
-- `scan_findings.notes` — string concat with separator (both analysts' notes preserved).
-- `scan_findings.merged_tools` — JSON array union.
-- `vulnerabilities.status` — rank-max (higher-ranked status wins: `resolved` > `accepted` > `confirmed` > `investigating`).
-- `checklist_items.checked` — logical OR.
+- `scan_findings.notes` - string concat with separator (both analysts' notes preserved).
+- `scan_findings.merged_tools` - JSON array union.
+- `vulnerabilities.status` - rank-max (higher-ranked status wins: `resolved` > `accepted` > `confirmed` > `investigating`).
+- `checklist_items.checked` - logical OR.
 
 ## Tombstones
 
-Deletes don't remove rows immediately. They set `tombstone=1, updated_at_ms=now()`. Sync treats tombstones as upserts — the `sync:delete` message carries only the `sync_id`, not the row. A daily sweep (30-day retention, configurable) hard-deletes rows where `server_updated_at_ms < now - 30d AND tombstone=1`.
+Deletes don't remove rows immediately. They set `tombstone=1, updated_at_ms=now()`. Sync treats tombstones as upserts - the `sync:delete` message carries only the `sync_id`, not the row. A daily sweep (30-day retention, configurable) hard-deletes rows where `server_updated_at_ms < now - 30d AND tombstone=1`.
 
 ## Offline queue
 
-Writes while disconnected land in the local `sync_outbox` table (`sync_id` unique + `attempts` + `last_error`). The client drains it in FIFO order on reconnect, with exponential backoff per row. Rows hitting `attempts >= 5` surface as an error banner — never silently lost.
+Writes while disconnected land in the local `sync_outbox` table (`sync_id` unique + `attempts` + `last_error`). The client drains it in FIFO order on reconnect, with exponential backoff per row. Rows hitting `attempts >= 5` surface as an error banner - never silently lost.
 
 ## Rate limits & backpressure
 

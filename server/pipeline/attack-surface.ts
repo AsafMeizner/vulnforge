@@ -156,7 +156,7 @@ const CODE_EXTENSIONS = new Set([
 // ── Main Functions ─────────────────────────────────────────────────────────
 
 /**
- * Map all entry points in a project — network listeners, API endpoints,
+ * Map all entry points in a project - network listeners, API endpoints,
  * file parsers, CLI handlers, environment readers, signal handlers, IPC.
  */
 export function mapEntryPoints(projectPath: string, _meta?: ProjectMeta): EntryPoint[] {
@@ -213,7 +213,7 @@ function scanFile(filePath: string, projectPath: string, results: EntryPoint[]):
 }
 
 /**
- * Map trust boundaries — find where authentication/validation happens
+ * Map trust boundaries - find where authentication/validation happens
  * relative to entry points.
  */
 export function mapTrustBoundaries(

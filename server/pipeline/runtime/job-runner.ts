@@ -6,7 +6,7 @@
  * gets plugged in via registerExecutor(). The runner creates DB rows, builds
  * the JobContext, runs executors asynchronously, and exposes cancel hooks.
  *
- * Pattern mirrors server/pipeline/orchestrator.ts — an internal Map of active
+ * Pattern mirrors server/pipeline/orchestrator.ts - an internal Map of active
  * jobs with per-job cancel closures, plus broadcastProgress() for live updates.
  */
 
@@ -133,7 +133,7 @@ export class RuntimeJobRunner {
     // Create per-job output directory under the canonical root.
     await fs.mkdir(outputDir, { recursive: true });
 
-    // Validate config — executor throws on invalid input.
+    // Validate config - executor throws on invalid input.
     const config = spec.config || {};
     try {
       executor.validate(config);
@@ -202,7 +202,7 @@ export class RuntimeJobRunner {
       shouldStop: (): boolean => cancelled,
     };
 
-    // Kick off async execution — do NOT await.
+    // Kick off async execution - do NOT await.
     this.runAsync(jobId, executor, ctx).catch((err: any) => {
       console.error(`[Runtime ${jobId}] Fatal runner error:`, err);
     });

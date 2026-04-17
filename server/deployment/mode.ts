@@ -1,5 +1,5 @@
 /**
- * Deployment mode detection — single source of truth for "am I a desktop
+ * Deployment mode detection - single source of truth for "am I a desktop
  * or a team server?". Read anywhere to branch behavior consistently.
  *
  * Precedence:
@@ -8,7 +8,7 @@
  *   3. default                                      → 'server'
  *
  * Client-side mode (solo vs team) is separate and stored in the local
- * `settings` table as `deployment_client_mode` — that concerns how the
+ * `settings` table as `deployment_client_mode` - that concerns how the
  * desktop behaves relative to a server, not what this process IS.
  */
 
@@ -44,7 +44,7 @@ export function isDesktopMode(): boolean {
 }
 
 /**
- * Reset cache — only for tests that manipulate env between scenarios.
+ * Reset cache - only for tests that manipulate env between scenarios.
  * Production code must not call this.
  */
 export function __resetDeploymentModeForTests(): void {

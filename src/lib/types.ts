@@ -91,7 +91,7 @@ export interface Tool {
   description: string;
   docs: string | null;
   track_record: string | null;
-  // SQLite stores boolean as 0/1 — the API surfaces it numerically.
+  // SQLite stores boolean as 0/1 - the API surfaces it numerically.
   // Treat as truthy everywhere (0 = false, non-zero = true).
   enabled: number | boolean;
   file_path?: string;

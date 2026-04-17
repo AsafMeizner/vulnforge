@@ -4,11 +4,11 @@ The server's entire state is one SQLite file + the `plugins/` directory. Back up
 
 ## What matters
 
-| Path | Contents |
-|---|---|
-| `/var/lib/vulnforge/vulnforge.db` (bare) or `/data/vulnforge.db` (docker) | Entire DB |
-| `/var/lib/vulnforge/.env` | JWT secret, OIDC creds, admin config |
-| `/opt/vulnforge/plugins/` (bare) or Docker volume `/data/plugins/` | Plugin binaries the server installed |
+| Path                                                                      | Contents                             |
+| ------------------------------------------------------------------------- | ------------------------------------ |
+| `/var/lib/vulnforge/vulnforge.db` (bare) or `/data/vulnforge.db` (docker) | Entire DB                            |
+| `/var/lib/vulnforge/.env`                                                 | JWT secret, OIDC creds, admin config |
+| `/opt/vulnforge/plugins/` (bare) or Docker volume `/data/plugins/`        | Plugin binaries the server installed |
 
 Not critical (can be reinstalled): `dist-server/`, `node_modules/`.
 
@@ -21,7 +21,7 @@ set -e
 DST=/var/backups/vulnforge
 mkdir -p $DST
 DATE=$(date +%F)
-# SQLite online backup — safe while server is running
+# SQLite online backup - safe while server is running
 sqlite3 /var/lib/vulnforge/vulnforge.db ".backup $DST/vulnforge-$DATE.db"
 tar czf $DST/env-and-plugins-$DATE.tgz \
   /var/lib/vulnforge/.env \
@@ -33,7 +33,7 @@ EOF
 sudo chmod +x /etc/cron.daily/vulnforge-backup
 ```
 
-The `sqlite3 ".backup"` command is safe to run while the server is serving traffic — it takes a consistent snapshot without blocking writers for more than milliseconds.
+The `sqlite3 ".backup"` command is safe to run while the server is serving traffic - it takes a consistent snapshot without blocking writers for more than milliseconds.
 
 ## Docker
 
@@ -58,4 +58,4 @@ docker run --rm \
 - [ ] Backups are on a **different host** from the server (not the same disk).
 - [ ] You've done a restore drill at least once in the last quarter.
 - [ ] JWT_SECRET backup is encrypted at rest (it's in `.env`).
-- [ ] Desktop clients have `sync_outbox` entries — they will auto-flush on reconnect so a short outage is non-destructive. But a multi-day outage will hit the 5-retry cap per row; alert your team to watch for the sync error banner on return.
+- [ ] Desktop clients have `sync_outbox` entries - they will auto-flush on reconnect so a short outage is non-destructive. But a multi-day outage will hit the 5-retry cap per row; alert your team to watch for the sync error banner on return.

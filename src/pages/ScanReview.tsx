@@ -194,7 +194,7 @@ export default function ScanReview({ scanId, projectName, onClose, onAccepted }:
               Review Scan Findings
             </div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-              {projectName && <span>{projectName} — </span>}
+              {projectName && <span>{projectName} - </span>}
               <span style={{ color: 'var(--green)' }}>{counts.pending} pending</span>
               {counts.auto_rejected > 0 && (
                 <span style={{ color: 'var(--muted)', marginLeft: 8 }}>
@@ -364,10 +364,10 @@ export default function ScanReview({ scanId, projectName, onClose, onAccepted }:
                           {f.file}
                           {f.line_start ? <span style={{ color: 'var(--blue)' }}>:{f.line_start}</span> : null}
                         </>
-                      ) : '—'}
+                      ) : '-'}
                     </td>
                     <td style={{ ...tdStyle, color: 'var(--muted)', fontFamily: 'monospace', fontSize: 11 }}>
-                      {f.tool_name || '—'}
+                      {f.tool_name || '-'}
                     </td>
                     <td style={{ ...tdStyle }}>
                       <span style={{
@@ -380,7 +380,7 @@ export default function ScanReview({ scanId, projectName, onClose, onAccepted }:
                     </td>
                     {tab === 'auto_rejected' && (
                       <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11, fontStyle: 'italic' }}>
-                        {f.rejection_reason || '—'}
+                        {f.rejection_reason || '-'}
                       </td>
                     )}
                     {tab === 'pending' && (

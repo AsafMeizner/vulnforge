@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * docs-lint — enforce that changes to load-bearing server dirs come with
+ * docs-lint - enforce that changes to load-bearing server dirs come with
  * corresponding doc updates.
  *
  * Runs against the set of paths changed since origin/main (or an explicit
@@ -60,18 +60,18 @@ const watchedTouched = changed.filter(f => WATCHED.some(w => f.startsWith(w)));
 const docsTouched = changed.some(f => f.startsWith('docs/') || f === 'README.md');
 
 if (watchedTouched.length === 0) {
-  console.log('[docs-lint] no watched paths changed — skip');
+  console.log('[docs-lint] no watched paths changed - skip');
   process.exit(0);
 }
 
 if (docsTouched) {
-  console.log(`[docs-lint] ok — ${watchedTouched.length} watched file(s) changed; docs were updated`);
+  console.log(`[docs-lint] ok - ${watchedTouched.length} watched file(s) changed; docs were updated`);
   process.exit(0);
 }
 
 const messages = commitMessagesSinceBase();
 if (/\[skip-docs\]/i.test(messages)) {
-  console.log('[docs-lint] ok — [skip-docs] marker present in commit range');
+  console.log('[docs-lint] ok - [skip-docs] marker present in commit range');
   process.exit(0);
 }
 

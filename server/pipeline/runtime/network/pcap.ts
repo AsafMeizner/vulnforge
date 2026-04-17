@@ -1,5 +1,5 @@
 /**
- * Packet Capture Executor — wraps tcpdump (capture) + tshark (parsing).
+ * Packet Capture Executor - wraps tcpdump (capture) + tshark (parsing).
  * Falls back to tshark -w if tcpdump is not available (useful on Windows).
  */
 import cp from 'child_process';

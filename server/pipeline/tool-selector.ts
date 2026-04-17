@@ -101,7 +101,7 @@ export function selectToolsForProject(meta: ProjectMeta): ToolSelection {
   for (const t of UNIVERSAL_TOOLS) tools.add(t);
   reasons.push('Universal security tools (secrets, auth, taint)');
 
-  // C/C++ — highest tool coverage, these have the best hit rate
+  // C/C++ - highest tool coverage, these have the best hit rate
   if (hasC) {
     for (const t of C_MEMORY_TOOLS) tools.add(t);
     for (const t of C_SECURITY_TOOLS) tools.add(t);
@@ -128,7 +128,7 @@ export function selectToolsForProject(meta: ProjectMeta): ToolSelection {
     reasons.push('Go API + concurrency tools');
   }
 
-  // Rust — mostly safe by default, focus on unsafe blocks and logic
+  // Rust - mostly safe by default, focus on unsafe blocks and logic
   if (hasRust) {
     tools.add('logic_bug_scanner');
     tools.add('error_path_divergence');
@@ -149,7 +149,7 @@ export function selectToolsForProject(meta: ProjectMeta): ToolSelection {
     reasons.push('Java deserialization + injection tools');
   }
 
-  // Always run Semgrep — it has auto-config and covers many languages
+  // Always run Semgrep - it has auto-config and covers many languages
   plugins.push({ pluginName: 'semgrep' });
   reasons.push('Semgrep (universal static analysis)');
 

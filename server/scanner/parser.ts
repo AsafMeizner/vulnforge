@@ -50,13 +50,13 @@ function extractSection(text: string, heading: string): string | undefined {
 
 // ── Main finding header patterns ───────────────────────────────────────────
 
-// Pattern 1: ### [SEVERITY] path/to/file.c:123 — Title
+// Pattern 1: ### [SEVERITY] path/to/file.c:123 - Title
 // Pattern 2: ### SEVERITY: Title (file.c:123)
 // Pattern 3: ## Finding N: Title
 // Pattern 4: **[CRITICAL]** Title at file.c:123
 
 const FINDING_PATTERNS = [
-  // ### [CRITICAL] src/foo.c:123 — Buffer overflow in parse()
+  // ### [CRITICAL] src/foo.c:123 - Buffer overflow in parse()
   /^#{1,4}\s*\[?(CRITICAL|HIGH|MEDIUM|MED|LOW|INFO|INFORMATIONAL)\]?\s+([^\n]+)/im,
   // ### CRITICAL: Buffer overflow
   /^#{1,4}\s*(CRITICAL|HIGH|MEDIUM|MED|LOW|INFO):\s*([^\n]+)/im,
@@ -79,12 +79,12 @@ function splitIntoFindings(markdown: string): RawFinding[] {
   const splitRegex = /(?=^#{1,4}\s*(?:\[)?(CRITICAL|HIGH|MEDIUM|MED|LOW|INFO(?:RMATIONAL)?)\]?\s)/im;
   const blocks = markdown.split(splitRegex);
 
-  // blocks will have the captured severity groups interspersed — reassemble
+  // blocks will have the captured severity groups interspersed - reassemble
   const assembled: string[] = [];
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
     if (/^(CRITICAL|HIGH|MEDIUM|MED|LOW|INFO(?:RMATIONAL)?)$/i.test(block.trim())) {
-      // This is a captured group — prepend to next block
+      // This is a captured group - prepend to next block
       if (i + 1 < blocks.length) {
         assembled.push(block + blocks[i + 1]);
         i++;
@@ -136,7 +136,7 @@ function parseFinding(finding: RawFinding, projectId?: number): Partial<Vulnerab
 
   // Extract file location from title
   // Title might be: "heap overflow in foo() at src/bar.c:123"
-  // or: "src/bar.c:123 — integer overflow"
+  // or: "src/bar.c:123 - integer overflow"
   let title = rawTitle;
   let file: string | undefined;
   let lineStart: number | undefined;
@@ -149,11 +149,11 @@ function parseFinding(finding: RawFinding, projectId?: number): Partial<Vulnerab
     file = loc.file;
     lineStart = loc.lineStart;
     lineEnd = loc.lineEnd;
-    title = rawTitle.replace(atFileMatch[0], '').trim().replace(/\s*—\s*$/, '').trim();
+    title = rawTitle.replace(atFileMatch[0], '').trim().replace(/\s*-\s*$/, '').trim();
   }
 
-  // Look for "file.c:123 — title" pattern in title
-  const fileFirstMatch = rawTitle.match(/^([^\s]+:\d+(?:-\d+)?)\s*[—–-]+\s*(.+)$/);
+  // Look for "file.c:123 - title" pattern in title
+  const fileFirstMatch = rawTitle.match(/^([^\s]+:\d+(?:-\d+)?)\s*[-–-]+\s*(.+)$/);
   if (!file && fileFirstMatch) {
     const loc = parseFileLocation(fileFirstMatch[1]);
     file = loc.file;
@@ -177,7 +177,7 @@ function parseFinding(finding: RawFinding, projectId?: number): Partial<Vulnerab
   // Extract code snippet
   const codeSnippet = extractCodeBlock(body);
 
-  // Extract description — text between header and first sub-heading
+  // Extract description - text between header and first sub-heading
   const descMatch = body.match(/^#{1,4}[^\n]+\n+([\s\S]*?)(?=\n#{1,4}\s|$)/);
   let description = descMatch ? descMatch[1].trim() : '';
   // Remove code blocks from description

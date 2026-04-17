@@ -2,7 +2,7 @@
  * Shown when the sync engine reports a server-side conflict for a row
  * we pushed. User picks "keep mine" / "keep theirs" / "merge fields".
  *
- * The actual merge isn't done in this banner — we just emit the user's
+ * The actual merge isn't done in this banner - we just emit the user's
  * choice via onResolve. Caller performs the DB write and re-enqueues
  * the row with a newer updated_at_ms if "mine" was kept.
  */
@@ -48,7 +48,7 @@ export default function SyncConflictBanner({ conflict, local, onResolve, onDismi
   return (
     <div style={card}>
       <div style={{ fontSize: 12, color: '#888', textTransform: 'uppercase' }}>
-        Sync conflict — {conflict.table}
+        Sync conflict - {conflict.table}
       </div>
       <h4 style={{ margin: '4px 0 10px' }}>{title}</h4>
       <p style={{ fontSize: 13, color: '#555', margin: '0 0 10px' }}>

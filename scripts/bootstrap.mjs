@@ -12,7 +12,7 @@
  *   - Seed default RBAC permissions
  *   - Exit 0 on success, non-zero on any failure
  *
- * Does NOT create users — that happens when the first admin POSTs
+ * Does NOT create users - that happens when the first admin POSTs
  * to /api/session/bootstrap from the desktop wizard.
  */
 import { initDb } from '../dist-server/server/db.js';
@@ -21,7 +21,7 @@ const t0 = Date.now();
 console.log('[bootstrap] initializing DB…');
 try {
   await initDb();
-  console.log(`[bootstrap] ok — schema + seed ready (${Date.now() - t0}ms)`);
+  console.log(`[bootstrap] ok - schema + seed ready (${Date.now() - t0}ms)`);
   process.exit(0);
 } catch (err) {
   console.error('[bootstrap] failed:', err?.message || err);

@@ -158,7 +158,7 @@ export class PluginManager {
         requires: [],
         version: 'unknown',
         category: 'user-installed',
-        stars: '—',
+        stars: '-',
       };
     }
 

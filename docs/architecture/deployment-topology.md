@@ -12,7 +12,7 @@ Target user: individual researcher.
 
 ### Team mode
 
-A separately installed **server process** runs the shared core. Each team member still runs the full desktop app locally (it retains its own SQLite, MCP server, plugin manager, and pipeline engine) — but the desktop also connects to the team server and **syncs** rows marked `sync_scope='team'` in real time.
+A separately installed **server process** runs the shared core. Each team member still runs the full desktop app locally (it retains its own SQLite, MCP server, plugin manager, and pipeline engine) - but the desktop also connects to the team server and **syncs** rows marked `sync_scope='team'` in real time.
 
 Target user: security team inside a company.
 
@@ -20,11 +20,11 @@ The desktop in team mode is **local-first**: you keep working when the network i
 
 ## Three artifacts, one codebase
 
-| Artifact | Built by | Process environment |
-|---|---|---|
-| Desktop installer (`.exe`/`.dmg`/`.AppImage`) | `npm run build:desktop` | `VULNFORGE_MODE=desktop` (implicit when Electron is the parent) |
-| Server Docker image (`vulnforge/server:<ver>`) | `npm run build:server:docker` | `VULNFORGE_MODE=server` |
-| Server bare tarball (`vulnforge-server-<ver>.tar.gz`) | `npm run build:server:tar` | `VULNFORGE_MODE=server` |
+| Artifact                                              | Built by                      | Process environment                                             |
+| ----------------------------------------------------- | ----------------------------- | --------------------------------------------------------------- |
+| Desktop installer (`.exe`/`.dmg`/`.AppImage`)         | `npm run build:desktop`       | `VULNFORGE_MODE=desktop` (implicit when Electron is the parent) |
+| Server Docker image (`vulnforge/server:<ver>`)        | `npm run build:server:docker` | `VULNFORGE_MODE=server`                                         |
+| Server bare tarball (`vulnforge-server-<ver>.tar.gz`) | `npm run build:server:tar`    | `VULNFORGE_MODE=server`                                         |
 
 `server/deployment/mode.ts` is the single detection point. All mode-dependent behavior (worker pool, multi-user, OIDC, capability manifest) flows from `isServerMode()` / `isDesktopMode()`.
 
@@ -32,9 +32,9 @@ The desktop in team mode is **local-first**: you keep working when the network i
 
 Every syncable row carries a `sync_scope` column with three values:
 
-- `private` — desktop-only. Never touches the sync wire even if it would otherwise qualify.
-- `team` — syncs to the team server and out to all members.
-- `pool` — opt-in, anonymized, shared across orgs through a separate `/api/pool/*` endpoint (not regular sync).
+- `private` - desktop-only. Never touches the sync wire even if it would otherwise qualify.
+- `team` - syncs to the team server and out to all members.
+- `pool` - opt-in, anonymized, shared across orgs through a separate `/api/pool/*` endpoint (not regular sync).
 
 See [`../user/privacy-scopes.md`](../user/privacy-scopes.md) for the user-facing guide.
 

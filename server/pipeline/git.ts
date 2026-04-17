@@ -238,7 +238,7 @@ export function extractDependencies(dirPath: string): DependencyInfo[] {
               if (match) packages.push({ name: match[1], version: match[2] || '*' });
             }
           } else if (relFile.endsWith('pyproject.toml')) {
-            // Basic TOML dep extraction — handles common format
+            // Basic TOML dep extraction - handles common format
             const depMatch = content.match(/\[project\]\s*[\s\S]*?dependencies\s*=\s*\[([\s\S]*?)\]/);
             if (depMatch) {
               for (const line of depMatch[1].split('\n')) {

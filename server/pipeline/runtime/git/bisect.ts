@@ -1,5 +1,5 @@
 /**
- * Git Bisect Executor — wraps `git bisect run` to find the commit that
+ * Git Bisect Executor - wraps `git bisect run` to find the commit that
  * introduced a bug. Plugs into the runtime job framework.
  */
 import cp from 'child_process';

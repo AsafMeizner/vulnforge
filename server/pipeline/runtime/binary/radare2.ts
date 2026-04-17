@@ -1,5 +1,5 @@
 /**
- * Radare2 Executor — wraps r2/rizin for binary analysis.
+ * Radare2 Executor - wraps r2/rizin for binary analysis.
  * Runs a sequence of r2 commands via rabin2/r2 -c and parses the output.
  */
 import cp from 'child_process';

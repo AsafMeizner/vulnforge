@@ -47,7 +47,7 @@ export class LocalNotesProvider implements NotesProvider {
     return path.join(this.basePath, bucket);
   }
 
-  /** Build a filename from a title — YYYY-MM-DD-{slug}.md. */
+  /** Build a filename from a title - YYYY-MM-DD-{slug}.md. */
   protected buildFilename(title: string, createdAt?: string): string {
     const d = createdAt ? new Date(createdAt) : new Date();
     const iso = isNaN(d.getTime()) ? new Date() : d;

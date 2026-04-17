@@ -4,7 +4,7 @@ import { teachFromDecision, runLearnedPatterns, validatePoCInSandbox } from '../
 
 const router = Router();
 
-// POST /api/teach — record a user decision and learn from it
+// POST /api/teach - record a user decision and learn from it
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { finding_id, action, reasoning } = req.body;
@@ -23,7 +23,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/teach/examples — list teach examples
+// GET /api/teach/examples - list teach examples
 router.get('/examples', (req: Request, res: Response) => {
   try {
     const examples = getTeachExamples({
@@ -37,7 +37,7 @@ router.get('/examples', (req: Request, res: Response) => {
   }
 });
 
-// GET /api/teach/patterns — list learned patterns
+// GET /api/teach/patterns - list learned patterns
 router.get('/patterns', (_req: Request, res: Response) => {
   try {
     const patterns = getLearnedPatterns();
@@ -47,7 +47,7 @@ router.get('/patterns', (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/teach/patterns/run — run learned patterns against a project
+// POST /api/teach/patterns/run - run learned patterns against a project
 router.post('/patterns/run', async (req: Request, res: Response) => {
   try {
     const { project_id } = req.body;
@@ -66,7 +66,7 @@ router.post('/patterns/run', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/teach/validate-poc — run an exploit in a sandbox
+// POST /api/teach/validate-poc - run an exploit in a sandbox
 router.post('/validate-poc', async (req: Request, res: Response) => {
   try {
     const { exploit_id, target_image, timeout } = req.body;

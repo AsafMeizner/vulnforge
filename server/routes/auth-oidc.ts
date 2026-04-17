@@ -1,5 +1,5 @@
 /**
- * OIDC HTTP routes — SSO flow for team-server logins.
+ * OIDC HTTP routes - SSO flow for team-server logins.
  *
  * Mounted at /api/auth/oidc/*. Disabled unless `isOidcEnabled()` returns
  * true (check happens per-request so admin can toggle without restart).
@@ -120,7 +120,7 @@ router.post('/exchange', async (req: Request, res: Response) => {
     const username = rec.upstream_email || `${rec.provider_name}:${rec.upstream_sub}`;
     let user: UserRow | null = getUserByUsername(username);
     if (!user) {
-      // Synthesize a random bcrypt hash — user never uses password login.
+      // Synthesize a random bcrypt hash - user never uses password login.
       const randomPw = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
       const password_hash = await hashPassword(randomPw + 'OidcOnlyAccount!');
       const role = mapRoleFromProvider(provider, rec.upstream_email, []);
@@ -174,7 +174,7 @@ function renderPastePage(oneTimeCode: string, email: string | null): string {
   const safeCode = oneTimeCode.replace(/[<>"']/g, '');
   const safeEmail = email ? email.replace(/[<>"']/g, '') : '';
   return `<!doctype html>
-<html><head><meta charset="utf-8"><title>VulnForge — Sign-in complete</title>
+<html><head><meta charset="utf-8"><title>VulnForge - Sign-in complete</title>
 <style>
   body { font-family: system-ui, -apple-system, sans-serif; max-width: 560px;
          margin: 80px auto; padding: 0 16px; line-height: 1.5; color: #222; }
@@ -196,7 +196,7 @@ function renderPastePage(oneTimeCode: string, email: string | null): string {
 function renderError(msg: string): string {
   const safe = msg.replace(/[<>"']/g, '');
   return `<!doctype html>
-<html><head><meta charset="utf-8"><title>VulnForge — Sign-in error</title>
+<html><head><meta charset="utf-8"><title>VulnForge - Sign-in error</title>
 <style>body{font-family:system-ui;max-width:560px;margin:80px auto;padding:0 16px}
 .err{background:#fff5f5;border:1px solid #fcc;color:#900;padding:12px 16px;border-radius:6px}</style>
 </head><body><h1>Sign-in failed</h1><div class="err">${safe}</div></body></html>`;

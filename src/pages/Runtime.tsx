@@ -45,7 +45,7 @@ function statusColor(status: string): string {
 }
 
 function relativeTime(iso: string): string {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const diff = Date.now() - new Date(iso).getTime();
   const s = Math.floor(diff / 1000);
   if (s < 60) return `${s}s ago`;
@@ -113,7 +113,7 @@ export default function Runtime() {
         <div>
           <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, color: 'var(--text)' }}>Runtime Analysis</h2>
           <p style={{ fontSize: 12, color: 'var(--muted)', margin: '4px 0 0' }}>
-            Fuzzing, debugging, packet capture, port scans — all runtime tools unified.
+            Fuzzing, debugging, packet capture, port scans - all runtime tools unified.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -280,21 +280,21 @@ function StatsSummary({ job }: { job: RuntimeJob }) {
 
   if (job.type === 'capture') {
     return <>
-      {stats.packet_count ? `${stats.packet_count} packets` : '—'}
+      {stats.packet_count ? `${stats.packet_count} packets` : '-'}
       {stats.bytes ? ` · ${formatBytes(stats.bytes)}` : ''}
     </>;
   }
 
   if (job.type === 'portscan') {
     return <>
-      {stats.open_ports !== undefined ? `${stats.open_ports} open / ${stats.total_ports || 0}` : '—'}
+      {stats.open_ports !== undefined ? `${stats.open_ports} open / ${stats.total_ports || 0}` : '-'}
       {stats.up_hosts !== undefined ? ` · ${stats.up_hosts} up` : ''}
     </>;
   }
 
   if (job.type === 'debug') {
     return <>
-      {stats.hit_breakpoint !== undefined ? (stats.hit_breakpoint ? 'breakpoint hit' : 'no hit') : '—'}
+      {stats.hit_breakpoint !== undefined ? (stats.hit_breakpoint ? 'breakpoint hit' : 'no hit') : '-'}
       {stats.signal ? ` · ${stats.signal}` : ''}
     </>;
   }
@@ -309,7 +309,7 @@ function StatsSummary({ job }: { job: RuntimeJob }) {
     </>;
   }
 
-  return <>—</>;
+  return <>-</>;
 }
 
 function formatBytes(n: number): string {
@@ -581,7 +581,7 @@ function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input type="checkbox" checked={formData.snapshot_mode ?? false}
                   onChange={e => update('snapshot_mode', e.target.checked)} />
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>Volatile — changes lost on shutdown</span>
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>Volatile - changes lost on shutdown</span>
               </label>
             </Field>
             <Field label="Timeout (seconds, 0 = unlimited)">

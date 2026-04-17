@@ -216,7 +216,7 @@ export default function Projects() {
                     <td style={{ padding: '9px 14px', color: 'var(--text)', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title}</td>
                     <td style={{ padding: '9px 14px' }}><SeverityBadge severity={v.severity} /></td>
                     <td style={{ padding: '9px 14px' }}><StatusBadge status={v.status} /></td>
-                    <td style={{ padding: '9px 14px', color: 'var(--muted)', fontSize: 11 }}>{v.method ?? '—'}</td>
+                    <td style={{ padding: '9px 14px', color: 'var(--muted)', fontSize: 11 }}>{v.method ?? '-'}</td>
                     <td style={{ padding: '9px 14px', color: 'var(--muted)' }}>{relativeTime(v.found_at)}</td>
                   </tr>
                 ))}
@@ -224,14 +224,14 @@ export default function Projects() {
             </table>
           )}
 
-          {/* Research Workspace — notes for this project */}
+          {/* Research Workspace - notes for this project */}
           <div style={{ padding: 16, borderTop: '1px solid var(--border)' }}>
             <NotesPanel projectId={selectedProject.id} initiallyOpen={false} />
           </div>
         </div>
       )}
 
-      {/* Import modal — Local Path or Git URL */}
+      {/* Import modal - Local Path or Git URL */}
       <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Import Project" width={520}>
         <ImportProjectForm
           onImported={() => { setImportOpen(false); load(); }}

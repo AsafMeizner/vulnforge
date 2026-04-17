@@ -54,7 +54,7 @@ export const OSVScannerIntegration = {
       useShell: true,
     });
 
-    // osv-scanner exits non-zero when it finds vulns — use stdout regardless
+    // osv-scanner exits non-zero when it finds vulns - use stdout regardless
     const output = result.stdout + result.stderr;
     return { output, findings: OSVScannerIntegration.parseOutput(result.stdout) };
   },

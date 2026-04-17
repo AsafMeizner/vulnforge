@@ -16,7 +16,7 @@
 /**
  * @fileoverview Streams API definitions
  *
- * Based on Living Standard — Last Updated 5 August 2016
+ * Based on Living Standard - Last Updated 5 August 2016
  * https://streams.spec.whatwg.org/commit-snapshots/34ecaadbcce8df9943d7a2cdb7fca4dc25914df4/
  *
  * @see https://streams.spec.whatwg.org/

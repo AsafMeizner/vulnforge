@@ -39,7 +39,7 @@ export interface JobContext {
   projectId?: number;
   findingId?: number;
 
-  /** Emit a progress event (stats, output, etc.) — broadcasted via WebSocket. */
+  /** Emit a progress event (stats, output, etc.) - broadcasted via WebSocket. */
   emit(ev: Omit<JobEvent, 'timestamp'>): void;
 
   /** Update persisted stats for this job (merged with existing stats). */

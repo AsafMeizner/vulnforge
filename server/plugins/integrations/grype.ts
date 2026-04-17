@@ -48,7 +48,7 @@ export const GrypeIntegration = {
     target: string,
     options: GrypeOptions = {}
   ): Promise<{ output: string; findings: PluginFinding[] }> => {
-    // Grype supports dir:, image:, file: prefixes — default to dir: for paths
+    // Grype supports dir:, image:, file: prefixes - default to dir: for paths
     const scanTarget = target.includes(':') ? target : `dir:${target}`;
     const args = [scanTarget, '-o', 'json'];
     if (options.scope) args.push('--scope', options.scope);

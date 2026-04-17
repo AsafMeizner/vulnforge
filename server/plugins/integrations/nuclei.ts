@@ -93,7 +93,7 @@ export const NucleiIntegration = {
             ? JSON.stringify(obj.extracted_results) : undefined,
           raw: obj,
         });
-      } catch { /* progress lines — skip */ }
+      } catch { /* progress lines - skip */ }
     }
     return findings;
   },

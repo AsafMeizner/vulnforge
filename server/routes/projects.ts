@@ -107,7 +107,7 @@ router.get('/:id', (req: Request, res: Response) => {
   }
 });
 
-// POST /api/projects — import project by path
+// POST /api/projects - import project by path
 router.post('/', (req: Request, res: Response) => {
   try {
     const { path: projectPath, name, repo_url, branch } = req.body;
@@ -137,7 +137,7 @@ router.post('/', (req: Request, res: Response) => {
   }
 });
 
-// POST /api/projects/import-url — clone a git repo and import
+// POST /api/projects/import-url - clone a git repo and import
 router.post('/import-url', async (req: Request, res: Response) => {
   try {
     const { url, branch, depth } = req.body;
@@ -162,7 +162,7 @@ router.post('/import-url', async (req: Request, res: Response) => {
     });
     updateProject(projectId, { clone_status: 'cloning' } as any);
 
-    // Return 202 immediately — clone happens async
+    // Return 202 immediately - clone happens async
     res.status(202).json({ id: projectId, name, status: 'cloning' });
 
     // Async clone + analysis

@@ -1,22 +1,22 @@
 name: Release
 
-# Triggered when a tag vX.Y.Z is pushed. Builds three artifacts —
+# Triggered when a tag vX.Y.Z is pushed. Builds three artifacts -
 # desktop installers (win/mac/linux), server Docker image, and bare
-# server tarball — then attaches them to the GitHub Release.
+# server tarball - then attaches them to the GitHub Release.
 
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v0.2.0). Must already exist.'
+        description: "Tag to release (e.g. v0.2.0). Must already exist."
         required: true
 
 permissions:
-  contents: write  # for creating/attaching releases
-  packages: write  # for pushing to GHCR
+  contents: write # for creating/attaching releases
+  packages: write # for pushing to GHCR
 
 concurrency:
   group: release-${{ github.ref }}
@@ -37,8 +37,8 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
       - run: npm ci --ignore-scripts
       - name: build desktop
         run: npm run build:desktop
@@ -101,8 +101,8 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
       - run: npm ci --ignore-scripts
       - name: build tarball
         run: npm run build:server:tar
@@ -145,8 +145,8 @@ jobs:
           body: |
             ## Downloads
 
-            - **Desktop installer** — pick the file that matches your OS below.
+            - **Desktop installer** - pick the file that matches your OS below.
             - **Server Docker image:** `ghcr.io/${{ github.repository_owner }}/vulnforge-server:${{ github.event.inputs.tag || github.ref_name }}`
-            - **Server tarball:** `vulnforge-server-*.tar.gz` — extract and run `sudo ./scripts/install-server.sh`.
+            - **Server tarball:** `vulnforge-server-*.tar.gz` - extract and run `sudo ./scripts/install-server.sh`.
 
             See [docs/](https://github.com/${{ github.repository }}/tree/main/docs) for install guides.

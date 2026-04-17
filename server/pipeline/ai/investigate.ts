@@ -1,5 +1,5 @@
 /**
- * Investigate Mode — interactive AI investigation loop with per-step approval.
+ * Investigate Mode - interactive AI investigation loop with per-step approval.
  * State lives in SQLite session_state so the frontend can poll progress.
  */
 import crypto from 'crypto';

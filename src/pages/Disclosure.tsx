@@ -62,7 +62,7 @@ export default function DisclosurePage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const vendorName = (id?: number) => id ? (vendors.find(v => v.id === id)?.name || `#${id}`) : '—';
+  const vendorName = (id?: number) => id ? (vendors.find(v => v.id === id)?.name || `#${id}`) : '-';
 
   const handleStatusChange = async (d: Disclosure, status: string) => {
     try {
@@ -181,13 +181,13 @@ export default function DisclosurePage() {
                                 ? `${Math.abs(d.sla_days_remaining!)}d overdue`
                                 : `${d.sla_days_remaining}d left`}
                             </span>
-                          ) : <span style={{ color: 'var(--muted)' }}>—</span>}
+                          ) : <span style={{ color: 'var(--muted)' }}>-</span>}
                         </td>
                         <td style={{ ...tdStyle, fontFamily: 'monospace', color: 'var(--blue)', fontSize: 11 }}>
-                          {d.cve_id || '—'}
+                          {d.cve_id || '-'}
                         </td>
                         <td style={{ ...tdStyle, color: 'var(--green)', fontWeight: 600 }}>
-                          {d.bounty_amount ? `$${d.bounty_amount}` : '—'}
+                          {d.bounty_amount ? `$${d.bounty_amount}` : '-'}
                         </td>
                         <td style={tdStyle}>
                           <button onClick={() => setSelected(d)} style={smallBtn('var(--blue)')}>View</button>
@@ -220,15 +220,15 @@ export default function DisclosurePage() {
                     {vendors.map(v => (
                       <tr key={v.id} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td style={{ ...tdStyle, color: 'var(--text)', fontWeight: 600 }}>{v.name}</td>
-                        <td style={{ ...tdStyle, color: 'var(--muted)' }}>{v.platform || '—'}</td>
+                        <td style={{ ...tdStyle, color: 'var(--muted)' }}>{v.platform || '-'}</td>
                         <td style={{ ...tdStyle, color: 'var(--muted)', fontFamily: 'monospace', fontSize: 11 }}>
-                          {v.security_email || '—'}
+                          {v.security_email || '-'}
                         </td>
                         <td style={{ ...tdStyle, color: 'var(--muted)' }}>
-                          {v.typical_response_days ? `${v.typical_response_days}d` : '—'}
+                          {v.typical_response_days ? `${v.typical_response_days}d` : '-'}
                         </td>
                         <td style={{ ...tdStyle, color: 'var(--muted)', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {v.notes || '—'}
+                          {v.notes || '-'}
                         </td>
                       </tr>
                     ))}
@@ -299,7 +299,7 @@ function NewDisclosureModal({ vendors, onClose, onCreated }: {
       <Field label="Title (required)"><input value={title} onChange={e => setTitle(e.target.value)} autoFocus style={inputStyle} /></Field>
       <Field label="Vendor">
         <select value={vendorId} onChange={e => setVendorId(e.target.value ? Number(e.target.value) : '')} style={inputStyle}>
-          <option value="">— select vendor —</option>
+          <option value="">- select vendor -</option>
           {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
         </select>
       </Field>
@@ -358,13 +358,13 @@ function DisclosureDetailModal({ disclosure, vendor, onClose }: {
     <ModalShell title={disclosure.title} onClose={onClose}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 14 }}>
         <Info label="Status" value={disclosure.status} />
-        <Info label="Vendor" value={vendor?.name || '—'} />
-        <Info label="CVE" value={disclosure.cve_id || '—'} />
-        <Info label="Tracking ID" value={disclosure.tracking_id || '—'} />
-        <Info label="Submitted" value={disclosure.submission_date?.split('T')[0] || '—'} />
-        <Info label="SLA" value={disclosure.sla_days ? `${disclosure.sla_days} days` : '—'} />
-        <Info label="Bounty" value={disclosure.bounty_amount ? `$${disclosure.bounty_amount}` : '—'} />
-        <Info label="Paid" value={disclosure.bounty_paid_date?.split('T')[0] || '—'} />
+        <Info label="Vendor" value={vendor?.name || '-'} />
+        <Info label="CVE" value={disclosure.cve_id || '-'} />
+        <Info label="Tracking ID" value={disclosure.tracking_id || '-'} />
+        <Info label="Submitted" value={disclosure.submission_date?.split('T')[0] || '-'} />
+        <Info label="SLA" value={disclosure.sla_days ? `${disclosure.sla_days} days` : '-'} />
+        <Info label="Bounty" value={disclosure.bounty_amount ? `$${disclosure.bounty_amount}` : '-'} />
+        <Info label="Paid" value={disclosure.bounty_paid_date?.split('T')[0] || '-'} />
       </div>
       {disclosure.notes && (
         <div>

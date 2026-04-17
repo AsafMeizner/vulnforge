@@ -3,14 +3,14 @@
  *
  * Access tokens are short-lived (15 minutes) and carry only what's
  * needed for routing + permission checks: user id, role, device id.
- * They are ephemeral on the client (memory only) — never persisted
+ * They are ephemeral on the client (memory only) - never persisted
  * to disk. Refresh tokens (separate module) live longer and are
  * used to mint fresh access tokens.
  *
  * Secret source precedence:
- *   1. process.env.VULNFORGE_JWT_SECRET (prod — set by server install)
- *   2. settings.jwt_signing_secret (dev — auto-generated on first boot)
- *   3. in-memory random (test — every test run regenerates)
+ *   1. process.env.VULNFORGE_JWT_SECRET (prod - set by server install)
+ *   2. settings.jwt_signing_secret (dev - auto-generated on first boot)
+ *   3. in-memory random (test - every test run regenerates)
  *
  * Rotating the secret invalidates every outstanding access token
  * instantly and is documented in docs/security/secret-handling.md.
@@ -36,7 +36,7 @@ export function getJwtSecret(): string {
     cachedSecret = envSecret;
     return cachedSecret;
   }
-  // Dev/test fallback — random per process. Won't persist across restarts,
+  // Dev/test fallback - random per process. Won't persist across restarts,
   // which is deliberately inconvenient so prod installs set the env var.
   cachedSecret = randomBytes(48).toString('base64');
   return cachedSecret;

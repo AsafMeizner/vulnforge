@@ -1,10 +1,10 @@
 /**
- * Auth middleware — JWT verification, user attachment, solo-mode short-circuit.
+ * Auth middleware - JWT verification, user attachment, solo-mode short-circuit.
  *
  * Exported variants:
- *   requireAuth      — 401 if no/invalid token
- *   optionalAuth     — attaches req.user if present, never blocks
- *   soloModeBypass   — attaches a synthetic admin user (id=1) and moves on
+ *   requireAuth      - 401 if no/invalid token
+ *   optionalAuth     - attaches req.user if present, never blocks
+ *   soloModeBypass   - attaches a synthetic admin user (id=1) and moves on
  *
  * The auth stack picks a variant at mount time based on deployment mode:
  *   VULNFORGE_MODE=server → requireAuth on all /api routes
@@ -78,7 +78,7 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction): 
 
 /**
  * Solo-mode pass-through. Desktop in solo mode has no network auth but still
- * runs route permission checks — this hands those checks a synthetic admin
+ * runs route permission checks - this hands those checks a synthetic admin
  * user so they uniformly succeed.
  */
 export function soloModeBypass(req: Request, _res: Response, next: NextFunction): void {

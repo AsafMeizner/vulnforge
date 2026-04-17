@@ -112,7 +112,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const severityData = stats?.bySeverity ?? [];
   const totalSeverityCount = severityData.reduce((acc, d) => acc + Number(d.count), 0) || 1;
 
-  // Recent activity — merge scans + findings sorted by time
+  // Recent activity - merge scans + findings sorted by time
   const recentActivity = [
     ...scans.slice(0, 10).map(s => ({
       type: 'scan' as const,
@@ -156,17 +156,17 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       {/* Quick Hunt */}
       <QuickHunt onNavigate={onNavigate} />
 
-      {/* Stats cards — clickable to navigate */}
+      {/* Stats cards - clickable to navigate */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
-        <StatCard label="Total Findings" value={loading ? '—' : (stats?.totalVulns ?? stats?.total ?? 0)} color="var(--text)" onClick={() => onNavigate('findings')} />
-        <StatCard label="Critical" value={loading ? '—' : (stats?.critical ?? 0)} color="var(--red)" onClick={() => onNavigate('findings')} />
-        <StatCard label="High" value={loading ? '—' : (stats?.high ?? 0)} color="var(--orange)" onClick={() => onNavigate('findings')} />
-        <StatCard label="Medium" value={loading ? '—' : (stats?.medium ?? 0)} color="var(--yellow)" onClick={() => onNavigate('findings')} />
-        <StatCard label="Verified" value={loading ? '—' : (stats?.verified ?? 0)} color="var(--green)" onClick={() => onNavigate('findings')} />
-        <StatCard label="Projects" value={loading ? '—' : (stats?.totalProjects ?? stats?.projects ?? 0)} color="var(--blue)" onClick={() => onNavigate('projects')} />
+        <StatCard label="Total Findings" value={loading ? '-' : (stats?.totalVulns ?? stats?.total ?? 0)} color="var(--text)" onClick={() => onNavigate('findings')} />
+        <StatCard label="Critical" value={loading ? '-' : (stats?.critical ?? 0)} color="var(--red)" onClick={() => onNavigate('findings')} />
+        <StatCard label="High" value={loading ? '-' : (stats?.high ?? 0)} color="var(--orange)" onClick={() => onNavigate('findings')} />
+        <StatCard label="Medium" value={loading ? '-' : (stats?.medium ?? 0)} color="var(--yellow)" onClick={() => onNavigate('findings')} />
+        <StatCard label="Verified" value={loading ? '-' : (stats?.verified ?? 0)} color="var(--green)" onClick={() => onNavigate('findings')} />
+        <StatCard label="Projects" value={loading ? '-' : (stats?.totalProjects ?? stats?.projects ?? 0)} color="var(--blue)" onClick={() => onNavigate('projects')} />
       </div>
 
-      {/* Feature summary row — clickable */}
+      {/* Feature summary row - clickable */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
         <StatCard label="Notes" value={featureCounts.notes} color="var(--blue)" onClick={() => onNavigate('hypotheses')} />
         <StatCard label="Runtime Jobs" value={featureCounts.runtimeJobs} color="var(--purple)" onClick={() => onNavigate('runtime')} />

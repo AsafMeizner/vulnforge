@@ -115,7 +115,7 @@ const agentTools: AgentTool[] = [
       if (vulns.length === 0) return 'No findings match the filters.';
 
       const lines = vulns.map(v =>
-        `#${v.id} [${v.severity ?? 'Unknown'}] ${v.title} — ${v.status ?? 'Open'}`
+        `#${v.id} [${v.severity ?? 'Unknown'}] ${v.title} - ${v.status ?? 'Open'}`
       );
       return `Found ${vulns.length} finding(s):\n${lines.join('\n')}`;
     },
@@ -129,7 +129,7 @@ const agentTools: AgentTool[] = [
       if (!projectPath || !pattern) return 'Error: projectPath and pattern are required';
 
       try {
-        // Use execFile (not exec/execSync) — args are passed as an array, never interpolated into a shell string
+        // Use execFile (not exec/execSync) - args are passed as an array, never interpolated into a shell string
         const { stdout } = await execFileAsync('grep', [
           '-rn',
           '--include=*.c',
@@ -146,7 +146,7 @@ const agentTools: AgentTool[] = [
           ? `Found ${lines.length} match(es):\n${lines.join('\n')}`
           : 'No matches found.';
       } catch (err: any) {
-        // grep exits 1 when there are no matches — that is not an error
+        // grep exits 1 when there are no matches - that is not an error
         if (err.code === 1) return 'No matches found.';
         return `Search error: ${err.message}`;
       }
@@ -160,7 +160,7 @@ const agentTools: AgentTool[] = [
       const projects = getAllProjects();
       if (projects.length === 0) return 'No projects found.';
       return projects
-        .map(p => `#${p.id}: ${p.name} (${p.language ?? 'unknown'}) — ${p.path ?? 'no path'}`)
+        .map(p => `#${p.id}: ${p.name} (${p.language ?? 'unknown'}) - ${p.path ?? 'no path'}`)
         .join('\n');
     },
   },
@@ -237,7 +237,7 @@ const agentTools: AgentTool[] = [
         const { blameVulnerableLine } = await import('../pipeline/git-analyzer.js');
         const result = await blameVulnerableLine(project.path, params.file, Number(params.line));
         if (!result) return 'Blame data not available (may be a shallow clone)';
-        return `Line ${result.line}: introduced by ${result.author} on ${result.date} (${result.age_days} days ago)\nCommit: ${result.commit_hash} — ${result.commit_message}`;
+        return `Line ${result.line}: introduced by ${result.author} on ${result.date} (${result.age_days} days ago)\nCommit: ${result.commit_hash} - ${result.commit_message}`;
       } catch (err: any) {
         return `Error: ${err.message}`;
       }
@@ -256,7 +256,7 @@ const agentTools: AgentTool[] = [
         const limit = Math.min(Number(params.limit) || 10, 20);
         if (commits.length === 0) return 'No security-relevant commits found.';
         return commits.slice(0, limit).map(c =>
-          `${c.hash.slice(0, 8)} [${c.severity_hint}] ${c.message.slice(0, 80)} (${c.date.split('T')[0]}) — keywords: ${c.security_keywords.join(', ')}`
+          `${c.hash.slice(0, 8)} [${c.severity_hint}] ${c.message.slice(0, 80)} (${c.date.split('T')[0]}) - keywords: ${c.security_keywords.join(', ')}`
         ).join('\n');
       } catch (err: any) {
         return `Error: ${err.message}`;
@@ -299,7 +299,7 @@ const agentTools: AgentTool[] = [
         }
         out += `\nTop entry points:\n`;
         for (const ep of surface.entry_points.slice(0, 10)) {
-          out += `  [${ep.type}] ${ep.file}:${ep.line} — ${ep.function_name} (${ep.exposure})\n`;
+          out += `  [${ep.type}] ${ep.file}:${ep.line} - ${ep.function_name} (${ep.exposure})\n`;
         }
         return out;
       } catch (err: any) {
@@ -322,7 +322,7 @@ const agentTools: AgentTool[] = [
           : variants;
         if (filtered.length === 0) return 'No CVE variant patterns matched.';
         return filtered.slice(0, 15).map(v =>
-          `[${v.confidence}] ${v.cve_name} (${v.cve_id}) at ${v.file}:${v.line} — ${v.evidence.slice(0, 100)}`
+          `[${v.confidence}] ${v.cve_name} (${v.cve_id}) at ${v.file}:${v.line} - ${v.evidence.slice(0, 100)}`
         ).join('\n');
       } catch (err: any) {
         return `Error: ${err.message}`;
@@ -359,7 +359,7 @@ const agentTools: AgentTool[] = [
         });
         if (findings.length === 0) return 'No findings for this pipeline.';
         return findings.slice(0, 20).map(f =>
-          `#${f.id} [${f.severity}] ${f.title} — ${f.file || 'no file'}:${f.line_start || '?'} (${f.confidence}, ${f.status})`
+          `#${f.id} [${f.severity}] ${f.title} - ${f.file || 'no file'}:${f.line_start || '?'} (${f.confidence}, ${f.status})`
         ).join('\n');
       } catch (err: any) {
         return `Error: ${err.message}`;
@@ -415,12 +415,12 @@ When the goal is fully complete, respond with:
 }
 
 Rules:
-- Always respond with valid JSON only — no markdown, no explanation outside the JSON.
+- Always respond with valid JSON only - no markdown, no explanation outside the JSON.
 - Choose the most appropriate tool for each step.
 - Use results from previous steps to inform subsequent steps.
 - If a tool returns an error, decide whether to retry, try a different approach, or mark done.
 - Be methodical: list projects before scanning, list findings before triaging.
-- Do not invent tool names — only use: ${TOOL_NAMES.join(', ')}, done.`;
+- Do not invent tool names - only use: ${TOOL_NAMES.join(', ')}, done.`;
 
 // ── Agent runner ───────────────────────────────────────────────────────────────
 
@@ -461,7 +461,7 @@ export async function runAgent(goal: string, maxSteps = 25): Promise<AgentStep[]
       break;
     }
 
-    // Parse agent JSON — strip optional markdown fences
+    // Parse agent JSON - strip optional markdown fences
     let parsed: { thought: string; action: string; params: Record<string, any> };
     try {
       let jsonText = raw;

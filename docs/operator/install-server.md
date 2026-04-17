@@ -51,7 +51,7 @@ curl https://vulnforge.acme.corp/api/health
 
 Creates a Windows service `VulnForgeServer` with auto-start. Env file at `C:\ProgramData\VulnForge\.env`.
 
-## Bootstrap — first admin
+## Bootstrap - first admin
 
 After the install finishes you'll see:
 
@@ -84,7 +84,7 @@ VULNFORGE_USER=vf \
 
 ### Service won't start
 
-- `journalctl -u vulnforge-server -n 100 --no-pager` — read the last 100 log lines.
+- `journalctl -u vulnforge-server -n 100 --no-pager` - read the last 100 log lines.
 - Common causes: DB path unwritable by `vulnforge` user, missing `VULNFORGE_JWT_SECRET`, port 3001 already in use.
 
 ### Desktop can't connect

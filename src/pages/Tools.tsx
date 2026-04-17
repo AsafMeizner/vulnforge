@@ -68,7 +68,7 @@ export default function Tools({ onNavigateToScanner }: ToolsProps) {
             });
           }
         } else {
-          // No modules — show as single tool
+          // No modules - show as single tool
           pluginTools.push({
             id: 10000 + p.id,
             name: p.name,

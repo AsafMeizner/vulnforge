@@ -19,7 +19,7 @@
  * This api is still in development and not yet stable. Use at your
  * own risk.
  *
- * Based on Living Standard — Last Updated 17 August 2016
+ * Based on Living Standard - Last Updated 17 August 2016
  *
  * @see https://fetch.spec.whatwg.org/
  * @externs

@@ -1,5 +1,5 @@
 /**
- * Sync model — single source of truth for multi-device sync behavior.
+ * Sync model - single source of truth for multi-device sync behavior.
  *
  * Every cross-cutting decision about what syncs, how rows are tagged,
  * and how conflicts / pool anonymization work lives here as pure data.
@@ -12,7 +12,7 @@ import { ulid } from '../utils/ulid.js';
 
 // ── Which tables participate in which sync category ─────────────────────────
 
-/** Category A — rows have the 7 sync columns and can be pushed/pulled. */
+/** Category A - rows have the 7 sync columns and can be pushed/pulled. */
 export const SYNCABLE_TABLES = [
   'projects',
   'vulnerabilities',
@@ -29,7 +29,7 @@ export const SYNCABLE_TABLES = [
 export type SyncableTable = typeof SYNCABLE_TABLES[number];
 
 /**
- * Category B — strictly per-machine. Never push, never pull, never expose
+ * Category B - strictly per-machine. Never push, never pull, never expose
  * via the sync REST/WS endpoints even to an authenticated admin.
  * These hold local filesystem paths, API keys, refresh tokens, UI prefs, or
  * binaries that have no meaning on another machine.
@@ -37,10 +37,10 @@ export type SyncableTable = typeof SYNCABLE_TABLES[number];
 export const UNSYNCABLE_TABLES = [
   'plugins',                 // on-disk binaries / paths
   'notes_providers',         // holds vault paths, OAuth tokens
-  'ai_providers',            // local API keys (Category C on server — see CAPABILITY_TABLES)
+  'ai_providers',            // local API keys (Category C on server - see CAPABILITY_TABLES)
   'integrations',            // local OAuth tokens (Category C on server)
   'api_tokens',              // long-lived tokens for MCP clients
-  'refresh_tokens',          // auth refresh tokens — NEVER leave the device they were issued to
+  'refresh_tokens',          // auth refresh tokens - NEVER leave the device they were issued to
   'sync_outbox',             // client-only outbox
   'sync_cursors',            // client-only per-table cursor state
   'audit_log',               // server-only; desktop writes go to local file
@@ -48,7 +48,7 @@ export const UNSYNCABLE_TABLES = [
 ] as const;
 
 /**
- * Category C — exists on BOTH desktop and server with independent rows.
+ * Category C - exists on BOTH desktop and server with independent rows.
  * Server version is exposed to clients via the capability manifest
  * (names + capabilities only, never secrets). Clients invoke server-side
  * versions through the proxy endpoints.
@@ -85,7 +85,7 @@ export type SyncStatus = typeof SYNC_STATUS_VALUES[number];
 
 /**
  * Minimal shape every syncable row satisfies. Concrete tables have many
- * more columns — this is just the sync contract.
+ * more columns - this is just the sync contract.
  */
 export interface SyncableRow {
   sync_id: string;
@@ -98,7 +98,7 @@ export interface SyncableRow {
   [otherColumns: string]: any;
 }
 
-// ── Helpers — stamping & filtering ──────────────────────────────────────────
+// ── Helpers - stamping & filtering ──────────────────────────────────────────
 
 /**
  * Prepare a row for a local write. Assigns a fresh sync_id if absent,
@@ -178,14 +178,14 @@ export type ConflictOutcome =
   | { kind: 'field-merge'; merged: SyncableRow };
 
 /**
- * Field-level merge whitelist — tables + columns where concurrent edits
+ * Field-level merge whitelist - tables + columns where concurrent edits
  * compose instead of clobbering. Applied server-side BEFORE row-level LWW.
  *
  * Strategy per field:
- *   'concat'       — concatenate strings with '\n\n---\n\n' separator
- *   'status-max'   — keep the higher-ranked status
- *   'or-boolean'   — logical OR of 0/1 values
- *   'union-array'  — unique-union parsed JSON arrays
+ *   'concat'       - concatenate strings with '\n\n---\n\n' separator
+ *   'status-max'   - keep the higher-ranked status
+ *   'or-boolean'   - logical OR of 0/1 values
+ *   'union-array'  - unique-union parsed JSON arrays
  */
 export const FIELD_MERGE: Record<string, Record<string, 'concat' | 'status-max' | 'or-boolean' | 'union-array'>> = {
   scan_findings: {
@@ -286,10 +286,10 @@ export function resolveConflict(
  * accepted into the shared pool dataset. Runs server-side on POST /api/pool/push.
  *
  * Each rule is either:
- *   'strip'          — delete the column entirely
- *   'redact-url'     — keep scheme + host + path, strip user/query/fragment
- *   'redact-path'    — keep basename only if it looks like OSS; else generic
- *   (fn)             — custom transform (value) => newValue
+ *   'strip'          - delete the column entirely
+ *   'redact-url'     - keep scheme + host + path, strip user/query/fragment
+ *   'redact-path'    - keep basename only if it looks like OSS; else generic
+ *   (fn)             - custom transform (value) => newValue
  */
 export type AnonymizeAction =
   | 'strip'
@@ -334,7 +334,7 @@ function redactPath(raw: any): string {
   return parts[parts.length - 1] || '';
 }
 
-/** Apply POOL_ANONYMIZE to a row. Returns a NEW row — never mutates. */
+/** Apply POOL_ANONYMIZE to a row. Returns a NEW row - never mutates. */
 export function anonymizeForPool(table: string, row: Record<string, any>): Record<string, any> {
   const rules = POOL_ANONYMIZE[table];
   if (!rules) return { ...row };
@@ -368,7 +368,7 @@ export function userCanSeeRow(
     case 'private':
       // Private rows only sync back to their owner on the SAME device.
       // In team mode, private rows never leave the device, so this is
-      // effectively dead code server-side — but keep the check as defense
+      // effectively dead code server-side - but keep the check as defense
       // in depth in case a buggy client pushes a private row.
       return row.owner_user_id === ctx.user_id;
     case 'team':

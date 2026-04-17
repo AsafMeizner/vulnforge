@@ -450,7 +450,7 @@ function NoteBackendsSection() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>
-        Note backends store your research notes, hypotheses, and observations. Each provider keeps content in its own format (local markdown files, Obsidian vault, etc.) — VulnForge only stores metadata. You can enable multiple backends.
+        Note backends store your research notes, hypotheses, and observations. Each provider keeps content in its own format (local markdown files, Obsidian vault, etc.) - VulnForge only stores metadata. You can enable multiple backends.
       </p>
 
       {loading ? (

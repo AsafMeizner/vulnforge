@@ -159,10 +159,10 @@ export default function History() {
                             fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
                           }}>{c.severity || 'unknown'}</span>
                         </td>
-                        <td style={{ ...tdStyle, fontFamily: 'monospace', color: 'var(--text)' }}>{c.cvss_score ?? '—'}</td>
-                        <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11 }}>{c.published?.split('T')[0] || '—'}</td>
+                        <td style={{ ...tdStyle, fontFamily: 'monospace', color: 'var(--text)' }}>{c.cvss_score ?? '-'}</td>
+                        <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11 }}>{c.published?.split('T')[0] || '-'}</td>
                         <td style={{ ...tdStyle, maxWidth: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>
-                          {c.description || '—'}
+                          {c.description || '-'}
                         </td>
                       </tr>
                     ))}
@@ -192,10 +192,10 @@ export default function History() {
                       <tr key={m.id} style={{ borderBottom: '1px solid var(--border)' }}>
                         <td style={{ ...tdStyle, fontFamily: 'monospace', color: 'var(--blue)' }}>{m.cve_id}</td>
                         <td style={{ ...tdStyle, color: 'var(--text)' }}>{projectName(m.project_id)}</td>
-                        <td style={{ ...tdStyle, color: 'var(--text)' }}>{m.dependency_name || '—'}</td>
-                        <td style={{ ...tdStyle, color: 'var(--muted)', fontFamily: 'monospace' }}>{m.dependency_version || '—'}</td>
+                        <td style={{ ...tdStyle, color: 'var(--text)' }}>{m.dependency_name || '-'}</td>
+                        <td style={{ ...tdStyle, color: 'var(--muted)', fontFamily: 'monospace' }}>{m.dependency_version || '-'}</td>
                         <td style={{ ...tdStyle, color: 'var(--muted)' }}>{m.match_reason}</td>
-                        <td style={{ ...tdStyle, color: 'var(--muted)' }}>{m.confidence ? `${(m.confidence * 100).toFixed(0)}%` : '—'}</td>
+                        <td style={{ ...tdStyle, color: 'var(--muted)' }}>{m.confidence ? `${(m.confidence * 100).toFixed(0)}%` : '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -258,7 +258,7 @@ export default function History() {
                 background: `${severityColor(selectedCve.severity)}22`, color: severityColor(selectedCve.severity),
                 fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
               }}>{selectedCve.severity}</span>
-              <span style={{ color: 'var(--text)', fontWeight: 700, fontFamily: 'monospace' }}>{selectedCve.cvss_score ?? '—'}</span>
+              <span style={{ color: 'var(--text)', fontWeight: 700, fontFamily: 'monospace' }}>{selectedCve.cvss_score ?? '-'}</span>
             </div>
 
             <p style={{ color: 'var(--text)', fontSize: 13, lineHeight: 1.6, margin: '10px 0' }}>

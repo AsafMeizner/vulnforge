@@ -82,7 +82,7 @@ export async function analyzeRecentCommits(
     const { stdout } = await execFileAsync('git', ['rev-parse', '--is-shallow-repository'], { cwd: projectPath });
     if (stdout.trim() === 'true') {
       hasFullHistory = false;
-      // Try to deepen history — don't fail if it doesn't work
+      // Try to deepen history - don't fail if it doesn't work
       try {
         await execFileAsync('git', ['fetch', '--deepen=200'], { cwd: projectPath, timeout: 30_000 });
       } catch { /* shallow clone with no remote, that's OK */ }

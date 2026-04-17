@@ -20,7 +20,7 @@ export class SlackIntegration implements ServiceIntegration {
   }
 
   async createTicket(data: { title: string; description: string; severity?: string; url?: string }, config: ServiceConfig): Promise<TicketResult> {
-    // Slack doesn't create tickets — send a formatted message instead
+    // Slack doesn't create tickets - send a formatted message instead
     await this.sendNotification(
       `*[${data.severity || 'Medium'}] New Finding*\n>${data.title}\n${data.description?.slice(0, 300) || ''}${data.url ? `\n<${data.url}|View in VulnForge>` : ''}`,
       config,

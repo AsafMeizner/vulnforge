@@ -49,7 +49,7 @@ export const BanditIntegration = {
 
     const args = ['-r', target, '-f', 'json', '-o', outputFile];
     if (options.severity && options.severity.length > 0) {
-      // Bandit uses -l (LOW), -ll (MEDIUM+), -lll (HIGH) — map from array
+      // Bandit uses -l (LOW), -ll (MEDIUM+), -lll (HIGH) - map from array
       const sevSet = new Set(options.severity.map(s => s.toUpperCase()));
       if (sevSet.has('HIGH')) args.push('-lll');
       else if (sevSet.has('MEDIUM')) args.push('-ll');

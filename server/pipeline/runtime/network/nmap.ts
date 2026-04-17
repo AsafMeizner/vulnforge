@@ -1,5 +1,5 @@
 /**
- * Nmap Executor — port/service scanning with XML output parsing.
+ * Nmap Executor - port/service scanning with XML output parsing.
  */
 import cp from 'child_process';
 import { promisify } from 'util';
@@ -96,7 +96,7 @@ export class NmapExecutor implements RuntimeJobExecutor {
     try {
       xml = await fs.readFile(xmlPath, 'utf-8');
     } catch {
-      throw new Error('nmap XML output not found — scan may have failed');
+      throw new Error('nmap XML output not found - scan may have failed');
     }
 
     const result = this.parseNmapXml(xml);

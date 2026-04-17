@@ -97,10 +97,10 @@ export default function FirstLaunch({ onFinished }: Props) {
       const u = serverUrl.replace(/\/$/, '') + '/api/health';
       const r = await fetch(u);
       if (!r.ok) throw new Error(`health ${r.status}`);
-      // Try session/bootstrap path first — if bootstrap is pending server replies 503.
+      // Try session/bootstrap path first - if bootstrap is pending server replies 503.
       setStep('team-login');
     } catch (e: any) {
-      setErr(`Cannot reach ${serverUrl} — ${e.message}`);
+      setErr(`Cannot reach ${serverUrl} - ${e.message}`);
     } finally { setBusy(false); }
   }
 

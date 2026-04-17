@@ -1,5 +1,5 @@
 /**
- * cleanup.ts — Delete auto-scan findings (keep original 36 seeded vulns)
+ * cleanup.ts - Delete auto-scan findings (keep original 36 seeded vulns)
  * Run: npx tsx cleanup.ts
  */
 import initSqlJs from 'sql.js';

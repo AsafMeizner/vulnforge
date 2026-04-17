@@ -1,5 +1,5 @@
 /**
- * Capability manifest — what server-side AI providers and integrations
+ * Capability manifest - what server-side AI providers and integrations
  * are exposed to clients, by name + capability only (never secrets).
  *
  * Per-user visibility filtered by RBAC (`ai:use`, `integrations:use`).
@@ -38,7 +38,7 @@ function isManifestEnabled(): boolean {
   // Only the server-mode process ever exposes a manifest. Desktop-mode
   // clients always get an empty manifest (they ARE the server themselves).
   if (process.env.VULNFORGE_MODE !== 'server') return false;
-  // Admin kill switch via env or settings — default ON for server mode.
+  // Admin kill switch via env or settings - default ON for server mode.
   const raw = process.env.VULNFORGE_CAPABILITY_MANIFEST;
   if (raw === 'false' || raw === '0') return false;
   try {
@@ -63,7 +63,7 @@ export function getServerCapabilityManifest(user: { user_id: number; role: strin
   };
   if (!isManifestEnabled()) return base;
 
-  // AI providers — only expose those with source='server' and enabled=1.
+  // AI providers - only expose those with source='server' and enabled=1.
   if (hasPermission(user.role, 'ai', 'use')) {
     try {
       const db = getDb();
@@ -86,7 +86,7 @@ export function getServerCapabilityManifest(user: { user_id: number; role: strin
     } catch { /* ai_providers.source column may be missing on older DBs */ }
   }
 
-  // Integrations — expose those with source='server' and enabled=1.
+  // Integrations - expose those with source='server' and enabled=1.
   if (hasPermission(user.role, 'integrations', 'use')) {
     try {
       const db = getDb();

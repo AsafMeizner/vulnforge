@@ -14,7 +14,7 @@ import { getServiceIntegration, listAvailableIntegrations } from '../integration
 
 const router = Router();
 
-// GET /api/integrations — list configured + available
+// GET /api/integrations - list configured + available
 router.get('/', (_req: Request, res: Response) => {
   try {
     const configured = getIntegrations();
@@ -39,7 +39,7 @@ router.get('/', (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/integrations — add a new integration
+// POST /api/integrations - add a new integration
 router.post('/', (req: Request, res: Response) => {
   try {
     const { name, type, config, enabled } = req.body;
@@ -84,7 +84,7 @@ router.delete('/:id', (req: Request, res: Response) => {
   }
 });
 
-// POST /api/integrations/:id/test — test connection
+// POST /api/integrations/:id/test - test connection
 router.post('/:id/test', async (req: Request, res: Response) => {
   try {
     const integration = getIntegrationById(Number(req.params.id));
@@ -101,7 +101,7 @@ router.post('/:id/test', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/integrations/:id/create-ticket — create ticket from finding or disclosure
+// POST /api/integrations/:id/create-ticket - create ticket from finding or disclosure
 router.post('/:id/create-ticket', async (req: Request, res: Response) => {
   try {
     const integration = getIntegrationById(Number(req.params.id));
@@ -157,7 +157,7 @@ router.post('/:id/create-ticket', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/integrations/tickets — list all linked tickets
+// GET /api/integrations/tickets - list all linked tickets
 router.get('/tickets', (req: Request, res: Response) => {
   try {
     const filters: any = {};
@@ -171,7 +171,7 @@ router.get('/tickets', (req: Request, res: Response) => {
   }
 });
 
-// POST /api/integrations/:id/notify — send notification (Slack etc.)
+// POST /api/integrations/:id/notify - send notification (Slack etc.)
 router.post('/:id/notify', async (req: Request, res: Response) => {
   try {
     const integration = getIntegrationById(Number(req.params.id));

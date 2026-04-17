@@ -1,4 +1,4 @@
-# VulnForge server — multi-stage build.
+# VulnForge server - multi-stage build.
 #
 # Build context: the repo root.
 # Produces a slim runtime image with no dev deps and no electron.
@@ -15,7 +15,7 @@ COPY . .
 
 # Compile server TypeScript → dist-server/
 # We don't bundle; simple tsc output so imports stay resolvable.
-RUN npx tsc --project tsconfig.server.json || (echo "tsconfig.server.json missing — using ad hoc" && npx tsc --outDir dist-server --rootDir . --target es2022 --module esnext --moduleResolution bundler server/index.ts)
+RUN npx tsc --project tsconfig.server.json || (echo "tsconfig.server.json missing - using ad hoc" && npx tsc --outDir dist-server --rootDir . --target es2022 --module esnext --moduleResolution bundler server/index.ts)
 
 # Prune dev deps for the copy-out step.
 RUN npm prune --omit=dev --ignore-scripts

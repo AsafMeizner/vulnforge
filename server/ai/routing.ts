@@ -158,7 +158,7 @@ export const ROUTING_PRESETS: Record<string, RoutingPreset> = {
   'claude-cli': {
     name: 'claude-cli',
     label: 'Claude CLI Only',
-    description: 'Use Claude Code CLI for everything. No API key needed — uses your Claude Code subscription.',
+    description: 'Use Claude Code CLI for everything. No API key needed - uses your Claude Code subscription.',
     rules: ALL_TASK_TYPES.map(task => ({
       task, provider: 'claude_cli', model: 'claude-code', priority: 1,
     })),

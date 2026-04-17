@@ -1,5 +1,5 @@
 /**
- * Core Dump Analyzer — uses gdb to extract metadata from an ELF/Linux core file.
+ * Core Dump Analyzer - uses gdb to extract metadata from an ELF/Linux core file.
  * Lightweight wrapper; for richer analysis use the main gdb executor.
  */
 import cp from 'child_process';

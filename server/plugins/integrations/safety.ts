@@ -46,7 +46,7 @@ export const SafetyIntegration = {
       useShell: true,
     });
 
-    // Safety exits non-zero when vulns found — use stdout regardless
+    // Safety exits non-zero when vulns found - use stdout regardless
     const output = result.stdout + result.stderr;
     return { output, findings: SafetyIntegration.parseOutput(result.stdout || result.stderr) };
   },

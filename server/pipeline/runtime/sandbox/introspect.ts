@@ -1,5 +1,5 @@
 /**
- * Sandbox introspection helpers — shared between Docker and QEMU executors.
+ * Sandbox introspection helpers - shared between Docker and QEMU executors.
  * All functions spawn CLI tools via execFile (no shell injection).
  */
 import cp from 'child_process';

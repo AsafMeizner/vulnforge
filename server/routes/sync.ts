@@ -1,12 +1,12 @@
 /**
- * Sync REST routes — fallback + primary transport when WebSocket is down.
+ * Sync REST routes - fallback + primary transport when WebSocket is down.
  *
  * Mounted at /api/sync/*. Protected by auth middleware.
  *
- *   GET  /api/sync/pull?table=X&since=N&limit=N   — batch pull
- *   POST /api/sync/push                            — batch push
- *   GET  /api/sync/cursors                         — current per-table cursors
- *   POST /api/sync/gc                              — admin tombstone sweep
+ *   GET  /api/sync/pull?table=X&since=N&limit=N   - batch pull
+ *   POST /api/sync/push                            - batch push
+ *   GET  /api/sync/cursors                         - current per-table cursors
+ *   POST /api/sync/gc                              - admin tombstone sweep
  */
 import { Router, type Request, type Response } from 'express';
 

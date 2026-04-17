@@ -1,4 +1,4 @@
-# VulnForge — code ownership + review routing.
+# VulnForge - code ownership + review routing.
 #
 # Lines use the standard CODEOWNERS syntax. Last matching pattern wins.
 # GitHub auto-requests a review from the listed owners on any PR that
@@ -7,10 +7,10 @@
 # Until other maintainers are onboarded, everything routes to the project
 # maintainer. Add additional entries above the catch-all when that changes.
 
-# Catch-all — everything in the repo.
+# Catch-all - everything in the repo.
 *                                       @AsafMeizner
 
-# Security-sensitive code — tighter review expected.
+# Security-sensitive code - tighter review expected.
 /server/auth/                           @AsafMeizner
 /server/sync/                           @AsafMeizner
 /server/workers/                        @AsafMeizner
@@ -19,6 +19,6 @@
 /scripts/install-server.*               @AsafMeizner
 /.github/                               @AsafMeizner
 
-# Docs changes that may affect operators — surface them prominently.
+# Docs changes that may affect operators - surface them prominently.
 /docs/operator/                         @AsafMeizner
 /docs/security/                         @AsafMeizner

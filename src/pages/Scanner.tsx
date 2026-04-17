@@ -147,7 +147,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
             case 'scan:complete': {
               const findings = msg.findings ?? 0;
               setOutput(prev => [...prev,
-                `[done] Job ${(msg.jobId as string)?.slice(0, 8)} completed — ${findings} finding(s) staged for review`
+                `[done] Job ${(msg.jobId as string)?.slice(0, 8)} completed - ${findings} finding(s) staged for review`
               ]);
               // Capture first scan DB id for the review modal
               if (msg.scanDbId) {
@@ -160,7 +160,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
                 const allDone = updated.every(j => j.status === 'completed' || j.status === 'failed');
                 if (allDone && updated.length > 0) {
                   const totalFindings = updated.reduce((acc, j) => acc + (j.findings ?? 0), 0);
-                  toast(`Scan complete — ${totalFindings} finding(s) staged for review`, 'success');
+                  toast(`Scan complete - ${totalFindings} finding(s) staged for review`, 'success');
                   setRunning(false);
                   setEstimatedEnd(null);
                   loadScans();
@@ -198,7 +198,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
               break;
 
             case 'queue:drain':
-              setOutput(prev => [...prev, '[ws] Queue drained — all jobs finished']);
+              setOutput(prev => [...prev, '[ws] Queue drained - all jobs finished']);
               break;
 
             case 'triage:complete':
@@ -229,7 +229,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
       };
 
       ws.onerror = () => {
-        setOutput(prev => [...prev, '[ws] Connection error — retrying...']);
+        setOutput(prev => [...prev, '[ws] Connection error - retrying...']);
       };
     };
 
@@ -314,7 +314,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
       }
     }
 
-    // Dispatch plugin jobs — each plugin run is fire-and-forget (202)
+    // Dispatch plugin jobs - each plugin run is fire-and-forget (202)
     const pluginJobs: ScanJobState[] = [];
     if (pluginIds.length > 0 && project?.path) {
       for (const pluginId of pluginIds) {
@@ -333,7 +333,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
             setOutput(prev => [...prev, `[error] Plugin "${pl.name}": ${body.error}`]);
             setActiveJobs(prev => prev.map(j => j.jobId === jobId ? { ...j, status: 'failed' } : j));
           } else {
-            setOutput(prev => [...prev, `[plugin] "${pl.name}" queued — findings saved to Findings page`]);
+            setOutput(prev => [...prev, `[plugin] "${pl.name}" queued - findings saved to Findings page`]);
             setActiveJobs(prev => prev.map(j => j.jobId === jobId ? { ...j, status: 'completed', findings: 0 } : j));
           }
         }).catch(err => {
@@ -343,13 +343,13 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
       }
       setOutput(prev => [...prev, `[scan] Dispatched ${pluginJobs.length} plugin(s)`]);
     } else if (pluginIds.length > 0 && !project?.path) {
-      toast('Selected project has no path — cannot run plugins', 'error');
+      toast('Selected project has no path - cannot run plugins', 'error');
     }
 
     const allJobs = [...toolJobs, ...pluginJobs];
     setActiveJobs(allJobs);
     setOutput(prev => [...prev, `[scan] Started: ${allJobs.map(j => j.toolName).join(', ')}`]);
-    toast(`Scan started — ${allJobs.length} job(s) queued`, 'success');
+    toast(`Scan started - ${allJobs.length} job(s) queued`, 'success');
 
     // If only plugins (no tool jobs), mark running done once dispatched
     if (toolJobs.length === 0 && pluginJobs.length > 0) {
@@ -409,7 +409,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
         </div>
       </div>
 
-      {/* Scan summary card — shown after scan completes */}
+      {/* Scan summary card - shown after scan completes */}
       {scanSummary && !running && (
         <div style={{
           background: 'var(--surface)',
@@ -419,7 +419,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--green)' }}>
-              Scan Complete — {scanSummary.total} finding(s) staged for review
+              Scan Complete - {scanSummary.total} finding(s) staged for review
             </span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {reviewScanDbId != null && (
@@ -463,7 +463,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
               <span style={summaryPill('var(--muted)')}>Low: {scanSummary.low}</span>
             )}
             {scanSummary.total === 0 && (
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>No vulnerabilities found — target looks clean.</span>
+              <span style={{ fontSize: 13, color: 'var(--muted)' }}>No vulnerabilities found - target looks clean.</span>
             )}
           </div>
 
@@ -510,7 +510,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
               onChange={e => setSelectedProject(e.target.value ? Number(e.target.value) : '')}
               style={selectStyle}
             >
-              <option value="">— Select project —</option>
+              <option value="">- Select project -</option>
               {projects.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
@@ -569,7 +569,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>
                 <span>Progress</span>
-                <span>{doneJobs}/{totalJobs} ({progressPct}%){timeRemaining ? ` — ${timeRemaining}` : ''}</span>
+                <span>{doneJobs}/{totalJobs} ({progressPct}%){timeRemaining ? ` - ${timeRemaining}` : ''}</span>
               </div>
               <div style={{ height: 6, background: 'var(--bg)', borderRadius: 3, overflow: 'hidden', border: '1px solid var(--border)' }}>
                 <div style={{
@@ -714,7 +714,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
             SCAN OUTPUT
             {running && (
               <span style={{ marginLeft: 8, color: 'var(--orange)', fontWeight: 400, fontSize: 11 }}>
-                — live
+                - live
               </span>
             )}
           </span>
@@ -802,7 +802,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
                         {s.status.toUpperCase()}
                       </span>
                     </td>
-                    <td style={{ padding: '8px 14px', color: 'var(--text)' }}>{s.findings_count ?? '—'}</td>
+                    <td style={{ padding: '8px 14px', color: 'var(--text)' }}>{s.findings_count ?? '-'}</td>
                     <td style={{ padding: '8px 14px', color: 'var(--muted)', whiteSpace: 'nowrap' }}>{relativeTime(s.started_at)}</td>
                   </tr>
                 ))}

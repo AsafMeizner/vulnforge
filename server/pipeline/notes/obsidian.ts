@@ -90,7 +90,7 @@ export class ObsidianNotesProvider extends LocalNotesProvider {
         throw err;
       }
 
-      // Ensure our subfolder exists and is writable — create it if missing.
+      // Ensure our subfolder exists and is writable - create it if missing.
       await fs.mkdir(this.basePath, { recursive: true });
 
       const probe = path.join(this.basePath, `.vf-probe-${Date.now()}`);

@@ -50,7 +50,7 @@ export function generateHarness(signature: string, language = 'c'): HarnessResul
   const lang = language.toLowerCase();
 
   if (lang !== 'c' && lang !== 'cpp' && lang !== 'c++') {
-    notes.push(`Language "${language}" is not yet fully supported — returning a stub. Only C/C++ are auto-generated today.`);
+    notes.push(`Language "${language}" is not yet fully supported - returning a stub. Only C/C++ are auto-generated today.`);
     return {
       harness_code: `// TODO: libFuzzer harness for ${language} is not supported yet.\n// Manual harness required. See https://llvm.org/docs/LibFuzzer.html\n`,
       notes,
@@ -61,7 +61,7 @@ export function generateHarness(signature: string, language = 'c'): HarnessResul
   const sigMatch = signature.match(/^\s*(?:(?:static|extern|inline|const)\s+)*([\w*\s]+?)\s+(\w+)\s*\(([^)]*)\)/);
 
   if (!sigMatch) {
-    notes.push('Could not parse signature — ensure it matches "returntype funcname(params)" format.');
+    notes.push('Could not parse signature - ensure it matches "returntype funcname(params)" format.');
     return {
       harness_code: `// TODO: Could not parse signature: ${signature}\n// Please write the harness manually.\n`,
       notes,
@@ -98,11 +98,11 @@ export function generateHarness(signature: string, language = 'c'): HarnessResul
 
   if (dataParamIdx >= 0 && params.length === 2) {
     // Simple case: parse_packet(uint8_t *data, size_t len)
-    notes.push('Detected data/length pair — generated direct call.');
+    notes.push('Detected data/length pair - generated direct call.');
     body.push(`    ${funcName}((${params[dataParamIdx].replace(/\w+\s*$/, '').trim()})Data, (${params[sizeParamIdx].replace(/\w+\s*$/, '').trim()})Size);`);
   } else if (params.length === 1 && isPointer(params[0])) {
     // Single null-terminated string
-    notes.push('Single pointer arg detected — treating as NUL-terminated. Note: input is not guaranteed to end with NUL.');
+    notes.push('Single pointer arg detected - treating as NUL-terminated. Note: input is not guaranteed to end with NUL.');
     body.push('    // TODO: libFuzzer inputs are not NUL-terminated. Copy into a buffer if needed.');
     body.push('    char *buf = (char*)malloc(Size + 1);');
     body.push('    if (!buf) return 0;');
@@ -111,12 +111,12 @@ export function generateHarness(signature: string, language = 'c'): HarnessResul
     body.push(`    ${funcName}(buf);`);
     body.push('    free(buf);');
   } else if (params.length === 0) {
-    notes.push('Function takes no arguments — harness will call it repeatedly with no fuzz input. Consider whether this is what you want.');
+    notes.push('Function takes no arguments - harness will call it repeatedly with no fuzz input. Consider whether this is what you want.');
     body.push(`    ${funcName}();`);
     body.push('    (void)Data; (void)Size;');
   } else {
     // Complex signature: stub with TODOs
-    notes.push(`Complex signature with ${params.length} params — generated a stub. You\'ll need to unpack Data into the expected inputs.`);
+    notes.push(`Complex signature with ${params.length} params - generated a stub. You\'ll need to unpack Data into the expected inputs.`);
     body.push('    // TODO: This function has a non-trivial signature:');
     body.push(`    //   ${signature.trim()}`);
     body.push('    // Unpack Data into the expected inputs. Typical patterns:');

@@ -1,4 +1,4 @@
-// fix-projects.ts — Link vulns to projects + set project display names
+// fix-projects.ts - Link vulns to projects + set project display names
 // Run: npx tsx fix-projects.ts
 import initSqlJs from 'sql.js';
 import fs from 'fs';

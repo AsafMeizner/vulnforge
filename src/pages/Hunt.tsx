@@ -188,7 +188,7 @@ export default function Hunt({ onNavigate }: HuntProps) {
       setPipelines(prev => prev.map(p =>
         p.id === pipelineId ? { ...p, status: 'paused', stage: 'Paused' } : p
       ));
-      toast('info', 'Pipeline paused — you can resume later from the Hunt page');
+      toast('info', 'Pipeline paused - you can resume later from the Hunt page');
     } catch (err: any) {
       toast('error', `Pause failed: ${err.message}`);
     }
@@ -351,7 +351,7 @@ export default function Hunt({ onNavigate }: HuntProps) {
           </button>
         </div>
 
-        {/* Paused Hunts — shown only if any paused hunts exist */}
+        {/* Paused Hunts - shown only if any paused hunts exist */}
         {pausedHunts.length > 0 && (
           <div style={{
             width: '100%', maxWidth: 640, padding: 20,
@@ -480,7 +480,7 @@ export default function Hunt({ onNavigate }: HuntProps) {
 
             {/* Stage info */}
             <div style={{ color: 'var(--muted)', fontSize: 12 }}>
-              {p.stage}{p.detail ? ` — ${p.detail}` : ''}
+              {p.stage}{p.detail ? ` - ${p.detail}` : ''}
             </div>
 
             {/* Stats row when data available */}

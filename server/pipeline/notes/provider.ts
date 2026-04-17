@@ -97,7 +97,7 @@ export function parseNoteFile(content: string): { meta: NoteMeta; markdown: stri
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
 
   if (!fmMatch) {
-    // No frontmatter — treat whole file as markdown, title = first h1 or first line
+    // No frontmatter - treat whole file as markdown, title = first h1 or first line
     const titleMatch = content.match(/^#\s+(.+)$/m);
     return {
       meta: { title: titleMatch?.[1] || 'Untitled', type: 'note' },
@@ -109,7 +109,7 @@ export function parseNoteFile(content: string): { meta: NoteMeta; markdown: stri
   const body = fmMatch[2];
   const meta: NoteMeta = { title: 'Untitled' };
 
-  // Simple YAML parse — only handle what we wrote
+  // Simple YAML parse - only handle what we wrote
   const vfBlock = yaml.match(/vulnforge:\s*\n([\s\S]+?)(?:\n[a-z]|\n*$)/i);
   const lines = (vfBlock ? vfBlock[1] : yaml).split('\n');
 

@@ -1,5 +1,5 @@
 /**
- * Crash triage helpers — stack hash computation and exploitability classification.
+ * Crash triage helpers - stack hash computation and exploitability classification.
  */
 import crypto from 'crypto';
 

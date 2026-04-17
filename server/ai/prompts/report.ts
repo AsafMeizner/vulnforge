@@ -1,10 +1,10 @@
 // ── Report Generation Prompt Templates ─────────────────────────────────────
 //
 // Four report types:
-//   disclosure  — Full markdown disclosure (security-solver TEMPLATE.md format)
-//   email       — Plain text email body for private disclosure
-//   advisory    — GitHub Security Advisory structured format
-//   summary     — Executive summary for non-technical audience
+//   disclosure  - Full markdown disclosure (security-solver TEMPLATE.md format)
+//   email       - Plain text email body for private disclosure
+//   advisory    - GitHub Security Advisory structured format
+//   summary     - Executive summary for non-technical audience
 
 export type ReportType = 'disclosure' | 'email' | 'advisory' | 'summary';
 
@@ -108,7 +108,7 @@ ${buildVulnContext(vuln)}
 
 Use ${format}.
 
-Produce only the report content — no preamble, no "here is the report", no meta-commentary.`;
+Produce only the report content - no preamble, no "here is the report", no meta-commentary.`;
 
   return { systemPrompt, userMessage };
 }
@@ -118,7 +118,7 @@ Produce only the report content — no preamble, no "here is the report", no met
 function buildEmailPrompt(vuln: Record<string, any>): ReportPrompt {
   const systemPrompt = `\
 You are a security researcher writing a private disclosure email.
-Write in plain text — absolutely no markdown, no asterisks, no backticks, no fenced code blocks.
+Write in plain text - absolutely no markdown, no asterisks, no backticks, no fenced code blocks.
 Indented code uses 2 spaces. Tone is professional and collaborative.
 Be specific: include version numbers, file paths, and line numbers.`;
 
@@ -128,9 +128,9 @@ ${buildVulnContext(vuln)}
 
 Format:
 To: [security email if known, else "security@[project].org"]
-Subject: [Brief, accurate title — not alarming but clear]
+Subject: [Brief, accurate title - not alarming but clear]
 
-[Email body — plain text only]
+[Email body - plain text only]
 
 The email must include:
 1. Brief introduction (who you are, responsible disclosure intent)
@@ -141,7 +141,7 @@ The email must include:
 6. 90-day disclosure timeline statement
 7. Offer to assist with fix verification
 
-Produce only the email text — no meta-commentary.`;
+Produce only the email text - no meta-commentary.`;
 
   return { systemPrompt, userMessage };
 }
@@ -161,7 +161,7 @@ ${buildVulnContext(vuln)}
 Output these fields in order, each as a markdown section:
 
 ### Ecosystem
-[The package ecosystem: PyPI, npm, Maven, Go, etc. — or "n/a" for C/C++ native projects]
+[The package ecosystem: PyPI, npm, Maven, Go, etc. - or "n/a" for C/C++ native projects]
 
 ### Package Name
 [Package or project name]
@@ -173,7 +173,7 @@ Output these fields in order, each as a markdown section:
 [Version where fix landed, or "none yet"]
 
 ### Severity
-[Critical / High / Medium / Low] — CVSS ${vuln.cvss || 'score TBD'}
+[Critical / High / Medium / Low] - CVSS ${vuln.cvss || 'score TBD'}
 
 ### CVSS Vector
 ${vuln.cvss_vector || '[CVSS:3.1/... vector]'}
@@ -196,7 +196,7 @@ ${vuln.cwe || '[CWE-XXX: name]'}
 ### References
 [Links to commits, issues, or related advisories]
 
-Produce only the advisory content — no preamble.`;
+Produce only the advisory content - no preamble.`;
 
   return { systemPrompt, userMessage };
 }
@@ -207,7 +207,7 @@ function buildSummaryPrompt(vuln: Record<string, any>): ReportPrompt {
   const systemPrompt = `\
 You are a security analyst writing an executive briefing for a non-technical audience.
 Avoid jargon. Focus on business impact, risk, and what needs to happen.
-Keep it concise — under 400 words. No code blocks. No technical minutiae.`;
+Keep it concise - under 400 words. No code blocks. No technical minutiae.`;
 
   const userMessage = `Write an executive summary for this security vulnerability.
 
@@ -215,14 +215,14 @@ ${buildVulnContext(vuln)}
 
 Structure:
 1. What is the issue? (1-2 sentences, plain language)
-2. What is at risk? (data, systems, users — what can go wrong)
+2. What is at risk? (data, systems, users - what can go wrong)
 3. How serious is it? (use Critical/High/Medium/Low and explain what that means in plain terms)
 4. Who is affected? (which users/deployments/environments)
 5. What needs to happen? (immediate actions, timeline, owner)
 6. Has a fix been identified? (yes/no, brief description of fix approach)
 
 Write in paragraph form (no bullet points). Target audience: non-technical manager or executive.
-Produce only the summary — no preamble.`;
+Produce only the summary - no preamble.`;
 
   return { systemPrompt, userMessage };
 }

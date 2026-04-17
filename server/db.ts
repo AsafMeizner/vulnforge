@@ -207,7 +207,7 @@ export async function initDb(): Promise<void> {
 }
 
 export function getDb(): any {
-  if (!db) throw new Error('Database not initialized — call initDb() first');
+  if (!db) throw new Error('Database not initialized - call initDb() first');
   return db;
 }
 
@@ -719,7 +719,7 @@ function createTables(): void {
     )
   `);
 
-  // Subsystem B — Auth (JWT refresh tokens) + RBAC (permissions)
+  // Subsystem B - Auth (JWT refresh tokens) + RBAC (permissions)
   db.run(`
     CREATE TABLE IF NOT EXISTS refresh_tokens (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -845,13 +845,13 @@ function seedDefaultNotesProvider(): void {
 }
 
 /**
- * Seed RBAC defaults on first run. Idempotent — INSERT OR IGNORE uses
+ * Seed RBAC defaults on first run. Idempotent - INSERT OR IGNORE uses
  * the (role, resource, action) UNIQUE constraint to avoid dupes.
  *
  * Three starter roles:
- *   admin    — full access everywhere
- *   analyst  — day-to-day researcher: read/write findings + run pipelines + use integrations
- *   viewer   — read-only observer
+ *   admin    - full access everywhere
+ *   analyst  - day-to-day researcher: read/write findings + run pipelines + use integrations
+ *   viewer   - read-only observer
  */
 function seedDefaultPermissions(): void {
   const defaults: Array<[string, string, string]> = [
@@ -881,7 +881,7 @@ function seedDefaultPermissions(): void {
         `INSERT OR IGNORE INTO permissions (role, resource, action) VALUES (?, ?, ?)`,
         [role, resource, action],
       );
-    } catch { /* table may not exist in very old DB — migrateSchema creates it */ }
+    } catch { /* table may not exist in very old DB - migrateSchema creates it */ }
   }
 }
 
@@ -946,14 +946,14 @@ function migrateSchema(): void {
   }
 
   for (const sql of migrations) {
-    try { db.run(sql); } catch { /* column already exists — expected */ }
+    try { db.run(sql); } catch { /* column already exists - expected */ }
   }
 
   // Unique index on sync_id so two rows never collide.
   for (const table of SYNC_ENABLED_TABLES) {
     try {
       db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${table}_sync_id ON ${table}(sync_id) WHERE sync_id IS NOT NULL`);
-    } catch { /* expected on older SQLite without partial indexes — falls back to plain index */
+    } catch { /* expected on older SQLite without partial indexes - falls back to plain index */
       try { db.run(`CREATE INDEX IF NOT EXISTS idx_${table}_sync_id ON ${table}(sync_id)`); } catch {}
     }
   }
@@ -978,7 +978,7 @@ function backfillSyncColumns(): void {
       }
       stmt.free();
     } catch {
-      // Table may not exist yet on a very old DB — skip gracefully.
+      // Table may not exist yet on a very old DB - skip gracefully.
       continue;
     }
 
@@ -994,7 +994,7 @@ function backfillSyncColumns(): void {
            WHERE rowid = ?`,
           [id, nowMs, row.rid],
         );
-      } catch { /* best-effort — skip bad rows */ }
+      } catch { /* best-effort - skip bad rows */ }
     }
   }
 }
@@ -2587,7 +2587,7 @@ export function deleteSessionState(scope: string, scope_id: number | null, key?:
   persistDb();
 }
 
-// ── Subsystem B — Refresh tokens CRUD ──────────────────────────────────────
+// ── Subsystem B - Refresh tokens CRUD ──────────────────────────────────────
 
 export interface RefreshTokenRow {
   id?: number;
@@ -2647,7 +2647,7 @@ export function deleteExpiredRefreshTokens(now: number = Date.now()): number {
   return 0; // row count not reliable through sql.js
 }
 
-// ── Subsystem B — Permissions ──────────────────────────────────────────────
+// ── Subsystem B - Permissions ──────────────────────────────────────────────
 
 export interface PermissionRow {
   id?: number;

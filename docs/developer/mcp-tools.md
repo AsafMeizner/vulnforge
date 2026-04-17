@@ -4,14 +4,14 @@ VulnForge exposes 30+ tools to external AI agents (Claude Code, custom orchestra
 
 ## Where tools live
 
-`server/mcp/tools.ts` — one file, registered via `setupMcpServer(app)` in `server/index.ts`.
+`server/mcp/tools.ts` - one file, registered via `setupMcpServer(app)` in `server/index.ts`.
 
 Each tool follows a shape:
 
 ```typescript
 server.tool(
-  'tool_name',
-  'One-line description shown to the agent',
+  "tool_name",
+  "One-line description shown to the agent",
   {
     // Zod schema for arguments
     arg1: z.string(),
@@ -19,8 +19,8 @@ server.tool(
   },
   async ({ arg1, arg2 }) => {
     // ... do the thing, call into DB / pipeline / etc.
-    return { content: [{ type: 'text', text: JSON.stringify(result) }] };
-  },
+    return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  }
 );
 ```
 
@@ -28,30 +28,30 @@ server.tool(
 
 1. Open `server/mcp/tools.ts`.
 2. Add a `server.tool(...)` call before the `setupMcpServer` export.
-3. Use Zod for argument validation — bad args fail fast with a clear error.
-4. Call into existing server-side code (DB functions, sync repo, pipeline) — don't duplicate logic.
+3. Use Zod for argument validation - bad args fail fast with a clear error.
+4. Call into existing server-side code (DB functions, sync repo, pipeline) - don't duplicate logic.
 5. Return structured content. JSON strings are fine; the agent can parse.
 6. Document it here or in [`../user/mcp.md`](../user/mcp.md) if end users should know.
 
 ## Naming conventions
 
-- `list_*` — returns arrays (use pagination for big sets).
-- `get_*` — single record by id.
-- `create_*`, `update_*`, `delete_*` — write operations.
-- `run_*`, `start_*`, `hunt_*` — kicks off a pipeline / long-running operation.
-- `set_*`, `configure_*` — mutates config.
+- `list_*` - returns arrays (use pagination for big sets).
+- `get_*` - single record by id.
+- `create_*`, `update_*`, `delete_*` - write operations.
+- `run_*`, `start_*`, `hunt_*` - kicks off a pipeline / long-running operation.
+- `set_*`, `configure_*` - mutates config.
 
-Follow existing names rather than inventing new patterns — external agents often call tools by guessing names.
+Follow existing names rather than inventing new patterns - external agents often call tools by guessing names.
 
 ## Auth
 
-MCP clients authenticate via API token (phase-14 flow, `/api/auth/tokens`). Currently NOT integrated with the JWT session flow — MCP is a separate auth lane. Future work: unify under JWT so team-mode tokens can drive MCP sessions too.
+MCP clients authenticate via API token (phase-14 flow, `/api/auth/tokens`). Currently NOT integrated with the JWT session flow - MCP is a separate auth lane. Future work: unify under JWT so team-mode tokens can drive MCP sessions too.
 
 ## Team-mode MCP
 
 In server mode, `/mcp` is exposed too. Each user can have their own API token and see only their allowed resources via RBAC.
 
-In desktop mode, `/mcp` effectively trusts localhost — the same process owns both the user's UI and MCP.
+In desktop mode, `/mcp` effectively trusts localhost - the same process owns both the user's UI and MCP.
 
 ## Testing
 
@@ -69,7 +69,7 @@ From curl for sanity:
 curl -N http://localhost:3001/mcp -H 'Accept: text/event-stream'
 ```
 
-You'll see the SSE handshake. Actual JSON-RPC body goes over POST with a session id — easier to test via the Claude Code CLI or the MCP SDK directly.
+You'll see the SSE handshake. Actual JSON-RPC body goes over POST with a session id - easier to test via the Claude Code CLI or the MCP SDK directly.
 
 ## Common pitfalls
 

@@ -138,7 +138,7 @@
     },
     {
       "category": "Input Validation",
-      "title": "ReDoS — catastrophic backtracking",
+      "title": "ReDoS - catastrophic backtracking",
       "description": "Regular expressions applied to user input exhibit catastrophic backtracking behaviour, allowing DoS by crafting strings that trigger exponential evaluation time.",
       "severity": "Medium",
       "tool_names": "parser_complexity_scorer,recursive_bomb_scanner"
@@ -293,7 +293,7 @@
     {
       "category": "Supply Chain",
       "title": "Suspicious maintainer activity (XZ-pattern)",
-      "description": "Recent mass-commit from new contributor with unconventional build system changes — potential supply chain backdoor insertion.",
+      "description": "Recent mass-commit from new contributor with unconventional build system changes - potential supply chain backdoor insertion.",
       "severity": "Critical",
       "tool_names": "supply_chain_scanner"
     },

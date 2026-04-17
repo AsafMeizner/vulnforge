@@ -1,7 +1,7 @@
 # Repository instructions for GitHub Copilot
 
 Copilot code review reads these instructions alongside the diff.
-Keep the list short and focused on VulnForge-specific conventions —
+Keep the list short and focused on VulnForge-specific conventions -
 general "write clean code" reminders are noise.
 
 ## What this project is
@@ -20,14 +20,16 @@ docs under `docs/`.
 ## Conventions to enforce in review
 
 ### Style & structure
-- **ESM only.** Always `import` — never `require`.
+
+- **ESM only.** Always `import` - never `require`.
 - **Inline styles + CSS variables** in React components (no CSS-in-JS library,
   no Tailwind class salad). Follow existing patterns under `src/`.
 - **Hash-based routing** on the frontend.
 
 ### Database (sql.js + WASM)
+
 - Reads go through `execQuery()`, writes through `execRun()`.
-- **Every mutation must be followed by `persistDb()`** — missing that call is
+- **Every mutation must be followed by `persistDb()`** - missing that call is
   a silent data-loss bug on crash.
 - Schema changes go in `migrateSchema()` via `ALTER TABLE ADD COLUMN` wrapped
   in try/catch (idempotency). Never modify/drop columns.
@@ -35,42 +37,49 @@ docs under `docs/`.
   `server/sync/model.ts` and the mirror list in `server/db.ts`.
 
 ### API shapes
+
 - List endpoints: `res.json({ data, total })`.
 - Error shape: `res.json({ error: "...", code?: "ENUM" })`.
 
 ### Auth & sync
+
 - Route handlers MUST call `assertPermission(req, resource, action, res)` on
   writes. Read endpoints may rely on `userCanSeeRow()` filtering.
 - `sync_scope='private'` rows must never appear on the wire. The sync layer
-  already rejects them — do not add code paths that bypass the check.
+  already rejects them - do not add code paths that bypass the check.
 - Server-side AI and integration **secrets** never leave the server. Clients
   invoke capabilities by name via `/api/server/ai/invoke` +
   `/api/server/integrations/:name/:action`.
 
 ### WebSocket
+
 - All WS broadcasts go through `broadcast()` / `broadcastProgress()` /
-  `broadcastSyncDelta()` — don't hand-roll `ws.send` loops.
+  `broadcastSyncDelta()` - don't hand-roll `ws.send` loops.
 - `/ws` and `/sync` share one upgrade handler in `server/index.ts`. Don't
   re-introduce per-WSS `server:` bindings.
 
 ### MCP
+
 - New tools live in `server/mcp/tools.ts`. Args validated via Zod. No hidden
-  side effects — tools should map to existing server functions.
+  side effects - tools should map to existing server functions.
 
 ### Shell / process spawning
+
 - Never shell out with user-influenced input. Use the repo's
   `execFileNoThrow.ts` helper or `spawn(cmd, [argv...], { shell: false })`.
 - The unsafe `exec()` pattern (literal `child_process` dot `exec`) is banned
   outside vetted scripts.
 
 ### Tests
+
 - `vitest` is the runner. Integration tests instantiate a real DB in
-  `os.tmpdir()` per file — never touch `vulnforge.db` in the repo root.
+  `os.tmpdir()` per file - never touch `vulnforge.db` in the repo root.
 - Every new pure module gets a unit test. Touching `server/sync/*`,
   `server/auth/*`, `server/workers/*` without updating or adding a test
   should be flagged.
 
 ### Docs-lint
+
 - Editing `server/sync/`, `server/auth/`, `server/integrations/`,
   `server/workers/`, `server/deployment/`, `electron/`, `Dockerfile.server`,
   or `scripts/install-server.*` REQUIRES a matching edit under `docs/` or
@@ -86,5 +95,5 @@ docs under `docs/`.
   tables that may not exist on older DBs (e.g. `oidc_providers`,
   `refresh_tokens` before B13.4 ran).
 - **Mixing legacy API-token auth with JWT session auth.** The bridge lives
-  in `server/auth/auth.ts::authMiddleware` — JWT first, then API token.
+  in `server/auth/auth.ts::authMiddleware` - JWT first, then API token.
   Don't duplicate that logic elsewhere.

@@ -2,15 +2,15 @@
 
 ## Where secrets live
 
-| Secret | Location | Format |
-|---|---|---|
-| JWT signing secret | `/var/lib/vulnforge/.env::VULNFORGE_JWT_SECRET` | Base64, 48 bytes of entropy |
-| Bootstrap token | `.env::VULNFORGE_BOOTSTRAP_TOKEN` (one-time) | Hex, 24 bytes |
-| User password hashes | `users.password_hash` DB column | `$2a$12$...` bcrypt |
-| Refresh token hashes | `refresh_tokens.token_hash` | `$2a$06$...` bcrypt (raw token has 256 bits of entropy so cost 6 is enough) |
-| OIDC client secrets | `oidc_providers.client_secret` | Plain TEXT — protect the DB file |
-| Integration tokens | `integrations.config` JSON field | Plain TEXT |
-| AI provider API keys | `ai_providers.config` JSON field | Plain TEXT |
+| Secret               | Location                                        | Format                                                                      |
+| -------------------- | ----------------------------------------------- | --------------------------------------------------------------------------- |
+| JWT signing secret   | `/var/lib/vulnforge/.env::VULNFORGE_JWT_SECRET` | Base64, 48 bytes of entropy                                                 |
+| Bootstrap token      | `.env::VULNFORGE_BOOTSTRAP_TOKEN` (one-time)    | Hex, 24 bytes                                                               |
+| User password hashes | `users.password_hash` DB column                 | `$2a$12$...` bcrypt                                                         |
+| Refresh token hashes | `refresh_tokens.token_hash`                     | `$2a$06$...` bcrypt (raw token has 256 bits of entropy so cost 6 is enough) |
+| OIDC client secrets  | `oidc_providers.client_secret`                  | Plain TEXT - protect the DB file                                            |
+| Integration tokens   | `integrations.config` JSON field                | Plain TEXT                                                                  |
+| AI provider API keys | `ai_providers.config` JSON field                | Plain TEXT                                                                  |
 
 The DB file is the secondary trust boundary: anything inside must be treated as sensitive. File permissions on `/var/lib/vulnforge/vulnforge.db` should be `600` owned by the service user.
 
@@ -35,7 +35,7 @@ Schedule: annually, or immediately on suspected compromise.
 
 ### OIDC client secret
 
-From IdP admin UI → regenerate client secret → update the matching row in `oidc_providers.client_secret` (via admin UI or direct SQL). Restart not required — secret is read per-request.
+From IdP admin UI → regenerate client secret → update the matching row in `oidc_providers.client_secret` (via admin UI or direct SQL). Restart not required - secret is read per-request.
 
 ### Integration tokens
 
@@ -62,7 +62,7 @@ Or via admin UI → Users → pick user → "Sign out all devices". User gets a 
 - OIDC client secrets, integration API keys.
 - Bootstrap token after it's been consumed.
 
-The logging surface is deliberately narrow. `console.log` + `console.error` at `info` level include request paths, status codes, user ids, and ms timings — never request bodies or response bodies.
+The logging surface is deliberately narrow. `console.log` + `console.error` at `info` level include request paths, status codes, user ids, and ms timings - never request bodies or response bodies.
 
 ## Bootstrap token single-use enforcement
 

@@ -185,7 +185,7 @@ export async function routeAI(request: AIRequest): Promise<AIResponse> {
         throw err; // Non-exhaustion error, propagate
       }
     }
-    // All candidates exhausted — fall through to legacy
+    // All candidates exhausted - fall through to legacy
   }
 
   // Legacy / fallback: try each enabled provider in order

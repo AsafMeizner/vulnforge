@@ -1,5 +1,5 @@
 /**
- * Sync WebSocket channel — live transport for team-mode deltas.
+ * Sync WebSocket channel - live transport for team-mode deltas.
  *
  * Separate WS server at /sync (the existing /ws remains for pipeline
  * progress events). JWT access token carried in ?token=... query param
@@ -53,7 +53,7 @@ function extractToken(req: IncomingMessage): string | null {
 export function getSyncWsServer(): WebSocketServer | null { return syncWss; }
 
 export function initSyncWebSocket(server: Server): WebSocketServer {
-  // noServer — server/index.ts dispatches /ws + /sync through one upgrade handler.
+  // noServer - server/index.ts dispatches /ws + /sync through one upgrade handler.
   syncWss = new WebSocketServer({ noServer: true });
   void server;
 

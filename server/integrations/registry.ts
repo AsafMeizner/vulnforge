@@ -1,5 +1,5 @@
 /**
- * Integration registry — maps service names to their implementations.
+ * Integration registry - maps service names to their implementations.
  */
 import type { ServiceIntegration } from './types.js';
 import { JiraIntegration } from './jira.js';

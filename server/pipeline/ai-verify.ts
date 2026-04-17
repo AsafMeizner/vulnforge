@@ -54,7 +54,7 @@ export async function runAIVerification(
     const { getAllAIProviders } = await import('../db.js');
     const providers = getAllAIProviders();
     if (!providers.some(p => p.enabled)) {
-      console.log('[AI-Verify] No AI provider enabled — skipping verification (no-AI mode)');
+      console.log('[AI-Verify] No AI provider enabled - skipping verification (no-AI mode)');
       return { verified: total, rejected: 0, errors: 0, total }; // All pass through for manual review
     }
   } catch { /* proceed with verification attempt */ }
@@ -101,7 +101,7 @@ export async function runAIVerification(
           rejected++;
         }
       } else {
-        // AI response unparseable — keep finding as-is (conservative)
+        // AI response unparseable - keep finding as-is (conservative)
         errors++;
       }
     } catch (err: any) {
@@ -165,7 +165,7 @@ async function verifyAndEnrich(
   if (chainContext.length > 0) {
     enhancedContext += '\n\n--- VULNERABILITY CHAIN ---\n';
     for (const chain of chainContext) {
-      enhancedContext += `CHAIN: ${chain.chain_type} — ${chain.description}\n`;
+      enhancedContext += `CHAIN: ${chain.chain_type} - ${chain.description}\n`;
       enhancedContext += `Combined severity: ${chain.combined_severity}\n`;
       enhancedContext += `Exploitation: ${chain.exploitation_path}\n`;
     }
@@ -325,7 +325,7 @@ async function getBlameContext(
 function readSourceContext(finding: ScanFinding, projectPath: string): string {
   if (!finding.file) return 'Source file not specified.';
 
-  // Resolve file path — could be absolute or relative
+  // Resolve file path - could be absolute or relative
   let filePath = finding.file;
   if (!path.isAbsolute(filePath)) {
     filePath = path.join(projectPath, filePath);

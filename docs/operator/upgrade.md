@@ -1,13 +1,13 @@
 # Upgrading
 
-## Server — Docker
+## Server - Docker
 
 ```bash
 docker compose -f docker-compose.server.yml pull
 docker compose -f docker-compose.server.yml up -d
 ```
 
-Migrations run automatically on startup (`initDb()` → `migrateSchema()` + `backfillSyncColumns()` — all idempotent).
+Migrations run automatically on startup (`initDb()` → `migrateSchema()` + `backfillSyncColumns()` - all idempotent).
 
 For a specific version:
 
@@ -17,7 +17,7 @@ VULNFORGE_IMAGE_TAG=0.2.0
 docker compose ...
 ```
 
-## Server — bare metal
+## Server - bare metal
 
 ```bash
 # 1. Stop
@@ -55,7 +55,7 @@ To update manually:
 The client sends `X-VulnForge-Version` on every request. Server responses:
 
 - Matching major version → OK.
-- Major version skew → `426 Upgrade Required` — user gets a prompt to update.
+- Major version skew → `426 Upgrade Required` - user gets a prompt to update.
 - Minor skew → `X-Upgrade-Advisory: true` header; advisory banner in UI.
 
 When upgrading a server, plan a rollout: upgrade the server first (clients on N-1 still work via the compat shim), then push the desktop installer to users.

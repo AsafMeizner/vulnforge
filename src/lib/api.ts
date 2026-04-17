@@ -261,7 +261,7 @@ export const markFalsePositive = (id: number) =>
 export const getAIModels = () => request<Record<string, { models: Array<{ id: string; name: string; tier: string; context: number }> }>>('/ai/models');
 
 // AI routing rules
-// Server returns rules with task as a string — callers narrow via the
+// Server returns rules with task as a string - callers narrow via the
 // RoutingRule type from ./types (which is a superset string union).
 // We cast through unknown so consumers get the narrowed shape.
 import type { RoutingRule } from './types';
