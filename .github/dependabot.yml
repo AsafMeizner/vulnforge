@@ -40,25 +40,45 @@ updates:
     # Dependabot will still flag them via security advisories — these ignores
     # only suppress noisy drive-by majors.
     ignore:
+      # Test runner + coverage — must bump together with test rewrite.
       - dependency-name: "vitest"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@vitest/*"
         update-types: ["version-update:semver-major"]
+      # Electron desktop shell — 9-major jumps (e.g. 32→41) cross native ABI breaks.
       - dependency-name: "electron"
         update-types: ["version-update:semver-major"]
       - dependency-name: "electron-builder"
         update-types: ["version-update:semver-major"]
+      # Build toolchain — plugin-react & vite version lockstep.
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@vitejs/*"
         update-types: ["version-update:semver-major"]
+      # UI framework — React majors have runtime + type changes.
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
+      # Web framework — Express 5 middleware semantics differ.
       - dependency-name: "express"
         update-types: ["version-update:semver-major"]
+      # TS compiler — major bumps can surface new diagnostics.
       - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # AI SDKs — prod runtime deps. Major bumps (0.x→0.y with 50+ versions,
+      # or v4→v6) rewrite the provider-invocation shapes. Requires coordinated
+      # migration of server/ai/providers and the routing layer.
+      - dependency-name: "@anthropic-ai/sdk"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "openai"
+        update-types: ["version-update:semver-major"]
+      # Zod — schema validation used by MCP tools + auth + sync routes.
+      # v4 rewrote the parse API surface; needs a deliberate pass.
+      - dependency-name: "zod"
+        update-types: ["version-update:semver-major"]
+      # @modelcontextprotocol/sdk — MCP server protocol bumps need review.
+      - dependency-name: "@modelcontextprotocol/sdk"
         update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
