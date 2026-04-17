@@ -1,14 +1,14 @@
 # CodeQL static analysis.
 #
-# ⚠ Requires "Code scanning" to be ENABLED in the repo settings:
+# ⚠ Requires "Code scanning" to be ENABLED in repo settings:
 #     Settings → Code security → Code scanning → Set up
-# Until that toggle is flipped, the analyze step runs fine but the
-# SARIF upload returns 403 ("Code scanning is not enabled"). The
-# `continue-on-error: true` below keeps the workflow green in that
-# state; remove it (or leave it — harmless) once the feature is on.
+# Until that toggle is flipped, analyze runs fine but the SARIF upload
+# returns 403. The `continue-on-error: true` on the analyze STEP (not job)
+# hides that specific failure from the check summary without suppressing
+# real syntax or query errors that would surface in earlier steps.
 #
-# Analysis actually runs either way — the diagnostic value is in the
-# logs even before SARIF lands in the Security tab.
+# Once Code scanning is enabled you can remove the continue-on-error line;
+# leaving it is harmless.
 
 name: CodeQL
 
@@ -18,8 +18,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # Weekly rescan catches advisories published after merge.
-    - cron: '23 4 * * 1'
+    - cron: '23 4 * * 1' # Weekly rescan for fresh advisories
 
 permissions:
   actions: read
@@ -30,9 +29,6 @@ jobs:
   analyze:
     name: analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
-    # Don't red-X the commit just because Code scanning isn't enabled yet.
-    # Real syntax or query failures still surface in logs.
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -47,9 +43,9 @@ jobs:
       - name: autobuild
         uses: github/codeql-action/autobuild@v3
       - name: analyze
+        # Step-level continue-on-error so the SARIF 403 doesn't red-X the
+        # check summary. Earlier steps (init, autobuild) still fail loudly.
+        continue-on-error: true
         uses: github/codeql-action/analyze@v3
         with:
           category: /language:${{ matrix.language }}
-          # Silently skip the upload when the feature is disabled instead of
-          # dying on a 403. Once Code scanning is enabled this becomes a no-op.
-          upload: always

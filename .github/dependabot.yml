@@ -80,6 +80,10 @@ updates:
       # @modelcontextprotocol/sdk — MCP server protocol bumps need review.
       - dependency-name: "@modelcontextprotocol/sdk"
         update-types: ["version-update:semver-major"]
+      # @types/node — must track the Node runtime majors we actually run
+      # (Node 20 LTS now, 22 coming). Don't drift to unreleased Node types.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "automated"
@@ -102,10 +106,12 @@ updates:
       - "automated"
     commit-message:
       prefix: "ci(deps)"
-    # upload-artifact@v7 has path-handling breaks that don't help us;
-    # stay on v4. Majors for other actions still get PRs.
+    # upload/download-artifact majors have path-handling breaks that
+    # don't help us; stay on v4. Majors for other actions still flow.
     ignore:
       - dependency-name: "actions/upload-artifact"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "actions/download-artifact"
         update-types: ["version-update:semver-major"]
 
   # Docker — server image base + layer bumps
