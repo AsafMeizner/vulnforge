@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # docs-lint diffs against base
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
       - name: docs-lint
@@ -41,7 +41,7 @@ jobs:
         target: [server, frontend]
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -65,7 +65,7 @@ jobs:
         node: ['20', '22']
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
           cache: 'npm'
@@ -94,7 +94,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -110,7 +110,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
