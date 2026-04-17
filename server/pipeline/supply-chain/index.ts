@@ -195,6 +195,79 @@ function readFileSafe(p: string): string {
   }
 }
 
+/**
+ * Convert a pattern string that may start with `(?i)` (an inline
+ * case-insensitive flag — Perl/Python/PCRE syntax that JavaScript regex
+ * does NOT support) into a (pattern, flags) pair that `new RegExp`
+ * accepts. Idempotent when no `(?i)` prefix is present.
+ */
+function compileRule(src: string, extraFlags = ''): RegExp {
+  let pattern = src;
+  let flags = extraFlags;
+  if (pattern.startsWith('(?i)')) {
+    pattern = pattern.slice(4);
+    if (!flags.includes('i')) flags += 'i';
+  }
+  return new RegExp(pattern, flags);
+}
+
+/**
+ * Evaluate a rule against a file. Supports the richer ruleset shape where
+ * an optional `contextPattern` has to ALSO match within `contextWindow`
+ * lines of the primary `pattern` match. Returns 1-based line numbers of
+ * each primary match that also satisfies the context requirement.
+ *
+ * Kept simple: we scan line-by-line for `pattern`, then look at a window
+ * centred on that line to see if `contextPattern` matches anywhere inside
+ * the window.
+ */
+interface RuleMatch { line: number; text: string }
+function evalRuleOnFile(
+  body: string,
+  pattern: string,
+  contextPattern?: string,
+  contextWindow = 3,
+  languages?: string[],
+  fileExt?: string
+): RuleMatch[] {
+  if (languages && languages.length > 0 && fileExt) {
+    const extToLang: Record<string, string> = {
+      '.js': 'JavaScript', '.mjs': 'JavaScript', '.cjs': 'JavaScript',
+      '.jsx': 'JavaScript', '.ts': 'TypeScript', '.tsx': 'TypeScript',
+      '.py': 'Python', '.rb': 'Ruby', '.php': 'PHP', '.go': 'Go',
+      '.java': 'Java', '.kt': 'Kotlin', '.cs': 'C#',
+    };
+    const lang = extToLang[fileExt];
+    if (lang && !languages.includes(lang)) return [];
+  }
+
+  let primary: RegExp;
+  let ctx: RegExp | undefined;
+  try {
+    primary = compileRule(pattern);
+    if (contextPattern) ctx = compileRule(contextPattern);
+  } catch {
+    return []; // malformed rule - skip silently
+  }
+
+  const lines = body.split('\n');
+  const hits: RuleMatch[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!primary.test(lines[i])) continue;
+    if (ctx) {
+      const lo = Math.max(0, i - contextWindow);
+      const hi = Math.min(lines.length, i + contextWindow + 1);
+      let contextOk = false;
+      for (let j = lo; j < hi; j++) {
+        if (ctx.test(lines[j])) { contextOk = true; break; }
+      }
+      if (!contextOk) continue;
+    }
+    hits.push({ line: i + 1, text: lines[i] });
+  }
+  return hits;
+}
+
 // ──────────────────────────────────────────────────────────────────────────
 //  Sub-scanners
 // ──────────────────────────────────────────────────────────────────────────
@@ -375,24 +448,29 @@ function scanCrypto(
   for (const file of files) {
     const body = readFileSafe(file);
     if (!body) continue;
-    const lines = body.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      for (const rule of rules) {
-        if (new RegExp(rule.pattern).test(line)) {
-          findings.push({
-            category: 'weak_crypto',
-            subcategory: rule.id,
-            title: rule.description,
-            severity: rule.severity,
-            file,
-            line_start: i + 1,
-            evidence: line.trim().slice(0, 200),
-            confidence: 0.7,
-            cwe: rule.cwe,
-            remediation: rule.remediation,
-          });
-        }
+    const ext = path.extname(file).toLowerCase();
+    for (const rule of rules) {
+      const hits = evalRuleOnFile(
+        body,
+        rule.pattern,
+        (rule as any).contextPattern,
+        (rule as any).contextWindow,
+        rule.languages,
+        ext
+      );
+      for (const h of hits) {
+        findings.push({
+          category: 'weak_crypto',
+          subcategory: rule.id,
+          title: rule.description,
+          severity: rule.severity,
+          file,
+          line_start: h.line,
+          evidence: h.text.trim().slice(0, 200),
+          confidence: 0.7,
+          cwe: rule.cwe,
+          remediation: rule.remediation,
+        });
       }
     }
   }
@@ -418,24 +496,29 @@ function scanHiddenRoutes(
   for (const file of files) {
     const body = readFileSafe(file);
     if (!body) continue;
-    const lines = body.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      for (const rule of rules) {
-        if (new RegExp(rule.pattern).test(line)) {
-          findings.push({
-            category: 'hidden_route',
-            subcategory: rule.id,
-            title: rule.description,
-            severity: rule.severity,
-            file,
-            line_start: i + 1,
-            evidence: line.trim().slice(0, 200),
-            confidence: 0.65,
-            cwe: rule.cwe,
-            remediation: rule.remediation,
-          });
-        }
+    const ext = path.extname(file).toLowerCase();
+    for (const rule of rules) {
+      const hits = evalRuleOnFile(
+        body,
+        rule.pattern,
+        (rule as any).contextPattern,
+        (rule as any).contextWindow,
+        undefined,
+        ext
+      );
+      for (const h of hits) {
+        findings.push({
+          category: 'hidden_route',
+          subcategory: rule.id,
+          title: rule.description,
+          severity: rule.severity,
+          file,
+          line_start: h.line,
+          evidence: h.text.trim().slice(0, 200),
+          confidence: 0.65,
+          cwe: rule.cwe,
+          remediation: rule.remediation,
+        });
       }
     }
   }
@@ -489,24 +572,29 @@ function scanObfuscation(
       }
     }
 
-    const lines = body.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      for (const rule of rules) {
-        if (new RegExp(rule.pattern).test(line)) {
-          findings.push({
-            category: 'obfuscation',
-            subcategory: rule.id,
-            title: rule.description,
-            severity: rule.severity,
-            file,
-            line_start: i + 1,
-            evidence: line.trim().slice(0, 200),
-            confidence: 0.75,
-            cwe: rule.cwe,
-            remediation: rule.remediation,
-          });
-        }
+    const ext = path.extname(file).toLowerCase();
+    for (const rule of rules) {
+      const hits = evalRuleOnFile(
+        body,
+        rule.pattern,
+        (rule as any).contextPattern,
+        (rule as any).contextWindow,
+        undefined,
+        ext
+      );
+      for (const h of hits) {
+        findings.push({
+          category: 'obfuscation',
+          subcategory: rule.id,
+          title: rule.description,
+          severity: rule.severity,
+          file,
+          line_start: h.line,
+          evidence: h.text.trim().slice(0, 200),
+          confidence: 0.75,
+          cwe: rule.cwe,
+          remediation: rule.remediation,
+        });
       }
     }
   }

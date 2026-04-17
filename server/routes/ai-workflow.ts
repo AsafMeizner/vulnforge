@@ -16,14 +16,39 @@ import { analyzeChangeImpact } from '../pipeline/change-impact.js';
 import { cveMatchProbability } from '../ai/cve-match-probability.js';
 import { recommendAssignees } from '../ai/assignment-recommender.js';
 import { getScanFindings, getScanFindingById, getProjectById } from '../db.js';
+import { rateLimit } from '../utils/rate-limit.js';
 
 const router = Router();
+
+/**
+ * Rate-limiters scoped to the expense of each endpoint class:
+ *   - aiCallLimiter: hits an LLM provider (costs money + tokens)
+ *   - writeLimiter:  mutates git state (creates branches/commits/PRs)
+ *   - readLimiter:   read-only DB/git queries (cheap)
+ *
+ * All are per-IP sliding windows. Tune per ops feedback.
+ */
+const aiCallLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 20,
+  message: 'AI endpoint rate limit exceeded. Slow down to avoid unexpected AI costs.',
+});
+const writeLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 5,
+  message: 'Autonomous-remediation rate limit exceeded. Review PRs before creating more.',
+});
+const readLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 120,
+  message: 'Read rate limit exceeded.',
+});
 
 // ──────────────────────────────────────────────────────────────────────────
 //  Triage memory
 // ──────────────────────────────────────────────────────────────────────────
 
-router.get('/triage-memory/patterns', (req: Request, res: Response) => {
+router.get('/triage-memory/patterns', readLimiter, (req: Request, res: Response) => {
   try {
     const decision = req.query.decision as 'accept' | 'reject' | 'ignore' | undefined;
     const minTotal = req.query.min ? Number(req.query.min) : 1;
@@ -35,7 +60,7 @@ router.get('/triage-memory/patterns', (req: Request, res: Response) => {
   }
 });
 
-router.get('/triage-memory/suggest/:findingId', (req: Request, res: Response) => {
+router.get('/triage-memory/suggest/:findingId', readLimiter, (req: Request, res: Response) => {
   try {
     const id = Number(req.params.findingId);
     const f = getScanFindingById(id);
@@ -46,7 +71,7 @@ router.get('/triage-memory/suggest/:findingId', (req: Request, res: Response) =>
   }
 });
 
-router.post('/triage-memory/apply-batch', (req: Request, res: Response) => {
+router.post('/triage-memory/apply-batch', readLimiter, (req: Request, res: Response) => {
   try {
     const { pipeline_id, project_id, threshold } = req.body as {
       pipeline_id?: string;
@@ -65,7 +90,7 @@ router.post('/triage-memory/apply-batch', (req: Request, res: Response) => {
   }
 });
 
-router.post('/triage-memory/record', (req: Request, res: Response) => {
+router.post('/triage-memory/record', readLimiter, (req: Request, res: Response) => {
   try {
     const { finding_id, decision } = req.body as {
       finding_id: number;
@@ -88,7 +113,7 @@ router.post('/triage-memory/record', (req: Request, res: Response) => {
 //  Root-cause clustering
 // ──────────────────────────────────────────────────────────────────────────
 
-router.post('/root-cause/cluster', async (req: Request, res: Response) => {
+router.post('/root-cause/cluster', aiCallLimiter, async (req: Request, res: Response) => {
   try {
     const { pipeline_id, project_id, semantic = false, maxSemanticInput } = req.body as {
       pipeline_id?: string;
@@ -112,7 +137,7 @@ router.post('/root-cause/cluster', async (req: Request, res: Response) => {
 //  Autonomous remediation
 // ──────────────────────────────────────────────────────────────────────────
 
-router.post('/remediation/generate-fix', async (req: Request, res: Response) => {
+router.post('/remediation/generate-fix', aiCallLimiter, async (req: Request, res: Response) => {
   try {
     const { finding_id } = req.body as { finding_id: number };
     const f = getScanFindingById(finding_id);
@@ -126,7 +151,7 @@ router.post('/remediation/generate-fix', async (req: Request, res: Response) => 
   }
 });
 
-router.post('/remediation/autonomous', async (req: Request, res: Response) => {
+router.post('/remediation/autonomous', writeLimiter, async (req: Request, res: Response) => {
   try {
     const { finding_id, mode = 'dry-run', branch, draft, requireClean } = req.body as {
       finding_id: number;
@@ -150,7 +175,7 @@ router.post('/remediation/autonomous', async (req: Request, res: Response) => {
 //  Change impact analysis
 // ──────────────────────────────────────────────────────────────────────────
 
-router.post('/change-impact/analyze', async (req: Request, res: Response) => {
+router.post('/change-impact/analyze', readLimiter, async (req: Request, res: Response) => {
   try {
     const { project_id, since_ref, head_ref, statuses } = req.body as {
       project_id: number;
@@ -173,7 +198,7 @@ router.post('/change-impact/analyze', async (req: Request, res: Response) => {
 //  CVE match probability
 // ──────────────────────────────────────────────────────────────────────────
 
-router.post('/cve-match/score', async (req: Request, res: Response) => {
+router.post('/cve-match/score', readLimiter, async (req: Request, res: Response) => {
   try {
     const { finding_id, topK, minScore, candidatePool } = req.body as {
       finding_id: number;
@@ -190,7 +215,7 @@ router.post('/cve-match/score', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/cve-match/score-batch', async (req: Request, res: Response) => {
+router.post('/cve-match/score-batch', aiCallLimiter, async (req: Request, res: Response) => {
   try {
     const { pipeline_id, project_id, topK, minScore } = req.body as {
       pipeline_id?: string;
@@ -219,7 +244,7 @@ router.post('/cve-match/score-batch', async (req: Request, res: Response) => {
 //  Assignment recommendation
 // ──────────────────────────────────────────────────────────────────────────
 
-router.post('/assignment/recommend', async (req: Request, res: Response) => {
+router.post('/assignment/recommend', readLimiter, async (req: Request, res: Response) => {
   try {
     const { finding_id, topK, perSignalLimit } = req.body as {
       finding_id: number;

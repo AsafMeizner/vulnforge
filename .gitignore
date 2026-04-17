@@ -56,3 +56,7 @@ tmp/
 # Compiled server output (from npm run build:server / tsc -p tsconfig.server.json)
 /dist-server/
 /dist-tarball-stage/
+
+# Electron installer output (from npm run build:desktop)
+/release/
+/release2/

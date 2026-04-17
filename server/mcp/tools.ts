@@ -2541,4 +2541,191 @@ export const mcpTools: MCPToolDef[] = [
       return { screenshot_path: ssPath, vnc_port: stats.vnc_port, ssh_port: stats.ssh_port };
     },
   },
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  AI-workflow tools (triage memory, root-cause, remediation, change-impact,
+  //  CVE match, assignment). Expose the /api/ai-workflow/* capabilities to
+  //  external AI agents via MCP.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // ── Triage memory ──────────────────────────────────────────────────────
+  {
+    name: 'get_triage_patterns',
+    description: 'List historical triage patterns (accept/reject/ignore decisions recorded across past findings). Useful for understanding which classes of issue your team tends to accept vs reject.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        decision: { type: 'string', enum: ['accept', 'reject', 'ignore'], description: 'Filter by last decision' },
+        min_total: { type: 'number', description: 'Minimum total votes for a pattern to appear (default 1)' },
+        limit: { type: 'number', description: 'Max patterns to return (default 100)' },
+      },
+    },
+    handler: async (args: any) => {
+      const { listTriagePatterns } = await import('../ai/triage-memory.js');
+      return listTriagePatterns({
+        decision: args.decision,
+        minTotal: args.min_total || 1,
+        limit: args.limit || 100,
+      });
+    },
+  },
+  {
+    name: 'suggest_triage',
+    description: 'Given a scan finding, suggest an accept/reject/ignore decision based on history of similar past findings. Returns the suggestion with confidence and basis (vote counts per decision type).',
+    inputSchema: {
+      type: 'object',
+      properties: { finding_id: { type: 'number', description: 'Scan finding ID' } },
+      required: ['finding_id'],
+    },
+    handler: async (args: any) => {
+      const { applyTriageMemory } = await import('../ai/triage-memory.js');
+      const { getScanFindingById } = await import('../db.js');
+      const f = getScanFindingById(Number(args.finding_id));
+      if (!f) throw new Error('finding not found');
+      return applyTriageMemory(f);
+    },
+  },
+
+  // ── Root-cause clustering ──────────────────────────────────────────────
+  {
+    name: 'cluster_findings_by_root_cause',
+    description: 'Group findings that share a root cause so a single fix resolves many symptoms. Structural tier (same CWE + file + function) is fast and free. Semantic tier uses AI to find cross-file root causes - costs tokens.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        pipeline_id: { type: 'string', description: 'Pipeline to cluster findings from' },
+        project_id: { type: 'number', description: 'Project-wide clustering (alternative to pipeline_id)' },
+        semantic: { type: 'boolean', description: 'Run AI-assisted semantic clustering too (opt-in, costs AI tokens)' },
+        max_semantic_input: { type: 'number', description: 'Cap on findings sent to AI (default 100)' },
+      },
+    },
+    handler: async (args: any) => {
+      const { clusterByRootCause } = await import('../ai/root-cause.js');
+      const { getScanFindings } = await import('../db.js');
+      if (!args.pipeline_id && !args.project_id) throw new Error('pipeline_id or project_id required');
+      const findings = getScanFindings({ pipeline_id: args.pipeline_id, project_id: args.project_id });
+      const clusters = await clusterByRootCause(findings, {
+        semantic: !!args.semantic,
+        maxSemanticInput: args.max_semantic_input,
+      });
+      return { clusters, total_findings: findings.length, total_clusters: clusters.length };
+    },
+  },
+
+  // ── Autonomous remediation ─────────────────────────────────────────────
+  {
+    name: 'generate_fix_diff',
+    description: 'Generate a unified diff fix for a finding without applying anything. Safe to call - produces only a patch preview. Humans review before running autonomous_remediate.',
+    inputSchema: {
+      type: 'object',
+      properties: { finding_id: { type: 'number', description: 'Scan finding ID' } },
+      required: ['finding_id'],
+    },
+    handler: async (args: any) => {
+      const { generateFix } = await import('../ai/remediation.js');
+      const { getScanFindingById, getProjectById } = await import('../db.js');
+      const f = getScanFindingById(Number(args.finding_id));
+      if (!f) throw new Error('finding not found');
+      const project = f.project_id ? getProjectById(f.project_id) : null;
+      if (!project?.path) throw new Error('project has no local path');
+      return generateFix(f, project.path);
+    },
+  },
+  {
+    name: 'autonomous_remediate',
+    description: 'Generate + apply a fix for a finding in one of four modes: dry-run (no write), branch (commit to new branch), pr (also open a GitHub draft PR via gh), or direct (commit to current branch). Default dry-run. Target-files clean check gated on opts.require_clean (default true).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        finding_id: { type: 'number', description: 'Scan finding ID' },
+        mode: { type: 'string', enum: ['dry-run', 'branch', 'pr', 'direct'], description: 'Default dry-run' },
+        branch: { type: 'string', description: 'Branch name override' },
+        draft: { type: 'boolean', description: 'Open PR as draft (default true)' },
+        require_clean: { type: 'boolean', description: 'Abort if target files have uncommitted changes (default true)' },
+      },
+      required: ['finding_id'],
+    },
+    handler: async (args: any) => {
+      const { autonomousRemediate } = await import('../ai/remediation.js');
+      return autonomousRemediate(Number(args.finding_id), {
+        mode: args.mode || 'dry-run',
+        branch: args.branch,
+        draft: args.draft,
+        requireClean: args.require_clean,
+      });
+    },
+  },
+
+  // ── Change-impact analysis ─────────────────────────────────────────────
+  {
+    name: 'analyze_change_impact',
+    description: 'Given a git ref, bucket a project\'s findings into likely_resolved (file deleted), definitely_affected (hunk contains their line), possibly_affected (file changed elsewhere), unchanged. Drives incremental re-verification instead of blind full re-scans.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project_id: { type: 'number', description: 'Project ID' },
+        since_ref: { type: 'string', description: 'Git ref to diff from (e.g. a commit SHA or tag)' },
+        head_ref: { type: 'string', description: 'Head ref (default HEAD)' },
+        statuses: { type: 'array', items: { type: 'string' }, description: 'Finding statuses to consider (default pending+accepted)' },
+      },
+      required: ['project_id', 'since_ref'],
+    },
+    handler: async (args: any) => {
+      const { analyzeChangeImpact } = await import('../pipeline/change-impact.js');
+      return analyzeChangeImpact(Number(args.project_id), args.since_ref, {
+        headRef: args.head_ref,
+        statuses: args.statuses,
+      });
+    },
+  },
+
+  // ── CVE match probability ──────────────────────────────────────────────
+  {
+    name: 'score_cve_match',
+    description: 'Score how likely a finding corresponds to a published CVE in the local NVD mirror. Returns probability 0-1 + top candidate CVEs with per-signal evidence (CWE mention, product/file token overlap, keyword cosine, severity alignment).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        finding_id: { type: 'number', description: 'Scan finding ID' },
+        top_k: { type: 'number', description: 'Number of top matches to return (default 3)' },
+        min_score: { type: 'number', description: 'Minimum per-candidate score (default 0.2)' },
+      },
+      required: ['finding_id'],
+    },
+    handler: async (args: any) => {
+      const { cveMatchProbability } = await import('../ai/cve-match-probability.js');
+      const { getScanFindingById } = await import('../db.js');
+      const f = getScanFindingById(Number(args.finding_id));
+      if (!f) throw new Error('finding not found');
+      return cveMatchProbability(f, { topK: args.top_k, minScore: args.min_score });
+    },
+  },
+
+  // ── Assignment recommendation ──────────────────────────────────────────
+  {
+    name: 'recommend_assignees',
+    description: 'Suggest team members to fix a finding based on git blame (line author), file history (top modifiers), CWE history (past fixers of same class across repo), and CODEOWNERS. No schema/tracking required - pure git history.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        finding_id: { type: 'number', description: 'Scan finding ID' },
+        top_k: { type: 'number', description: 'Max assignees returned (default 5)' },
+        per_signal_limit: { type: 'number', description: 'Cap per-signal candidate counts (default 10)' },
+      },
+      required: ['finding_id'],
+    },
+    handler: async (args: any) => {
+      const { recommendAssignees } = await import('../ai/assignment-recommender.js');
+      const { getScanFindingById, getProjectById } = await import('../db.js');
+      const f = getScanFindingById(Number(args.finding_id));
+      if (!f) throw new Error('finding not found');
+      if (!f.project_id) throw new Error('finding has no project');
+      const project = getProjectById(f.project_id);
+      if (!project?.path) throw new Error('project has no local path');
+      return recommendAssignees(f, project.path, {
+        topK: args.top_k,
+        perSignalLimit: args.per_signal_limit,
+      });
+    },
+  },
 ];

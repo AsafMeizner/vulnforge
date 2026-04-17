@@ -9,8 +9,14 @@
  */
 import { spawnSync } from 'child_process';
 
+// On Windows, spawnSync with shell:false and cmd="npx" fails because npx
+// resolves to npx.cmd (a shell wrapper). shell:true lets Windows look up
+// .cmd/.bat files; on POSIX we keep shell:false for predictable argv
+// handling and a smaller shell-injection surface.
+const IS_WIN = process.platform === 'win32';
+
 function run(cmd, args) {
-  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: false });
+  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: IS_WIN });
   if (r.status !== 0) {
     console.error(`[build] failed: ${cmd} ${args.join(' ')}`);
     process.exit(r.status ?? 1);

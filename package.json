@@ -83,7 +83,7 @@
     },
     "win": {
       "target": "nsis",
-      "icon": "public/brand/favicon.ico"
+      "icon": "public/brand/logo-square.png"
     },
     "linux": {
       "target": "AppImage",
