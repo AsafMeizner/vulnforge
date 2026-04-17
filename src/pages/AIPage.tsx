@@ -8,6 +8,7 @@ import {
   getAIModels,
   getAIRouting,
   updateAIRouting,
+  apiFetch,
 } from '@/lib/api';
 import type { AIProvider, ChatMessage, Vulnerability, ModelInfo, RoutingRule } from '@/lib/types';
 import { useToast } from '@/components/Toast';
@@ -610,7 +611,7 @@ export default function AIPage() {
                   key={p.name}
                   onClick={async () => {
                     try {
-                      const res = await fetch(`/api/ai/routing/presets/${p.name}`, { method: 'POST' });
+                      const res = await apiFetch(`/api/ai/routing/presets/${p.name}`, { method: 'POST' });
                       if (!res.ok) throw new Error(await res.text());
                       const data = await res.json();
                       // Reload routing rules

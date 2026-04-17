@@ -7,6 +7,7 @@
  *   - Team:  enter server URL → try /api/health → either sign in or bootstrap.
  */
 import { useState } from 'react';
+import { apiFetch } from '@/lib/api';
 
 type Step =
   | 'choose'
@@ -74,7 +75,7 @@ export default function FirstLaunch({ onFinished }: Props) {
   const [busy, setBusy] = useState(false);
 
   async function writeSettings(body: Record<string, string>) {
-    await fetch('/api/settings/bulk', {
+    await apiFetch('/api/settings/bulk', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),

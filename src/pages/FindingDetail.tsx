@@ -21,6 +21,7 @@ import {
   type RuntimeJob,
   type FuzzCrash,
   type Disclosure,
+  apiFetch,
 } from '@/lib/api';
 import type { Vulnerability, Severity, VulnStatus } from '@/lib/types';
 import { SeverityBadge, StatusBadge, CvssScore } from '@/components/Badge';
@@ -449,7 +450,7 @@ export default function FindingDetail({ vulnId, onClose }: FindingDetailProps) {
     if (!vuln) return;
     setSuggestingFix(true);
     try {
-      const res = await fetch('/api/ai/suggest-fix', {
+      const res = await apiFetch('/api/ai/suggest-fix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vuln_id: vuln.id }),
@@ -473,7 +474,7 @@ export default function FindingDetail({ vulnId, onClose }: FindingDetailProps) {
     if (!vuln) return;
     setDeepAnalyzing(true);
     try {
-      const res = await fetch('/api/ai/deep-analyze', {
+      const res = await apiFetch('/api/ai/deep-analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vuln_id: vuln.id }),

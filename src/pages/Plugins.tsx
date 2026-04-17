@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { resolveWsBase } from '@/lib/api';
+import { resolveWsBase, apiFetch } from '@/lib/api';
 
 // -- Types --------------------------------------------------------------------
 
@@ -187,7 +187,7 @@ function RunDialog({ plugin, modules, projects, onClose }: RunDialogProps) {
       if (selectedModules.size > 0) options.modules = [...selectedModules];
       if (severity.length > 0) options.severity = severity;
 
-      const res = await fetch(`/api/plugins/${plugin.id}/run`, {
+      const res = await apiFetch(`/api/plugins/${plugin.id}/run`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -500,8 +500,8 @@ export default function Plugins() {
   const load = useCallback(async () => {
     try {
       const [plugRes, projRes] = await Promise.all([
-        fetch('/api/plugins'),
-        fetch('/api/projects'),
+        apiFetch('/api/plugins'),
+        apiFetch('/api/projects'),
       ]);
       if (plugRes.ok) {
         const data = await plugRes.json() as {
@@ -524,7 +524,7 @@ export default function Plugins() {
       installed
         .filter((p) => p.id != null)
         .map(async (p) => {
-          const res = await fetch(`/api/plugins/${p.id}/status`);
+          const res = await apiFetch(`/api/plugins/${p.id}/status`);
           if (res.ok) return { id: p.id, status: await res.json() as PluginStatus };
           return null;
         })
@@ -549,7 +549,7 @@ export default function Plugins() {
     setInstallError(null);
     setMissingDeps(null);
     try {
-      const res = await fetch('/api/plugins/install', {
+      const res = await apiFetch('/api/plugins/install', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
@@ -576,7 +576,7 @@ export default function Plugins() {
   const handleInstallDep = async (dep: string) => {
     setInstallingDep(dep);
     try {
-      const res = await fetch('/api/plugins/install-dep', {
+      const res = await apiFetch('/api/plugins/install-dep', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dependency: dep }),
@@ -606,12 +606,12 @@ export default function Plugins() {
 
   const handleUninstall = async (id: number, name: string) => {
     if (!window.confirm(`Uninstall "${name}"? The plugin files will remain on disk.`)) return;
-    await fetch(`/api/plugins/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/plugins/${id}`, { method: 'DELETE' });
     await load();
   };
 
   const handleOpenRun = async (plugin: InstalledPlugin) => {
-    const res = await fetch(`/api/plugins/${plugin.id}/modules`);
+    const res = await apiFetch(`/api/plugins/${plugin.id}/modules`);
     const modules: string[] = res.ok
       ? ((await res.json()) as { modules: string[] }).modules ?? []
       : [];

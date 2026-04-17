@@ -16,6 +16,7 @@
  * The wizard may also persist intermediate state under `vulnforge.setup.draft`.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { apiFetch } from '@/lib/api';
 
 export const SETUP_COMPLETE_KEY = 'vulnforge.setup.complete';
 export const SETUP_DRAFT_KEY = 'vulnforge.setup.draft';
@@ -133,7 +134,7 @@ async function defaultTestProvider(
   _apiKey: string,
 ): Promise<{ ok: boolean; message: string }> {
   try {
-    const res = await fetch('/api/ai/chat', {
+    const res = await apiFetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({

@@ -10,6 +10,7 @@
  */
 import { useEffect, useState } from 'react';
 import type { ConnectionStatus } from '../lib/sync';
+import { apiFetch } from '../lib/api';
 
 interface Props {
   /** Inject sync status from top-level app shell. */
@@ -66,7 +67,7 @@ export default function DeploymentSettings({
     let cancelled = false;
     (async () => {
       try {
-        const resp = await fetch('/api/settings');
+        const resp = await apiFetch('/api/settings');
         if (!resp.ok) return;
         const data = await resp.json() as { data?: Array<{ key: string; value: string }>; };
         const map: Settings = {};
@@ -82,7 +83,7 @@ export default function DeploymentSettings({
   async function save(key: keyof Settings, value: string) {
     setSaving(true);
     try {
-      await fetch('/api/settings/' + encodeURIComponent(String(key)), {
+      await apiFetch('/api/settings/' + encodeURIComponent(String(key)), {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ value }),

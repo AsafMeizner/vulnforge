@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getProjects, getTools, getScans, getPlugins, resolveWsBase } from '@/lib/api';
+import { getProjects, getTools, getScans, getPlugins, resolveWsBase, apiFetch } from '@/lib/api';
 import type { InstalledPlugin } from '@/lib/api';
 import type { Project, Tool, Scan, Vulnerability } from '@/lib/types';
 import { SeverityBadge, CvssScore } from '@/components/Badge';
@@ -284,7 +284,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
     const toolJobs: ScanJobState[] = [];
     if (toolNames.length > 0) {
       try {
-        const res = await fetch('/api/scans', {
+        const res = await apiFetch('/api/scans', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -321,7 +321,7 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
         const jobId = `plugin-${pluginId}-${Date.now()}`;
         pluginJobs.push({ jobId, toolName: `[plugin] ${pl.name}`, status: 'queued' });
         // Fire plugin run in background; server returns 202
-        fetch(`/api/plugins/${pluginId}/run`, {
+        apiFetch(`/api/plugins/${pluginId}/run`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ target: project.path, project_id: selectedProject }),

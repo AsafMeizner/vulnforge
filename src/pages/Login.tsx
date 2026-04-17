@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api';
 
 interface LoginProps {
   onAuthenticated: (token: string, user: { id: number; username: string; role: string }) => void;
@@ -13,7 +14,7 @@ export default function Login({ onAuthenticated }: LoginProps) {
 
   // Check if setup is needed
   useEffect(() => {
-    fetch('/api/auth/status')
+    apiFetch('/api/auth/status')
       .then(r => r.json())
       .then(data => {
         setMode(data.setup_required ? 'setup' : 'login');

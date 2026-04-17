@@ -7,6 +7,8 @@ import {
 } from '@/lib/api';
 import type { Tool, AIProvider } from '@/lib/types';
 import { useToast } from '@/components/Toast';
+import { ThemePicker } from '@/components/ThemePicker';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 interface ScanProfile {
   id: string;
@@ -22,7 +24,7 @@ const DEFAULT_PROFILES: ScanProfile[] = [
   { id: 'memory', name: 'Memory Safety', tools: ['uaf_detector', 'realloc_dangling_scanner', 'cross_arch_truncation'], severity_threshold: 'High' },
 ];
 
-type SettingsTab = 'general' | 'tools' | 'profiles' | 'notes' | 'advanced';
+type SettingsTab = 'general' | 'appearance' | 'language' | 'tools' | 'profiles' | 'notes' | 'advanced';
 
 export default function Settings() {
   const [tab, setTab] = useState<SettingsTab>('general');
@@ -91,13 +93,38 @@ export default function Settings() {
         <p style={{ fontSize: 12, color: 'var(--muted)', margin: '4px 0 0' }}>Configure VulnForge preferences and scan behavior</p>
       </div>
 
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 24, flexShrink: 0 }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 24, flexShrink: 0, flexWrap: 'wrap' }}>
         <button style={tabStyle('general')} onClick={() => setTab('general')}>General</button>
+        <button style={tabStyle('appearance')} onClick={() => setTab('appearance')}>Appearance</button>
+        <button style={tabStyle('language')} onClick={() => setTab('language')}>Language</button>
         <button style={tabStyle('tools')} onClick={() => setTab('tools')}>Tools</button>
         <button style={tabStyle('profiles')} onClick={() => setTab('profiles')}>Scan Profiles</button>
         <button style={tabStyle('notes')} onClick={() => setTab('notes')}>Note Backends</button>
         <button style={tabStyle('advanced' as any)} onClick={() => setTab('advanced' as any)}>Advanced</button>
       </div>
+
+      {tab === 'appearance' && (
+        <div style={{ overflowY: 'auto', paddingRight: 8, flex: 1 }}>
+          <div style={{ marginBottom: 16, color: 'var(--muted)', fontSize: 13 }}>
+            Pick a theme. Choice persists to <code>localStorage['vulnforge.theme']</code>.
+            Select &quot;System preference&quot; to auto-follow your OS theme.
+          </div>
+          <ThemePicker />
+        </div>
+      )}
+
+      {tab === 'language' && (
+        <div style={{ overflowY: 'auto', paddingRight: 8, flex: 1 }}>
+          <div style={{ marginBottom: 16, color: 'var(--muted)', fontSize: 13 }}>
+            Interface language. Choice persists to <code>localStorage['vulnforge.lang']</code>.
+            RTL locales (Arabic, Hebrew) flip <code>document.dir</code> automatically.
+          </div>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span style={{ fontSize: 13, color: 'var(--muted)' }}>Current:</span>
+            <LanguageSwitcher />
+          </div>
+        </div>
+      )}
 
       {/* General tab */}
       {tab === 'general' && (

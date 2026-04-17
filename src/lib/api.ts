@@ -66,6 +66,41 @@ export function resolveWsBase(): string {
 export const API_BASE = resolveApiBase();
 const BASE = API_BASE;
 
+/**
+ * Build a full API URL for a path that starts with "/api/..." or "/...".
+ *
+ * Accepts either a bare path ("/plugins") or a full "/api" path
+ * ("/api/plugins") and returns the correctly-prefixed URL for the current
+ * environment (packaged Electron, vite dev, or server-served). Use this
+ * anywhere direct `fetch()` is unavoidable - prefer the typed helpers
+ * in this file when possible.
+ */
+export function apiUrl(path: string): string {
+  if (/^https?:\/\//.test(path)) return path;
+  const cleaned = path.startsWith('/api/')
+    ? path.slice(4)    // '/api/foo' -> '/foo', then BASE + '/foo'
+    : path.startsWith('/')
+      ? path
+      : `/${path}`;
+  return BASE + cleaned;
+}
+
+/**
+ * Thin wrapper over fetch() that routes through apiUrl() and sets a
+ * sensible default Content-Type for JSON bodies. Use for file uploads,
+ * streaming, or any case where the typed helpers in this file don't fit.
+ */
+export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  const headers: Record<string, string> = {};
+  if (init?.body && typeof init.body === 'string' && !init.headers) {
+    headers['Content-Type'] = 'application/json';
+  }
+  return fetch(apiUrl(path), {
+    ...init,
+    headers: { ...headers, ...(init?.headers as any) },
+  });
+}
+
 async function request<T>(
   path: string,
   options?: RequestInit
@@ -631,7 +666,7 @@ export const deleteRuntimeJob = (id: string) =>
   request<{ deleted: boolean }>(`/runtime/${id}`, { method: 'DELETE' });
 
 export const getRuntimeJobOutput = (id: string, tail = 100) =>
-  fetch(`/api/runtime/${id}/output?tail=${tail}`).then(r => r.text());
+  fetch(apiUrl(`/api/runtime/${id}/output?tail=${tail}`)).then(r => r.text());
 
 export const listCrashes = (jobId: string) =>
   request<{ data: FuzzCrash[]; total: number }>(`/runtime/${jobId}/crashes`);

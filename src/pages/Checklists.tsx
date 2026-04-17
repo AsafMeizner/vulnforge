@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getProjects, type Project } from '@/lib/api';
+import { getProjects, apiFetch, type Project } from '@/lib/api';
 import { useToast } from '@/components/Toast';
 
-const BASE = '/api';
+// Use the shared apiFetch helper so this page works in packaged Electron,
+// vite dev, and server-served modes (including dynamic server port).
 async function req<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await apiFetch(path.startsWith('/api') ? path : `/api${path}`, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
   });
