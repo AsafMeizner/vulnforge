@@ -235,3 +235,6 @@ export async function analyzeChangeImpact(
 function normalize(p: string): string {
   return p.replace(/\\/g, '/').replace(/^\.\//, '');
 }
+
+// Exposed for tests (pure functions only)
+export const _internals = { rangesContainLine, normalize };

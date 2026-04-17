@@ -71,7 +71,7 @@ const CODE_EXTS = new Set([
   '.py', '.go', '.java', '.rb', '.php',
 ]);
 
-const _graphCache = new Map<string, { mtime: number; nodes: CallGraphNode[] }>();
+const _graphCache = new Map<string, { fingerprint: string; nodes: CallGraphNode[] }>();
 
 function walkFiles(root: string): string[] {
   const out: string[] = [];
@@ -167,21 +167,41 @@ function extractCallSites(body: string): string[] {
   return Array.from(calls);
 }
 
+/**
+ * Compute a coarse fingerprint of a file set that changes whenever ANY
+ * tracked source file is added, removed, or modified. Previously we
+ * sampled only the first 20 files' mtimes - that missed edits further
+ * into the tree. This hash covers the full set at O(n) file stat cost.
+ */
+function projectFingerprint(files: string[]): string {
+  let count = 0;
+  let totalSize = 0;
+  let maxMtime = 0;
+  for (const f of files) {
+    try {
+      const st = statSync(f);
+      count++;
+      totalSize += st.size;
+      if (st.mtimeMs > maxMtime) maxMtime = st.mtimeMs;
+    } catch {
+      /* unreadable - skip */
+    }
+  }
+  return `${count}:${totalSize}:${maxMtime}`;
+}
+
 function buildCallGraph(projectPath: string): CallGraphNode[] {
   const files = walkFiles(projectPath);
-  let latestMtime = 0;
-  for (const f of files.slice(0, 20)) {
-    try { latestMtime = Math.max(latestMtime, statSync(f).mtimeMs); } catch { /* skip */ }
-  }
+  const fingerprint = projectFingerprint(files);
   const cached = _graphCache.get(projectPath);
-  if (cached && cached.mtime >= latestMtime) return cached.nodes;
+  if (cached && cached.fingerprint === fingerprint) return cached.nodes;
   const all: CallGraphNode[] = [];
   for (const f of files) {
     const body = safeRead(f);
     if (!body) continue;
     all.push(...parseFunctionsInFile(f, body));
   }
-  _graphCache.set(projectPath, { mtime: latestMtime, nodes: all });
+  _graphCache.set(projectPath, { fingerprint, nodes: all });
   return all;
 }
 

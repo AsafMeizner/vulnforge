@@ -13,6 +13,8 @@ import {
 import { clusterByRootCause } from '../ai/root-cause.js';
 import { autonomousRemediate, generateFix } from '../ai/remediation.js';
 import { analyzeChangeImpact } from '../pipeline/change-impact.js';
+import { cveMatchProbability } from '../ai/cve-match-probability.js';
+import { recommendAssignees } from '../ai/assignment-recommender.js';
 import { getScanFindings, getScanFindingById, getProjectById } from '../db.js';
 
 const router = Router();
@@ -161,6 +163,75 @@ router.post('/change-impact/analyze', async (req: Request, res: Response) => {
       return;
     }
     const result = await analyzeChangeImpact(project_id, since_ref, { headRef: head_ref, statuses });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+//  CVE match probability
+// ──────────────────────────────────────────────────────────────────────────
+
+router.post('/cve-match/score', async (req: Request, res: Response) => {
+  try {
+    const { finding_id, topK, minScore, candidatePool } = req.body as {
+      finding_id: number;
+      topK?: number;
+      minScore?: number;
+      candidatePool?: number;
+    };
+    const f = getScanFindingById(finding_id);
+    if (!f) { res.status(404).json({ error: 'finding not found' }); return; }
+    const result = await cveMatchProbability(f, { topK, minScore, candidatePool });
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/cve-match/score-batch', async (req: Request, res: Response) => {
+  try {
+    const { pipeline_id, project_id, topK, minScore } = req.body as {
+      pipeline_id?: string;
+      project_id?: number;
+      topK?: number;
+      minScore?: number;
+    };
+    if (!pipeline_id && !project_id) {
+      res.status(400).json({ error: 'pipeline_id or project_id required' });
+      return;
+    }
+    const findings = getScanFindings({ pipeline_id, project_id, status: 'pending' });
+    const results = [];
+    for (const f of findings) {
+      const r = await cveMatchProbability(f, { topK, minScore });
+      if (r.probability > 0) results.push(r);
+    }
+    results.sort((a, b) => b.probability - a.probability);
+    res.json({ data: results, total: results.length, total_findings_checked: findings.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+//  Assignment recommendation
+// ──────────────────────────────────────────────────────────────────────────
+
+router.post('/assignment/recommend', async (req: Request, res: Response) => {
+  try {
+    const { finding_id, topK, perSignalLimit } = req.body as {
+      finding_id: number;
+      topK?: number;
+      perSignalLimit?: number;
+    };
+    const f = getScanFindingById(finding_id);
+    if (!f) { res.status(404).json({ error: 'finding not found' }); return; }
+    if (!f.project_id) { res.status(400).json({ error: 'finding has no project' }); return; }
+    const project = getProjectById(f.project_id);
+    if (!project?.path) { res.status(400).json({ error: 'project has no local path' }); return; }
+    const result = await recommendAssignees(f, project.path, { topK, perSignalLimit });
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

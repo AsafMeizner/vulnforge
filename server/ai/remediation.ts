@@ -144,8 +144,24 @@ async function git(args: string[], cwd: string): Promise<{ ok: boolean; stdout: 
   return { ok: r.ok, stdout: r.stdout, stderr: r.stderr };
 }
 
-async function isTreeClean(cwd: string): Promise<boolean> {
-  const r = await git(['status', '--porcelain'], cwd);
+/**
+ * Check whether the specific files we intend to patch are clean.
+ *
+ * A project-wide `git status --porcelain` check is too strict for real
+ * dev environments - developers routinely have unrelated modified files
+ * (editor settings, local tool configs, scratch changes) that should not
+ * block an autonomous fix to a totally different file. So we scope the
+ * clean check to just the files the diff touches.
+ *
+ * If `filesToCheck` is empty (defensive fallback), we do the whole-tree
+ * check to stay safe.
+ */
+async function areTargetFilesClean(cwd: string, filesToCheck: string[]): Promise<boolean> {
+  if (filesToCheck.length === 0) {
+    const r = await git(['status', '--porcelain'], cwd);
+    return r.ok && r.stdout.trim().length === 0;
+  }
+  const r = await git(['status', '--porcelain', '--', ...filesToCheck], cwd);
   return r.ok && r.stdout.trim().length === 0;
 }
 
@@ -172,6 +188,13 @@ function buildCommitMessage(finding: ScanFinding): string {
   ].filter(Boolean).join('\n');
   return `security: ${short}\n\n${body}`;
 }
+
+// Exposed for tests (pure helpers only)
+export const _internals = {
+  slugify: (s: string) => slugify(s),
+  buildCommitMessage: (f: ScanFinding) => buildCommitMessage(f),
+  buildPRBody: (f: ScanFinding, d: string) => buildPRBody(f, d),
+};
 
 function buildPRBody(finding: ScanFinding, diff: string): string {
   return [
@@ -239,10 +262,11 @@ export async function autonomousRemediate(
     return { ...base, ok: true, patch, patched_files };
   }
 
-  // Require clean tree for all non-dry-run modes unless opted out
+  // Require target files to be clean (not the whole tree - see
+  // areTargetFilesClean for rationale). Can be opted out per call.
   const requireClean = opts.requireClean !== false;
-  if (requireClean && !(await isTreeClean(cwd))) {
-    return { ...base, error: 'working_tree_dirty' };
+  if (requireClean && !(await areTargetFilesClean(cwd, patched_files))) {
+    return { ...base, error: 'target_files_have_uncommitted_changes' };
   }
 
   const branch =
