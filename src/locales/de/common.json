@@ -1,0 +1,64 @@
+{
+  "appName": "VulnForge",
+  "nav": {
+    "dashboard": "Übersicht",
+    "findings": "Befunde",
+    "scanner": "Scanner",
+    "projects": "Projekte",
+    "tools": "Werkzeuge",
+    "checklists": "Checklisten",
+    "ai": "KI",
+    "plugins": "Plugins",
+    "settings": "Einstellungen",
+    "hunt": "Jagd",
+    "review": "Überprüfung",
+    "runtime": "Laufzeit",
+    "history": "Verlauf",
+    "exploits": "Exploits",
+    "investigate": "Untersuchen",
+    "disclosure": "Offenlegung",
+    "audit": "Audit"
+  },
+  "buttons": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "export": "Exportieren",
+    "refresh": "Aktualisieren",
+    "close": "Schließen",
+    "confirm": "Bestätigen",
+    "edit": "Bearbeiten",
+    "add": "Hinzufügen",
+    "run": "Ausführen",
+    "retry": "Erneut versuchen",
+    "apply": "Anwenden"
+  },
+  "severity": {
+    "critical": "Kritisch",
+    "high": "Hoch",
+    "medium": "Mittel",
+    "low": "Niedrig",
+    "info": "Info"
+  },
+  "status": {
+    "pending": "Ausstehend",
+    "verified": "Verifiziert",
+    "rejected": "Abgelehnt",
+    "accepted": "Angenommen",
+    "running": "Läuft",
+    "failed": "Fehlgeschlagen",
+    "queued": "In Warteschlange",
+    "completed": "Abgeschlossen"
+  },
+  "errors": {
+    "generic": "Etwas ist schiefgelaufen. Bitte erneut versuchen.",
+    "network": "Netzwerkfehler. Verbindung prüfen.",
+    "unauthorized": "Sie sind nicht berechtigt, diese Aktion auszuführen.",
+    "notFound": "Die angeforderte Ressource wurde nicht gefunden.",
+    "validation": "Bitte Eingabe prüfen und erneut versuchen."
+  },
+  "empty": {
+    "noData": "Noch keine Daten",
+    "noResults": "Keine Ergebnisse gefunden"
+  }
+}

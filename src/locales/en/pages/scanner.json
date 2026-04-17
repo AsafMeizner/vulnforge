@@ -1,0 +1,14 @@
+{
+  "title": "Scanner",
+  "subtitle": "Configure and run static analysis scans",
+  "form": {
+    "target": "Target Path",
+    "tools": "Tools",
+    "profile": "Scan Profile",
+    "submit": "Start Scan"
+  },
+  "queue": {
+    "title": "Scan Queue",
+    "empty": "No scans queued"
+  }
+}

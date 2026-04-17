@@ -1,0 +1,196 @@
+{
+  "_schema": {
+    "version": 1,
+    "description": "Pattern database for the supply-chain & backdoor detector (Track F). Consumers: server/pipeline/supply-chain/*.ts.",
+    "fields": {
+      "topPackages": "Per-ecosystem list of popular package names used for typosquatting edit-distance checks.",
+      "postinstallRedFlags": "Array of {id, pattern, severity, reason} describing dangerous substrings in npm install scripts.",
+      "secretRegexes": "Array of {id, pattern, description, severity, cwe} for git-history secret scanning.",
+      "cryptoRedFlags": "Array of {id, pattern, description, severity, cwe, languages, remediation} for weak/backdoored crypto detection.",
+      "backdoorRoutePatterns": "Array of {id, pattern, description, severity, cwe, frameworks, remediation} for hidden-admin route detection.",
+      "obfuscationPatterns": "Array of {id, pattern, description, severity, cwe, remediation} for suspicious/obfuscated payloads.",
+      "severityMap": "Canonical severity mapping for subsystem outputs.",
+      "entropyThresholds": "Shannon entropy thresholds for flagging suspicious blobs.",
+      "skipDirs": "Directory names skipped during file traversal.",
+      "codeExtensions": "File extensions treated as source code."
+    }
+  },
+  "severityMap": {
+    "typosquat": "Critical",
+    "malicious_postinstall": "High",
+    "postinstall_network": "High",
+    "recently_published": "Medium",
+    "maintainer_churn": "Medium",
+    "secret_in_history": "Critical",
+    "weak_crypto": "Medium",
+    "hardcoded_key": "High",
+    "custom_crypto": "Medium",
+    "hidden_route": "Medium",
+    "header_bypass": "High",
+    "debug_bypass": "High",
+    "time_bomb": "High",
+    "obfuscation": "Medium",
+    "binary_blob": "Low",
+    "deleted_restored": "High"
+  },
+  "entropyThresholds": {
+    "base64Blob": 4.5,
+    "hexBlob": 3.8,
+    "minBlobLength": 1024
+  },
+  "skipDirs": [
+    ".git", "node_modules", "vendor", "__pycache__", "target",
+    "build", "dist", ".next", ".cache", "coverage",
+    "__fixtures__", "fixtures", "testdata"
+  ],
+  "codeExtensions": [
+    ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx",
+    ".py", ".rb", ".php", ".go", ".java", ".kt",
+    ".cs", ".c", ".cpp", ".cc", ".h", ".hpp",
+    ".rs", ".swift", ".scala", ".pl", ".sh", ".bash"
+  ],
+  "binaryExtensions": [".bin", ".dat", ".pyc", ".pyo", ".so", ".dll", ".dylib", ".class", ".exe", ".o", ".a", ".lib"],
+  "topPackages": {
+    "npm": [
+      "react", "react-dom", "lodash", "axios", "express", "chalk", "commander",
+      "debug", "request", "underscore", "moment", "async", "inquirer",
+      "yargs", "colors", "body-parser", "mkdirp", "glob", "rimraf", "uuid",
+      "minimist", "ms", "fs-extra", "prop-types", "typescript", "webpack",
+      "tslib", "semver", "bluebird", "cross-spawn", "jsonwebtoken", "mongoose",
+      "redis", "pg", "mysql", "mysql2", "sqlite3", "node-fetch", "got",
+      "socket.io", "ejs", "handlebars", "pug", "dotenv", "yaml", "cheerio",
+      "jsdom", "puppeteer", "playwright", "next", "nuxt", "vue", "angular",
+      "jquery", "bootstrap", "tailwindcss", "postcss", "autoprefixer",
+      "eslint", "prettier", "babel-core", "@babel/core", "rollup", "vite",
+      "jest", "mocha", "chai", "sinon", "ava", "tape", "vitest", "nyc",
+      "supertest", "nock", "nodemon", "pm2", "forever", "log4js", "winston",
+      "pino", "morgan", "helmet", "cors", "cookie-parser", "passport",
+      "bcrypt", "bcryptjs", "argon2", "crypto-js", "node-sass", "sass",
+      "less", "stylus", "gulp", "grunt", "browserify", "babelify",
+      "react-router", "redux", "mobx", "immer", "immutable", "rxjs",
+      "ramda", "date-fns", "luxon", "@types/node", "@types/react",
+      "ts-node", "tsx", "esbuild", "swc", "parcel", "react-native",
+      "expo", "react-scripts", "create-react-app", "concurrently", "nodemailer",
+      "stripe", "twilio", "aws-sdk", "firebase", "mongodb", "sequelize",
+      "knex", "prisma", "typeorm", "graphql", "apollo-server", "apollo-client",
+      "formik", "yup", "joi", "zod", "class-validator", "reflect-metadata"
+    ],
+    "pypi": [
+      "requests", "urllib3", "six", "numpy", "pandas", "setuptools", "certifi",
+      "pip", "wheel", "cryptography", "boto3", "botocore", "idna", "charset-normalizer",
+      "pyyaml", "click", "jinja2", "flask", "django", "fastapi", "pydantic",
+      "sqlalchemy", "psycopg2", "psycopg2-binary", "mysqlclient", "pymongo", "redis",
+      "celery", "kombu", "tornado", "aiohttp", "httpx", "uvicorn", "gunicorn",
+      "starlette", "werkzeug", "markupsafe", "itsdangerous", "babel", "pytz",
+      "python-dateutil", "tzdata", "pillow", "matplotlib", "seaborn", "scipy",
+      "scikit-learn", "tensorflow", "torch", "keras", "transformers", "huggingface-hub",
+      "tokenizers", "accelerate", "datasets", "pytest", "pytest-cov", "mock",
+      "nose", "coverage", "tox", "virtualenv", "poetry", "pipenv", "flake8",
+      "pylint", "black", "mypy", "isort", "autopep8", "beautifulsoup4", "lxml",
+      "scrapy", "selenium", "paramiko", "fabric", "ansible", "openpyxl", "xlrd",
+      "xlsxwriter", "cython", "cffi", "pycparser", "pynacl", "attrs", "packaging",
+      "pyparsing", "typing-extensions", "protobuf", "grpcio", "grpcio-tools",
+      "aiofiles", "anyio", "sniffio", "h11", "httpcore", "httptools", "python-multipart",
+      "email-validator", "passlib", "python-jose", "pyjwt", "bcrypt", "argon2-cffi",
+      "tqdm", "rich", "textual", "typer", "fire", "loguru", "structlog",
+      "colorama", "termcolor", "pygments", "jsonschema", "marshmallow",
+      "networkx", "sympy", "statsmodels", "xgboost", "lightgbm", "opencv-python",
+      "numba", "dask", "joblib", "threadpoolctl", "filelock", "platformdirs",
+      "virtualenvwrapper", "pre-commit", "rope", "pendulum", "arrow", "freezegun"
+    ],
+    "go": [
+      "github.com/gin-gonic/gin", "github.com/labstack/echo", "github.com/gorilla/mux",
+      "github.com/spf13/cobra", "github.com/spf13/viper", "github.com/sirupsen/logrus",
+      "go.uber.org/zap", "github.com/stretchr/testify", "github.com/golang/protobuf",
+      "google.golang.org/protobuf", "google.golang.org/grpc", "github.com/go-sql-driver/mysql",
+      "github.com/lib/pq", "github.com/mattn/go-sqlite3", "github.com/jmoiron/sqlx",
+      "gorm.io/gorm", "github.com/go-redis/redis", "github.com/prometheus/client_golang",
+      "github.com/aws/aws-sdk-go", "github.com/pkg/errors", "github.com/google/uuid",
+      "golang.org/x/crypto", "golang.org/x/net", "golang.org/x/sync", "golang.org/x/sys",
+      "golang.org/x/text", "golang.org/x/oauth2", "github.com/dgrijalva/jwt-go",
+      "github.com/golang-jwt/jwt"
+    ],
+    "maven": [
+      "org.springframework:spring-core", "org.springframework.boot:spring-boot-starter",
+      "com.google.guava:guava", "org.apache.commons:commons-lang3",
+      "commons-io:commons-io", "org.slf4j:slf4j-api", "ch.qos.logback:logback-classic",
+      "org.apache.logging.log4j:log4j-core", "com.fasterxml.jackson.core:jackson-databind",
+      "junit:junit", "org.junit.jupiter:junit-jupiter", "org.mockito:mockito-core",
+      "org.hibernate:hibernate-core", "mysql:mysql-connector-java",
+      "org.postgresql:postgresql", "redis.clients:jedis"
+    ],
+    "gem": [
+      "rails", "rake", "bundler", "activesupport", "activerecord", "actionpack",
+      "actionview", "nokogiri", "devise", "puma", "sidekiq", "rspec",
+      "rubocop", "pg", "mysql2", "redis", "sinatra", "rack", "jbuilder",
+      "byebug", "tzinfo", "i18n", "json", "concurrent-ruby"
+    ]
+  },
+  "postinstallRedFlags": [
+    { "id": "postinstall-curl", "pattern": "(?:^|[^a-zA-Z])curl\\s+", "severity": "High", "reason": "install script fetches remote content via curl" },
+    { "id": "postinstall-wget", "pattern": "(?:^|[^a-zA-Z])wget\\s+", "severity": "High", "reason": "install script fetches remote content via wget" },
+    { "id": "postinstall-http-pipe", "pattern": "https?://[^\\s'\"]+\\s*\\|", "severity": "High", "reason": "install script pipes remote URL into shell" },
+    { "id": "postinstall-dyn-eval", "pattern": "\\b(?:e)(?:v)(?:a)(?:l)\\s*[\\(`]", "severity": "High", "reason": "install script evaluates code dynamically" },
+    { "id": "postinstall-base64-decode", "pattern": "base64\\s+(?:-d|--decode)", "severity": "High", "reason": "install script decodes base64 payload" },
+    { "id": "postinstall-netcat", "pattern": "(?:^|[^a-zA-Z])nc\\s+-", "severity": "High", "reason": "install script uses netcat" },
+    { "id": "postinstall-write-outside", "pattern": "(?:~/|\\$HOME/|/etc/|/root/|/usr/local/)", "severity": "Medium", "reason": "install script writes outside project tree" },
+    { "id": "postinstall-spawn", "pattern": "child_process\\.|require\\(['\"]child_process['\"]\\)", "severity": "Medium", "reason": "install script spawns child process" },
+    { "id": "postinstall-network-lib", "pattern": "(?:node-fetch|axios|got|undici|https?\\.get)\\s*\\(", "severity": "High", "reason": "install script performs network fetch" },
+    { "id": "postinstall-chmod-x", "pattern": "chmod\\s+[0-7]*x", "severity": "Medium", "reason": "install script marks file executable" },
+    { "id": "postinstall-dynamic-require", "pattern": "require\\(\\s*Buffer\\.from", "severity": "High", "reason": "install script uses dynamic require from Buffer" }
+  ],
+  "secretRegexes": [
+    { "id": "aws-access-key", "pattern": "\\bAKIA[0-9A-Z]{16}\\b", "description": "AWS Access Key ID", "severity": "Critical", "cwe": "CWE-798" },
+    { "id": "aws-secret-key", "pattern": "(?i)aws(.{0,20})?(secret|private)[\\s=:\"']{1,5}([A-Za-z0-9/+=]{40})", "description": "AWS Secret Access Key", "severity": "Critical", "cwe": "CWE-798" },
+    { "id": "gcp-service-account", "pattern": "\"type\":\\s*\"service_account\"", "description": "GCP service-account credential JSON", "severity": "Critical", "cwe": "CWE-798" },
+    { "id": "gcp-api-key", "pattern": "\\bAIza[0-9A-Za-z_-]{35}\\b", "description": "Google API key", "severity": "High", "cwe": "CWE-798" },
+    { "id": "azure-storage-key", "pattern": "DefaultEndpointsProtocol=https?;AccountName=[^;]+;AccountKey=[A-Za-z0-9+/=]{60,}", "description": "Azure Storage connection string with account key", "severity": "Critical", "cwe": "CWE-798" },
+    { "id": "ssh-private-key", "pattern": "-----BEGIN (?:RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY", "description": "SSH/PGP private key", "severity": "Critical", "cwe": "CWE-798" },
+    { "id": "jwt-hardcoded", "pattern": "\\beyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\b", "description": "Hardcoded JWT", "severity": "High", "cwe": "CWE-798" },
+    { "id": "bearer-token", "pattern": "(?i)bearer\\s+[A-Za-z0-9._~+/=-]{20,}", "description": "Bearer token", "severity": "High", "cwe": "CWE-798" },
+    { "id": "slack-token", "pattern": "\\bxox[baprs]-[A-Za-z0-9-]{10,}", "description": "Slack API token", "severity": "Critical", "cwe": "CWE-798" },
+    { "id": "slack-webhook", "pattern": "https://hooks\\.slack\\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]{20,}", "description": "Slack webhook URL", "severity": "High", "cwe": "CWE-798" },
+    { "id": "discord-webhook", "pattern": "https://(?:ptb\\.|canary\\.)?discord(?:app)?\\.com/api/webhooks/\\d+/[A-Za-z0-9_-]{40,}", "description": "Discord webhook URL", "severity": "High", "cwe": "CWE-798" },
+    { "id": "discord-token", "pattern": "(?i)discord[^\\n]{0,40}['\"][MN][A-Za-z0-9]{23}\\.[\\w-]{6}\\.[\\w-]{27}['\"]", "description": "Discord bot token", "severity": "Critical", "cwe": "CWE-798" },
+    { "id": "github-token", "pattern": "\\bgh[pousr]_[A-Za-z0-9]{36}\\b", "description": "GitHub personal access token", "severity": "Critical", "cwe": "CWE-798" },
+    { "id": "github-oauth", "pattern": "\\bgho_[A-Za-z0-9]{36}\\b", "description": "GitHub OAuth token", "severity": "Critical", "cwe": "CWE-798" },
+    { "id": "stripe-live", "pattern": "\\b(?:sk|rk)_live_[A-Za-z0-9]{24,}\\b", "description": "Stripe live secret key", "severity": "Critical", "cwe": "CWE-798" },
+    { "id": "stripe-test", "pattern": "\\b(?:sk|rk)_test_[A-Za-z0-9]{24,}\\b", "description": "Stripe test secret key", "severity": "Medium", "cwe": "CWE-798" },
+    { "id": "db-conn-postgres", "pattern": "postgres(?:ql)?://[^\\s:]+:[^\\s@]+@[^\\s/]+", "description": "Postgres connection string with password", "severity": "High", "cwe": "CWE-798" },
+    { "id": "db-conn-mysql", "pattern": "mysql://[^\\s:]+:[^\\s@]+@[^\\s/]+", "description": "MySQL connection string with password", "severity": "High", "cwe": "CWE-798" },
+    { "id": "db-conn-mongo", "pattern": "mongodb(?:\\+srv)?://[^\\s:]+:[^\\s@]+@[^\\s/]+", "description": "MongoDB connection string with password", "severity": "High", "cwe": "CWE-798" },
+    { "id": "generic-password-assign", "pattern": "(?i)(?:password|passwd|pwd)\\s*[=:]\\s*[\"']([^\"'\\s]{8,})[\"']", "description": "Hardcoded password assignment", "severity": "High", "cwe": "CWE-798" },
+    { "id": "generic-api-key", "pattern": "(?i)(?:api[_-]?key|apikey|secret[_-]?key)\\s*[=:]\\s*[\"']([A-Za-z0-9_-]{20,})[\"']", "description": "Hardcoded API-key assignment", "severity": "High", "cwe": "CWE-798" }
+  ],
+  "cryptoRedFlags": [
+    { "id": "math-random-token", "pattern": "Math\\.random\\s*\\(\\s*\\)", "contextPattern": "(?i)(?:token|secret|session|key|nonce|salt|otp|password|reset|uuid|id)", "contextWindow": 2, "description": "Math.random() used for security-sensitive value", "severity": "High", "cwe": "CWE-338", "languages": ["JavaScript", "TypeScript"], "remediation": "Use crypto.randomBytes() / crypto.getRandomValues() / crypto.randomUUID()" },
+    { "id": "md5-password", "pattern": "(?i)(?:md5|createHash\\(['\"]md5['\"]\\))", "contextPattern": "(?i)(?:password|passwd|hash)", "contextWindow": 5, "description": "MD5 used with password data", "severity": "High", "cwe": "CWE-327", "languages": [], "remediation": "Use bcrypt, scrypt, argon2, or PBKDF2 with a high iteration count" },
+    { "id": "sha1-password", "pattern": "(?i)(?:createHash\\(['\"]sha1['\"]\\)|hashlib\\.sha1|SHA1\\b)", "contextPattern": "(?i)(?:password|passwd)", "contextWindow": 5, "description": "SHA1 used with password data", "severity": "High", "cwe": "CWE-327", "languages": [], "remediation": "Use bcrypt, scrypt, argon2, or PBKDF2 with a high iteration count" },
+    { "id": "des-cipher", "pattern": "(?i)(?:createCipher(?:iv)?\\(['\"]des|DESede|Cipher\\.getInstance\\(['\"]DES)", "description": "Weak DES/3DES cipher", "severity": "High", "cwe": "CWE-327", "languages": [], "remediation": "Use AES-256-GCM" },
+    { "id": "rc4-cipher", "pattern": "(?i)(?:rc4|arcfour)", "description": "Weak RC4 cipher", "severity": "High", "cwe": "CWE-327", "languages": [], "remediation": "Use AES-256-GCM" },
+    { "id": "ecb-mode", "pattern": "(?i)(?:aes-\\d+-ecb|/ECB/|Cipher\\.getInstance\\(['\"]AES/ECB)", "description": "ECB cipher mode leaks patterns", "severity": "High", "cwe": "CWE-327", "languages": [], "remediation": "Use GCM or CBC with random IV" },
+    { "id": "hardcoded-iv", "pattern": "(?i)iv\\s*[=:]\\s*(?:[\"'][A-Za-z0-9+/=]{8,}[\"']|Buffer\\.from\\([\"'][A-Fa-f0-9]{8,}[\"'])", "description": "Hardcoded initialization vector", "severity": "High", "cwe": "CWE-329", "languages": [], "remediation": "Generate a fresh random IV per message" },
+    { "id": "hardcoded-crypto-key", "pattern": "(?i)(?:crypto|cipher|secret|encryption)[_-]?key\\s*[=:]\\s*[\"'][A-Za-z0-9+/=]{16,}[\"']", "description": "Hardcoded encryption key", "severity": "High", "cwe": "CWE-798", "languages": [], "remediation": "Load keys from env vars or a secret manager" },
+    { "id": "srand-time", "pattern": "srand\\s*\\(\\s*time\\s*\\(", "description": "srand(time(NULL)) predictable PRNG seed", "severity": "High", "cwe": "CWE-337", "languages": ["C", "C++"], "remediation": "Use getrandom(), /dev/urandom, or a CSPRNG" },
+    { "id": "rand-modulo", "pattern": "\\brand\\s*\\(\\s*\\)\\s*%\\s*\\w+", "contextPattern": "(?i)(?:session|token|id|key|secret|nonce|salt)", "contextWindow": 3, "description": "rand() % n used for security-sensitive value", "severity": "High", "cwe": "CWE-338", "languages": ["C", "C++"], "remediation": "Use a CSPRNG such as arc4random_uniform() or getrandom()" },
+    { "id": "python-random-token", "pattern": "(?<!secrets\\.)(?:random\\.random|random\\.randint|random\\.choice|random\\.sample)", "contextPattern": "(?i)(?:token|secret|session|key|password|reset|otp)", "contextWindow": 3, "description": "Python random module used for security-sensitive value (use secrets module)", "severity": "High", "cwe": "CWE-338", "languages": ["Python"], "remediation": "Use secrets.token_bytes / secrets.token_urlsafe" }
+  ],
+  "backdoorRoutePatterns": [
+    { "id": "header-equality-bypass-js", "pattern": "req\\.headers\\[[\"']x-[a-z0-9-]+[\"']\\]\\s*===?\\s*[\"'][^\"']+[\"']", "description": "Authentication bypass via exact header-value match", "severity": "High", "cwe": "CWE-287", "frameworks": ["Express", "Koa", "Fastify"], "remediation": "Use proper authentication middleware (JWT, session, OAuth) instead of header equality" },
+    { "id": "header-equality-bypass-py", "pattern": "request\\.headers\\.get\\(\\s*[\"'][Xx]-[A-Za-z0-9-]+[\"']\\s*\\)\\s*==\\s*[\"'][^\"']+[\"']", "description": "Authentication bypass via exact header-value match (Python)", "severity": "High", "cwe": "CWE-287", "frameworks": ["Flask", "FastAPI", "Django"], "remediation": "Use framework authentication (Flask-Login, FastAPI Depends, Django auth middleware)" },
+    { "id": "debug-flag-bypass", "pattern": "(?:process\\.env\\.DEBUG|os\\.environ\\[[\"']DEBUG[\"']\\]|os\\.getenv\\([\"']DEBUG[\"']\\))", "contextPattern": "(?i)(?:admin|auth|bypass|skip|grant|allow|backdoor|super)", "contextWindow": 8, "description": "Authentication bypass gated on DEBUG env flag", "severity": "High", "cwe": "CWE-489", "frameworks": ["Express", "Koa", "Fastify", "Flask", "FastAPI", "Django"], "remediation": "Remove debug-only auth bypass or guard on build flags stripped in production" },
+    { "id": "ip-allowlist-bypass", "pattern": "(?:127\\.0\\.0\\.1|::1|localhost)", "contextPattern": "(?i)(?:x-forwarded-for|req\\.ip|request\\.remote_addr|getHeader)", "contextWindow": 6, "description": "IP allowlist trusts X-Forwarded-For header (client-controlled)", "severity": "High", "cwe": "CWE-290", "frameworks": ["Express", "Koa", "Fastify", "Flask", "FastAPI", "Django"], "remediation": "Use trust proxy settings safely; never trust X-Forwarded-For without a verified reverse proxy" },
+    { "id": "time-bomb-js", "pattern": "(?:new\\s+Date\\s*\\(\\s*[\"']20[2-9]\\d|Date\\.now\\s*\\(\\s*\\)\\s*[<>]=?\\s*\\d{10,})", "contextPattern": "(?i)(?:admin|auth|exec|spawn|rm\\s|delete|drop\\s|unlink)", "contextWindow": 5, "description": "Date comparison near auth/RCE sink (possible time-bomb)", "severity": "High", "cwe": "CWE-511", "frameworks": ["Express", "Koa", "Fastify"], "remediation": "Remove time-bomb logic; audit commit history for author of the comparison" },
+    { "id": "time-bomb-py", "pattern": "(?:datetime\\.now\\s*\\(\\s*\\)\\s*[<>]|datetime\\.today\\s*\\(\\s*\\)\\s*[<>]|time\\.time\\s*\\(\\s*\\)\\s*[<>]=?\\s*\\d{10,})", "contextPattern": "(?i)(?:admin|auth|exec|subprocess|os\\.system|pickle)", "contextWindow": 5, "description": "Date/time comparison near auth/RCE sink (possible time-bomb)", "severity": "High", "cwe": "CWE-511", "frameworks": ["Flask", "FastAPI", "Django"], "remediation": "Remove time-bomb logic; audit commit history" }
+  ],
+  "obfuscationPatterns": [],
+  "customCryptoHints": {
+    "functionNames": ["encrypt", "decrypt", "hash", "cipher", "obfuscate", "scramble", "encode_secret", "my_hash"],
+    "knownImports": [
+      "crypto", "node:crypto", "crypto-js", "bcrypt", "bcryptjs", "argon2",
+      "hashlib", "cryptography", "nacl", "pynacl", "secrets",
+      "javax.crypto", "java.security", "org.bouncycastle",
+      "openssl/evp.h", "sodium", "libsodium", "mbedtls", "crypto/rand"
+    ]
+  }
+}

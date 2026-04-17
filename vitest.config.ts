@@ -4,7 +4,18 @@ export default defineConfig({
   test: {
     globals: false,
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
+    include: [
+      'tests/**/*.test.ts',
+      'server/**/*.test.ts',
+      'src/**/*.test.{ts,tsx}',
+    ],
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/dist-server/**',
+      // Per-subdirectory vitest configs (e.g. detectors/injection) stay local.
+      'server/pipeline/detectors/injection/vitest.config.ts',
+    ],
     testTimeout: 15000,
     // In-memory DB for tests - override VULNFORGE_DB_PATH per-file as needed.
     env: {

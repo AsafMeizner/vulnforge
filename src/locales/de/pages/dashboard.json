@@ -1,0 +1,14 @@
+{
+  "title": "Übersicht",
+  "subtitle": "Überblick über aktuelle Aktivitäten, Befunde und Scans",
+  "widgets": {
+    "recentFindings": "Aktuelle Befunde",
+    "activeScans": "Aktive Scans",
+    "severityBreakdown": "Schweregradverteilung",
+    "toolHealth": "Werkzeug-Status"
+  },
+  "actions": {
+    "newScan": "Neuer Scan",
+    "viewAll": "Alle anzeigen"
+  }
+}

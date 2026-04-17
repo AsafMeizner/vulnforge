@@ -1,0 +1,64 @@
+{
+  "appName": "VulnForge",
+  "nav": {
+    "dashboard": "Dashboard",
+    "findings": "Findings",
+    "scanner": "Scanner",
+    "projects": "Projects",
+    "tools": "Tools",
+    "checklists": "Checklists",
+    "ai": "AI",
+    "plugins": "Plugins",
+    "settings": "Settings",
+    "hunt": "Hunt",
+    "review": "Review",
+    "runtime": "Runtime",
+    "history": "History",
+    "exploits": "Exploits",
+    "investigate": "Investigate",
+    "disclosure": "Disclosure",
+    "audit": "Audit"
+  },
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "export": "Export",
+    "refresh": "Refresh",
+    "close": "Close",
+    "confirm": "Confirm",
+    "edit": "Edit",
+    "add": "Add",
+    "run": "Run",
+    "retry": "Retry",
+    "apply": "Apply"
+  },
+  "severity": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "info": "Info"
+  },
+  "status": {
+    "pending": "Pending",
+    "verified": "Verified",
+    "rejected": "Rejected",
+    "accepted": "Accepted",
+    "running": "Running",
+    "failed": "Failed",
+    "queued": "Queued",
+    "completed": "Completed"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "network": "Network error. Check your connection.",
+    "unauthorized": "You are not authorized to perform this action.",
+    "notFound": "The requested resource was not found.",
+    "validation": "Please check your input and try again."
+  },
+  "empty": {
+    "noData": "No data yet",
+    "noResults": "No results found"
+  }
+}

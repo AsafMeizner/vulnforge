@@ -1,0 +1,64 @@
+{
+  "appName": "VulnForge",
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "findings": "Constatations",
+    "scanner": "Scanner",
+    "projects": "Projets",
+    "tools": "Outils",
+    "checklists": "Listes de contrôle",
+    "ai": "IA",
+    "plugins": "Plugins",
+    "settings": "Paramètres",
+    "hunt": "Chasse",
+    "review": "Revue",
+    "runtime": "Exécution",
+    "history": "Historique",
+    "exploits": "Exploits",
+    "investigate": "Enquêter",
+    "disclosure": "Divulgation",
+    "audit": "Audit"
+  },
+  "buttons": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "export": "Exporter",
+    "refresh": "Actualiser",
+    "close": "Fermer",
+    "confirm": "Confirmer",
+    "edit": "Modifier",
+    "add": "Ajouter",
+    "run": "Exécuter",
+    "retry": "Réessayer",
+    "apply": "Appliquer"
+  },
+  "severity": {
+    "critical": "Critique",
+    "high": "Élevé",
+    "medium": "Moyen",
+    "low": "Faible",
+    "info": "Info"
+  },
+  "status": {
+    "pending": "En attente",
+    "verified": "Vérifié",
+    "rejected": "Rejeté",
+    "accepted": "Accepté",
+    "running": "En cours",
+    "failed": "Échoué",
+    "queued": "En file",
+    "completed": "Terminé"
+  },
+  "errors": {
+    "generic": "Une erreur est survenue. Veuillez réessayer.",
+    "network": "Erreur réseau. Vérifiez votre connexion.",
+    "unauthorized": "Vous n’êtes pas autorisé à effectuer cette action.",
+    "notFound": "Ressource introuvable.",
+    "validation": "Vérifiez votre saisie et réessayez."
+  },
+  "empty": {
+    "noData": "Aucune donnée",
+    "noResults": "Aucun résultat"
+  }
+}

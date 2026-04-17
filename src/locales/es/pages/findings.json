@@ -1,0 +1,25 @@
+{
+  "title": "Hallazgos",
+  "subtitle": "Triar, verificar y resolver vulnerabilidades",
+  "filters": {
+    "severity": "Severidad",
+    "status": "Estado",
+    "project": "Proyecto",
+    "tool": "Herramienta"
+  },
+  "columns": {
+    "id": "ID",
+    "title": "Título",
+    "severity": "Severidad",
+    "status": "Estado",
+    "file": "Archivo",
+    "foundAt": "Encontrado",
+    "tool": "Herramienta"
+  },
+  "actions": {
+    "accept": "Aceptar",
+    "reject": "Rechazar",
+    "verify": "Verificar",
+    "triage": "Triar"
+  }
+}

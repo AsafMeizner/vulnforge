@@ -1,0 +1,14 @@
+{
+  "title": "Escáner",
+  "subtitle": "Configurar y ejecutar análisis estático",
+  "form": {
+    "target": "Ruta de destino",
+    "tools": "Herramientas",
+    "profile": "Perfil de escaneo",
+    "submit": "Iniciar escaneo"
+  },
+  "queue": {
+    "title": "Cola de escaneos",
+    "empty": "Sin escaneos en cola"
+  }
+}

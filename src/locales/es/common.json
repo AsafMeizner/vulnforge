@@ -1,0 +1,64 @@
+{
+  "appName": "VulnForge",
+  "nav": {
+    "dashboard": "Panel",
+    "findings": "Hallazgos",
+    "scanner": "Escáner",
+    "projects": "Proyectos",
+    "tools": "Herramientas",
+    "checklists": "Listas de comprobación",
+    "ai": "IA",
+    "plugins": "Complementos",
+    "settings": "Ajustes",
+    "hunt": "Caza",
+    "review": "Revisión",
+    "runtime": "Tiempo de ejecución",
+    "history": "Historial",
+    "exploits": "Exploits",
+    "investigate": "Investigar",
+    "disclosure": "Divulgación",
+    "audit": "Auditoría"
+  },
+  "buttons": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "export": "Exportar",
+    "refresh": "Actualizar",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "edit": "Editar",
+    "add": "Añadir",
+    "run": "Ejecutar",
+    "retry": "Reintentar",
+    "apply": "Aplicar"
+  },
+  "severity": {
+    "critical": "Crítico",
+    "high": "Alto",
+    "medium": "Medio",
+    "low": "Bajo",
+    "info": "Info"
+  },
+  "status": {
+    "pending": "Pendiente",
+    "verified": "Verificado",
+    "rejected": "Rechazado",
+    "accepted": "Aceptado",
+    "running": "En ejecución",
+    "failed": "Fallido",
+    "queued": "En cola",
+    "completed": "Completado"
+  },
+  "errors": {
+    "generic": "Algo salió mal. Inténtalo de nuevo.",
+    "network": "Error de red. Comprueba tu conexión.",
+    "unauthorized": "No tienes autorización para esta acción.",
+    "notFound": "No se encontró el recurso solicitado.",
+    "validation": "Comprueba los datos e inténtalo de nuevo."
+  },
+  "empty": {
+    "noData": "Aún no hay datos",
+    "noResults": "Sin resultados"
+  }
+}

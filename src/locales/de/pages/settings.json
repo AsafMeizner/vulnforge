@@ -1,0 +1,21 @@
+{
+  "title": "Einstellungen",
+  "tabs": {
+    "general": "Allgemein",
+    "ai": "KI",
+    "integrations": "Integrationen",
+    "theme": "Design",
+    "language": "Sprache",
+    "onboarding": "Einführung",
+    "deployment": "Bereitstellung",
+    "advanced": "Erweitert"
+  },
+  "language": {
+    "label": "Sprache",
+    "description": "Anzeigesprache der Anwendung"
+  },
+  "theme": {
+    "label": "Design",
+    "description": "Erscheinungsbild der Anwendung"
+  }
+}

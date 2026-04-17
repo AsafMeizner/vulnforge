@@ -1,0 +1,12 @@
+{
+  "title": "Ajustes",
+  "language": "Idioma",
+  "theme": "Tema",
+  "sections": {
+    "general": "General",
+    "appearance": "Apariencia",
+    "security": "Seguridad",
+    "integrations": "Integraciones"
+  },
+  "languageHint": "Cambiar el idioma actualiza la interfaz inmediatamente."
+}

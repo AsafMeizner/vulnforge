@@ -1,0 +1,15 @@
+{
+  "title": "Projects",
+  "subtitle": "Clone, manage, and analyze target projects",
+  "actions": {
+    "addProject": "Add Project",
+    "clone": "Clone Repository",
+    "import": "Import Local"
+  },
+  "fields": {
+    "name": "Name",
+    "source": "Source",
+    "language": "Primary Language",
+    "lastScan": "Last Scan"
+  }
+}

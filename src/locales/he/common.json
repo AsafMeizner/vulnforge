@@ -1,0 +1,64 @@
+{
+  "appName": "VulnForge",
+  "nav": {
+    "dashboard": "לוח בקרה",
+    "findings": "ממצאים",
+    "scanner": "סורק",
+    "projects": "פרויקטים",
+    "tools": "כלים",
+    "checklists": "רשימות בדיקה",
+    "ai": "בינה מלאכותית",
+    "plugins": "תוספים",
+    "settings": "הגדרות",
+    "hunt": "ציד",
+    "review": "סקירה",
+    "runtime": "סביבת ריצה",
+    "history": "היסטוריה",
+    "exploits": "ניצולים",
+    "investigate": "חקירה",
+    "disclosure": "גילוי",
+    "audit": "ביקורת"
+  },
+  "buttons": {
+    "save": "שמור",
+    "cancel": "ביטול",
+    "delete": "מחק",
+    "export": "ייצא",
+    "refresh": "רענן",
+    "close": "סגור",
+    "confirm": "אישור",
+    "edit": "ערוך",
+    "add": "הוסף",
+    "run": "הפעל",
+    "retry": "נסה שוב",
+    "apply": "החל"
+  },
+  "severity": {
+    "critical": "קריטי",
+    "high": "גבוה",
+    "medium": "בינוני",
+    "low": "נמוך",
+    "info": "מידע"
+  },
+  "status": {
+    "pending": "ממתין",
+    "verified": "מאומת",
+    "rejected": "נדחה",
+    "accepted": "אושר",
+    "running": "רץ",
+    "failed": "נכשל",
+    "queued": "בתור",
+    "completed": "הושלם"
+  },
+  "errors": {
+    "generic": "משהו השתבש. אנא נסה שוב.",
+    "network": "שגיאת רשת. בדוק את החיבור.",
+    "unauthorized": "אין לך הרשאה לבצע פעולה זו.",
+    "notFound": "המשאב המבוקש לא נמצא.",
+    "validation": "אנא בדוק את הקלט ונסה שוב."
+  },
+  "empty": {
+    "noData": "אין עדיין נתונים",
+    "noResults": "לא נמצאו תוצאות"
+  }
+}

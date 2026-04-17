@@ -1,0 +1,14 @@
+{
+  "title": "Scanner",
+  "subtitle": "Configurer et lancer des analyses statiques",
+  "form": {
+    "target": "Chemin cible",
+    "tools": "Outils",
+    "profile": "Profil de scan",
+    "submit": "Démarrer le scan"
+  },
+  "queue": {
+    "title": "File de scans",
+    "empty": "Aucun scan en file"
+  }
+}

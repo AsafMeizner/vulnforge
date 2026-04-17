@@ -1,0 +1,12 @@
+{
+  "title": "Paramètres",
+  "language": "Langue",
+  "theme": "Thème",
+  "sections": {
+    "general": "Général",
+    "appearance": "Apparence",
+    "security": "Sécurité",
+    "integrations": "Intégrations"
+  },
+  "languageHint": "Changer la langue met à jour l’interface immédiatement."
+}

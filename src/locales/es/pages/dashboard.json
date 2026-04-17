@@ -1,0 +1,14 @@
+{
+  "title": "Panel",
+  "subtitle": "Resumen de actividad reciente, hallazgos y escaneos",
+  "widgets": {
+    "recentFindings": "Hallazgos recientes",
+    "activeScans": "Escaneos activos",
+    "severityBreakdown": "Desglose por severidad",
+    "toolHealth": "Estado de herramientas"
+  },
+  "actions": {
+    "newScan": "Nuevo escaneo",
+    "viewAll": "Ver todo"
+  }
+}

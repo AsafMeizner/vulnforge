@@ -1,0 +1,13 @@
+{
+  "title": "Tools",
+  "subtitle": "Static analyzers, integrations, and plugin health",
+  "status": {
+    "available": "Available",
+    "missing": "Missing",
+    "unknown": "Unknown"
+  },
+  "actions": {
+    "runTool": "Run",
+    "configure": "Configure"
+  }
+}

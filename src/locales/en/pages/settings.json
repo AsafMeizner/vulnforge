@@ -1,0 +1,12 @@
+{
+  "title": "Settings",
+  "language": "Language",
+  "theme": "Theme",
+  "sections": {
+    "general": "General",
+    "appearance": "Appearance",
+    "security": "Security",
+    "integrations": "Integrations"
+  },
+  "languageHint": "Changing the language updates the interface immediately."
+}

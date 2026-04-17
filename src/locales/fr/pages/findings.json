@@ -1,0 +1,25 @@
+{
+  "title": "Constatations",
+  "subtitle": "Trier, vérifier et statuer sur les vulnérabilités",
+  "filters": {
+    "severity": "Sévérité",
+    "status": "Statut",
+    "project": "Projet",
+    "tool": "Outil"
+  },
+  "columns": {
+    "id": "ID",
+    "title": "Titre",
+    "severity": "Sévérité",
+    "status": "Statut",
+    "file": "Fichier",
+    "foundAt": "Trouvé",
+    "tool": "Outil"
+  },
+  "actions": {
+    "accept": "Accepter",
+    "reject": "Rejeter",
+    "verify": "Vérifier",
+    "triage": "Trier"
+  }
+}

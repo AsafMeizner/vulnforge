@@ -1,0 +1,64 @@
+{
+  "appName": "VulnForge",
+  "nav": {
+    "dashboard": "仪表板",
+    "findings": "发现",
+    "scanner": "扫描器",
+    "projects": "项目",
+    "tools": "工具",
+    "checklists": "清单",
+    "ai": "AI",
+    "plugins": "插件",
+    "settings": "设置",
+    "hunt": "狩猎",
+    "review": "审查",
+    "runtime": "运行时",
+    "history": "历史",
+    "exploits": "漏洞利用",
+    "investigate": "调查",
+    "disclosure": "披露",
+    "audit": "审计"
+  },
+  "buttons": {
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "export": "导出",
+    "refresh": "刷新",
+    "close": "关闭",
+    "confirm": "确认",
+    "edit": "编辑",
+    "add": "添加",
+    "run": "运行",
+    "retry": "重试",
+    "apply": "应用"
+  },
+  "severity": {
+    "critical": "严重",
+    "high": "高",
+    "medium": "中",
+    "low": "低",
+    "info": "信息"
+  },
+  "status": {
+    "pending": "待定",
+    "verified": "已验证",
+    "rejected": "已拒绝",
+    "accepted": "已接受",
+    "running": "运行中",
+    "failed": "失败",
+    "queued": "排队中",
+    "completed": "完成"
+  },
+  "errors": {
+    "generic": "出现问题,请重试。",
+    "network": "网络错误,请检查您的连接。",
+    "unauthorized": "您无权执行此操作。",
+    "notFound": "找不到请求的资源。",
+    "validation": "请检查您的输入并重试。"
+  },
+  "empty": {
+    "noData": "暂无数据",
+    "noResults": "未找到结果"
+  }
+}

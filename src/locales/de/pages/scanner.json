@@ -1,0 +1,12 @@
+{
+  "title": "Scanner",
+  "subtitle": "Scanaufträge auf Projekten ausführen",
+  "startScan": "Scan starten",
+  "selectProject": "Projekt auswählen",
+  "selectTools": "Werkzeuge auswählen",
+  "running": "Läuft",
+  "queued": "In Warteschlange",
+  "completed": "Abgeschlossen",
+  "failed": "Fehlgeschlagen",
+  "noActiveScans": "Keine aktiven Scans"
+}

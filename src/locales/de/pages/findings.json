@@ -1,0 +1,25 @@
+{
+  "title": "Befunde",
+  "subtitle": "Schwachstellen triagieren, verifizieren und zuweisen",
+  "filters": {
+    "severity": "Schweregrad",
+    "status": "Status",
+    "project": "Projekt",
+    "tool": "Werkzeug"
+  },
+  "columns": {
+    "id": "ID",
+    "title": "Titel",
+    "severity": "Schweregrad",
+    "status": "Status",
+    "file": "Datei",
+    "foundAt": "Gefunden",
+    "tool": "Werkzeug"
+  },
+  "actions": {
+    "accept": "Annehmen",
+    "reject": "Ablehnen",
+    "verify": "Verifizieren",
+    "triage": "Triagieren"
+  }
+}

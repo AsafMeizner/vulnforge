@@ -1,0 +1,14 @@
+{
+  "title": "Tableau de bord",
+  "subtitle": "Aperçu de l’activité récente, des constatations et des scans",
+  "widgets": {
+    "recentFindings": "Constatations récentes",
+    "activeScans": "Scans actifs",
+    "severityBreakdown": "Répartition par sévérité",
+    "toolHealth": "État des outils"
+  },
+  "actions": {
+    "newScan": "Nouveau scan",
+    "viewAll": "Tout voir"
+  }
+}

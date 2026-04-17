@@ -1,0 +1,25 @@
+{
+  "title": "Findings",
+  "subtitle": "Triage, verify, and disposition vulnerabilities",
+  "filters": {
+    "severity": "Severity",
+    "status": "Status",
+    "project": "Project",
+    "tool": "Tool"
+  },
+  "columns": {
+    "id": "ID",
+    "title": "Title",
+    "severity": "Severity",
+    "status": "Status",
+    "file": "File",
+    "foundAt": "Found",
+    "tool": "Tool"
+  },
+  "actions": {
+    "accept": "Accept",
+    "reject": "Reject",
+    "verify": "Verify",
+    "triage": "Triage"
+  }
+}

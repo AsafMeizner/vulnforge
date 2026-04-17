@@ -1,0 +1,8 @@
+{
+  "title": "Checklists",
+  "subtitle": "Manual review templates by language and framework",
+  "actions": {
+    "newChecklist": "New Checklist",
+    "assignTo": "Assign To"
+  }
+}

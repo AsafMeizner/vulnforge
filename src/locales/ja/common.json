@@ -1,0 +1,64 @@
+{
+  "appName": "VulnForge",
+  "nav": {
+    "dashboard": "ダッシュボード",
+    "findings": "検出結果",
+    "scanner": "スキャナー",
+    "projects": "プロジェクト",
+    "tools": "ツール",
+    "checklists": "チェックリスト",
+    "ai": "AI",
+    "plugins": "プラグイン",
+    "settings": "設定",
+    "hunt": "ハント",
+    "review": "レビュー",
+    "runtime": "ランタイム",
+    "history": "履歴",
+    "exploits": "エクスプロイト",
+    "investigate": "調査",
+    "disclosure": "開示",
+    "audit": "監査"
+  },
+  "buttons": {
+    "save": "保存",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "export": "エクスポート",
+    "refresh": "更新",
+    "close": "閉じる",
+    "confirm": "確認",
+    "edit": "編集",
+    "add": "追加",
+    "run": "実行",
+    "retry": "再試行",
+    "apply": "適用"
+  },
+  "severity": {
+    "critical": "重大",
+    "high": "高",
+    "medium": "中",
+    "low": "低",
+    "info": "情報"
+  },
+  "status": {
+    "pending": "保留中",
+    "verified": "検証済み",
+    "rejected": "却下",
+    "accepted": "承認済み",
+    "running": "実行中",
+    "failed": "失敗",
+    "queued": "キュー内",
+    "completed": "完了"
+  },
+  "errors": {
+    "generic": "問題が発生しました。もう一度お試しください。",
+    "network": "ネットワークエラーです。接続を確認してください。",
+    "unauthorized": "この操作を実行する権限がありません。",
+    "notFound": "要求されたリソースが見つかりませんでした。",
+    "validation": "入力を確認してもう一度お試しください。"
+  },
+  "empty": {
+    "noData": "まだデータがありません",
+    "noResults": "結果が見つかりません"
+  }
+}

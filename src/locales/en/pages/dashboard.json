@@ -1,0 +1,14 @@
+{
+  "title": "Dashboard",
+  "subtitle": "Overview of recent activity, findings, and scans",
+  "widgets": {
+    "recentFindings": "Recent Findings",
+    "activeScans": "Active Scans",
+    "severityBreakdown": "Severity Breakdown",
+    "toolHealth": "Tool Health"
+  },
+  "actions": {
+    "newScan": "New Scan",
+    "viewAll": "View All"
+  }
+}

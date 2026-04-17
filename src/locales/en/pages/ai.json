@@ -1,0 +1,9 @@
+{
+  "title": "AI",
+  "subtitle": "Configure providers, routing, and prompt playgrounds",
+  "sections": {
+    "providers": "Providers",
+    "routing": "Task Routing",
+    "prompts": "Prompts"
+  }
+}

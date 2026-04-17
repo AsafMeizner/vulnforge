@@ -1,0 +1,9 @@
+{
+  "title": "Plugins",
+  "subtitle": "Third-party scanners and integrations",
+  "actions": {
+    "enable": "Enable",
+    "disable": "Disable",
+    "install": "Install"
+  }
+}
