@@ -41,6 +41,13 @@ let serverProcess: ChildProcess | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
+// The port the backend actually bound to. Starts as the preferred 3001
+// but the server will increment on EADDRINUSE and report back the real
+// value. Window + tray display + renderer injection all use this.
+let actualPort = 3001;
+let portResolved: Promise<number> | null = null;
+let resolvePortListener: ((p: number) => void) | null = null;
+
 // ── Single-instance lock ────────────────────────────────────────────────
 //
 // Second-launch behaviour: focus the running instance instead of starting
@@ -88,6 +95,28 @@ function startServer(): void {
   const userDataDir = app.getPath('userData');
   const dbPath = path.join(userDataDir, 'vulnforge.db');
 
+  // In a packaged app, sql.js's native .wasm file lives inside
+  // app.asar.unpacked/node_modules/sql.js/dist/sql-wasm.wasm (it must be
+  // unpacked because asar's read-only overlay doesn't expose .wasm to
+  // child processes the way it exposes .js). We derive that path from
+  // app.getAppPath() and hand it to the forked server explicitly so it
+  // doesn't have to guess.
+  const appPath = app.getAppPath(); // e.g. .../resources/app.asar
+  const unpackedRoot = appPath.replace(/\.asar$/, '.asar.unpacked');
+  const wasmCandidate = path.join(
+    unpackedRoot,
+    'node_modules',
+    'sql.js',
+    'dist',
+    'sql-wasm.wasm'
+  );
+  const wasmPath = existsSync(wasmCandidate) ? wasmCandidate : '';
+
+  // Establish a fresh port-resolved promise for this server life.
+  portResolved = new Promise<number>((resolve) => {
+    resolvePortListener = resolve;
+  });
+
   serverProcess = fork(serverPath, [], {
     execArgv,
     env: {
@@ -96,13 +125,58 @@ function startServer(): void {
       VULNFORGE_HEADLESS: startHeadless ? '1' : '0',
       VULNFORGE_DB_PATH: process.env.VULNFORGE_DB_PATH || dbPath,
       VULNFORGE_DATA_DIR: process.env.VULNFORGE_DATA_DIR || userDataDir,
+      // Point server at the unpacked sql.js WASM. Only set when the
+      // candidate actually exists so in dev mode we fall through to the
+      // server's own resolver.
+      ...(wasmPath ? { VULNFORGE_WASM_PATH: wasmPath } : {}),
+      // Bind to loopback only in desktop mode. Default server binding is
+      // 0.0.0.0 (LAN-reachable), which is wrong for a desktop app - any
+      // other device on the Wi-Fi could hit /api/*.
+      VULNFORGE_HOST: process.env.VULNFORGE_HOST || '127.0.0.1',
+      // Electron loads the renderer from file:// (origin is "null" or
+      // "file://" depending on platform/version). The server's default
+      // CORS allowlist is localhost:5173 etc.; without this, the
+      // renderer's fetch() to /api/* is blocked. Since the server is
+      // bound to 127.0.0.1 above, the * here is not externally exposed.
+      VULNFORGE_CORS_ORIGIN: process.env.VULNFORGE_CORS_ORIGIN || '*',
     },
     stdio: 'pipe',
   });
 
   serverProcess.stdout?.on('data', (data: Buffer) => {
-    const line = data.toString().trim();
-    if (line) console.log('[server]', line);
+    const text = data.toString();
+    for (const line of text.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      // Parse the structured marker the server prints once the listen()
+      // callback fires. This is our canonical source for the bound port.
+      const m = trimmed.match(/^VULNFORGE_READY_PORT=(\d+)/);
+      if (m) {
+        const p = parseInt(m[1], 10);
+        if (Number.isFinite(p) && p > 0 && p < 65536) {
+          actualPort = p;
+          if (resolvePortListener) {
+            resolvePortListener(p);
+            resolvePortListener = null;
+          }
+          updateTrayMenu();
+        }
+      }
+      console.log('[server]', trimmed);
+    }
+  });
+
+  // IPC from fork() - backup channel for the same port signal,
+  // guarantees we don't miss it if stdout buffers.
+  serverProcess.on('message', (msg: any) => {
+    if (msg && msg.type === 'vulnforge:ready' && typeof msg.port === 'number') {
+      actualPort = msg.port;
+      if (resolvePortListener) {
+        resolvePortListener(msg.port);
+        resolvePortListener = null;
+      }
+      updateTrayMenu();
+    }
   });
 
   serverProcess.stderr?.on('data', (data: Buffer) => {
@@ -160,11 +234,22 @@ function createWindow(): void {
     },
   });
 
+  // Pass the live port to the renderer via the URL search string. The
+  // frontend's api.ts reads `?api=...` and `?ws=...` (fallback to '/api'
+  // for the dev vite proxy). This is what unbreaks file:// packaged
+  // fetches which would otherwise hit `file:///api/...`.
+  const apiOrigin = remoteServer || `http://127.0.0.1:${actualPort}`;
+  const wsOrigin = remoteServer
+    ? remoteServer.replace(/^http/, 'ws')
+    : `ws://127.0.0.1:${actualPort}`;
+  const search = `api=${encodeURIComponent(apiOrigin + '/api')}&ws=${encodeURIComponent(wsOrigin + '/ws')}`;
+
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL(`http://localhost:5173/?${search}`);
   } else {
     mainWindow.loadFile(
-      path.join(__dirname, '..', 'dist', 'client', 'index.html')
+      path.join(__dirname, '..', 'dist', 'client', 'index.html'),
+      { search }
     );
   }
 
@@ -246,7 +331,8 @@ function buildTrayMenu(): Menu {
     },
     {
       label: 'Open in Browser',
-      click: () => shell.openExternal('http://localhost:3001'),
+      click: () =>
+        shell.openExternal(remoteServer || `http://localhost:${actualPort}`),
     },
     { type: 'separator' },
     {
@@ -260,12 +346,12 @@ function buildTrayMenu(): Menu {
     },
     { type: 'separator' },
     {
-      label: `Server: ${remoteServer || 'http://localhost:3001'}`,
+      label: `Server: ${remoteServer || `http://localhost:${actualPort}`}`,
       enabled: false,
     },
     {
       label: 'MCP endpoint',
-      sublabel: `${remoteServer || 'http://localhost:3001'}/mcp`,
+      sublabel: `${remoteServer || `http://localhost:${actualPort}`}/mcp`,
       enabled: false,
     },
     {
@@ -358,9 +444,17 @@ app.on('ready', async () => {
 
   if (!remoteServer) {
     startServer();
-    // Give the server a small head-start so the window's initial fetch
-    // hits a live backend.
-    await new Promise((r) => setTimeout(r, 2500));
+    // Wait for the server to actually bind before opening the window,
+    // so the renderer's first fetch hits a live port. Cap the wait so
+    // we never hang forever if the server errors out - if the timeout
+    // fires we fall through and open the window against the default
+    // port anyway, and it'll recover on retry.
+    if (portResolved) {
+      await Promise.race([
+        portResolved,
+        new Promise<number>((resolve) => setTimeout(() => resolve(actualPort), 8000)),
+      ]);
+    }
   } else {
     console.log(`[Electron] Connecting to remote server: ${remoteServer}`);
   }

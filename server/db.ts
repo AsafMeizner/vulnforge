@@ -8,7 +8,29 @@ const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const DB_PATH = process.env.VULNFORGE_DB_PATH || path.join(process.cwd(), 'vulnforge.db');
-const WASM_PATH = process.env.VULNFORGE_WASM_PATH || path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm');
+
+/**
+ * Resolve the sql.js WASM path.
+ *
+ * Order:
+ *   1. VULNFORGE_WASM_PATH env var - set by Electron main for packaged apps
+ *      where process.cwd() points at win-unpacked/ and node_modules lives
+ *      inside app.asar.unpacked/.
+ *   2. require.resolve('sql.js/dist/sql-wasm.wasm') - works for both dev
+ *      runs and any install layout Node can resolve.
+ *   3. process.cwd()/node_modules/... - last-resort dev fallback for
+ *      niche launchers that can't resolve packages.
+ */
+function resolveWasmPath(): string {
+  if (process.env.VULNFORGE_WASM_PATH) return process.env.VULNFORGE_WASM_PATH;
+  try {
+    return require.resolve('sql.js/dist/sql-wasm.wasm');
+  } catch {
+    /* fall through to cwd fallback */
+  }
+  return path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', 'sql-wasm.wasm');
+}
+const WASM_PATH = resolveWasmPath();
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

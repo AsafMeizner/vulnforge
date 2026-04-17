@@ -16,6 +16,7 @@
     "build:server:tar": "node scripts/build-server-tar.mjs",
     "build:server:docker": "node scripts/build-server-docker.mjs",
     "build:desktop": "node scripts/build-desktop.mjs",
+    "release": "node scripts/release.mjs",
     "migrate": "node scripts/migrate.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

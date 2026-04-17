@@ -592,19 +592,60 @@ Be technical, precise, and actionable.`;
 
   // ── Start ─────────────────────────────────────────────────────────────
   const HOST = process.env.VULNFORGE_HOST || '0.0.0.0';
-  server.listen(PORT, HOST, () => {
+
+  // Dynamic port selection: try preferred PORT, increment on EADDRINUSE
+  // up to 20 times (3001 -> 3020 by default). Useful in desktop mode
+  // where another process may already own the preferred port. Emit a
+  // structured marker line so parent processes (e.g. Electron main)
+  // can read the actual bound port from stdout.
+  const portRetryLimit = 20;
+  let boundPort = PORT;
+  let finalized = false;
+
+  function onListening(): void {
+    if (finalized) return; // guard against the 'listening' callback firing
+                           // for a port that was already superseded on retry.
+    finalized = true;
     const mode = HEADLESS ? 'HEADLESS' : 'FULL';
+    // Structured marker for parent processes (Electron main) to parse.
+    // Keep the literal token stable; main.ts greps for this prefix.
+    console.log(`VULNFORGE_READY_PORT=${boundPort}`);
     console.log(`
 =================================================
-  VulnForge Backend  |  port ${PORT}  |  ${mode}
+  VulnForge Backend  |  port ${boundPort}  |  ${mode}
 =================================================
-  API:       http://localhost:${PORT}/api
-  WebSocket: ws://localhost:${PORT}/ws
-  MCP:       http://localhost:${PORT}/mcp
-  Health:    http://localhost:${PORT}/api/health${HEADLESS ? '\n  Mode:      Headless (no UI served, API/WS/MCP only)' : ''}
+  API:       http://localhost:${boundPort}/api
+  WebSocket: ws://localhost:${boundPort}/ws
+  MCP:       http://localhost:${boundPort}/mcp
+  Health:    http://localhost:${boundPort}/api/health${HEADLESS ? '\n  Mode:      Headless (no UI served, API/WS/MCP only)' : ''}
 =================================================
 `);
-  });
+    // If forked by Electron main, also send an IPC message so the parent
+    // can react before any child stdout buffering kicks in.
+    if (typeof process.send === 'function') {
+      try { process.send({ type: 'vulnforge:ready', port: boundPort }); } catch { /* ignore */ }
+    }
+  }
+
+  function onError(err: NodeJS.ErrnoException, attempt: number): void {
+    if (err.code === 'EADDRINUSE' && attempt < portRetryLimit) {
+      console.warn(`[Server] port ${boundPort} in use, trying ${boundPort + 1}`);
+      boundPort += 1;
+      // Reuse the same server object - just re-arm listeners + listen again.
+      server.removeAllListeners('error');
+      server.removeAllListeners('listening');
+      server.once('listening', onListening);
+      server.once('error', (e: NodeJS.ErrnoException) => onError(e, attempt + 1));
+      server.listen(boundPort, HOST);
+      return;
+    }
+    console.error('[Server] listen failed:', err.message);
+    process.exit(1);
+  }
+
+  server.once('listening', onListening);
+  server.once('error', (e: NodeJS.ErrnoException) => onError(e, 1));
+  server.listen(boundPort, HOST);
 
   // Graceful shutdown
   process.on('SIGTERM', () => {

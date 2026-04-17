@@ -9,8 +9,11 @@
 import { spawnSync } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
 
+// Windows resolves npx/docker to .cmd wrappers; need shell:true there.
+// POSIX keeps shell:false for predictable argv + smaller attack surface.
+const IS_WIN = process.platform === 'win32';
 function run(cmd, args) {
-  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: false });
+  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: IS_WIN });
   if (r.status !== 0) {
     console.error(`[build] failed: ${cmd} ${args.join(' ')}`);
     process.exit(r.status ?? 1);

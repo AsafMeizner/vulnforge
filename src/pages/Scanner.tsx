@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getProjects, getTools, getScans, getPlugins } from '@/lib/api';
+import { getProjects, getTools, getScans, getPlugins, resolveWsBase } from '@/lib/api';
 import type { InstalledPlugin } from '@/lib/api';
 import type { Project, Tool, Scan, Vulnerability } from '@/lib/types';
 import { SeverityBadge, CvssScore } from '@/components/Badge';
@@ -111,11 +111,9 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
 
   // WebSocket
   useEffect(() => {
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host.includes('5173')
-      ? window.location.hostname + ':3001'
-      : window.location.host;
-    const url = `${proto}//${host}/ws`;
+    // resolveWsBase (imported at top) handles Electron file:// (no
+    // location.host), vite proxy (5180 -> 3010), and same-origin modes.
+    const url = resolveWsBase();
     let ws: WebSocket;
     let retryTimer: ReturnType<typeof setTimeout>;
 

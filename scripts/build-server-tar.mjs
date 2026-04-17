@@ -19,8 +19,11 @@ import { spawnSync } from 'child_process';
 import { mkdirSync, copyFileSync, rmSync, cpSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
+// Windows resolves npx to npx.cmd (a shell wrapper); spawnSync needs
+// shell:true there. POSIX keeps shell:false for predictable argv.
+const IS_WIN = process.platform === 'win32';
 function run(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: false, ...opts });
+  const r = spawnSync(cmd, args, { stdio: 'inherit', shell: IS_WIN, ...opts });
   if (r.status !== 0) {
     console.error(`[build] command failed (${r.status}): ${cmd} ${args.join(' ')}`);
     process.exit(r.status ?? 1);

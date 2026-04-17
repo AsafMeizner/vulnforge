@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { resolveWsBase } from '@/lib/api';
 
 // -- Types --------------------------------------------------------------------
 
@@ -479,9 +480,9 @@ export default function Plugins() {
 
   // WebSocket for install progress
   useEffect(() => {
-    const wsHost = window.location.hostname + ':3001';
-    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${proto}//${wsHost}/ws`);
+    // resolveWsBase (imported at top) handles Electron file:// (no
+    // location.host), vite proxy, and same-origin modes.
+    const ws = new WebSocket(resolveWsBase());
     ws.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data);

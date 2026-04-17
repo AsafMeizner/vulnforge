@@ -14,7 +14,57 @@ import type {
 // separately reaching into ./types. Keeps call sites compact.
 export type { Stats, Vulnerability, Project, Scan, Tool, AIProvider, ChatMessage, Report, AgentStep };
 
-const BASE = '/api';
+/**
+ * API base URL resolution order:
+ *   1. `?api=<url>` query string - set by Electron main before loadFile
+ *   2. `window.__VULNFORGE_API_BASE__` injected global
+ *   3. '/api' - default for dev (vite proxy) and any server-origin setup
+ *
+ * Packaged Electron loads index.html via file://, where '/api' would
+ * resolve to `file:///api` and fail. Main process injects the live
+ * server origin with the dynamically-selected port. Web/dev continues
+ * to use the vite proxy.
+ */
+function resolveApiBase(): string {
+  if (typeof window === 'undefined') return '/api';
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('api');
+    if (fromQuery) return fromQuery;
+  } catch {
+    /* location unavailable in some test contexts */
+  }
+  const injected = (window as any).__VULNFORGE_API_BASE__;
+  if (typeof injected === 'string' && injected) return injected;
+  return '/api';
+}
+
+/**
+ * WebSocket base URL resolution - same layering as resolveApiBase but
+ * returns a ws:// URL. Hunts, Scanner, Plugins pages use this.
+ */
+export function resolveWsBase(): string {
+  if (typeof window === 'undefined') return '/ws';
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get('ws');
+    if (fromQuery) return fromQuery;
+  } catch {
+    /* ignore */
+  }
+  const injected = (window as any).__VULNFORGE_WS_BASE__;
+  if (typeof injected === 'string' && injected) return injected;
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  if (!host || window.location.protocol === 'file:') {
+    // Last-resort - file:// has no usable host. Better than failing silently.
+    return `${proto}//localhost:3001/ws`;
+  }
+  return `${proto}//${host}/ws`;
+}
+
+export const API_BASE = resolveApiBase();
+const BASE = API_BASE;
 
 async function request<T>(
   path: string,

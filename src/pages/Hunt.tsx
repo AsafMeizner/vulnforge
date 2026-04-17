@@ -10,6 +10,7 @@ import {
   pausePipeline as apiPause,
   resumePipeline as apiResume,
   cancelPipeline as apiCancel,
+  resolveWsBase,
   type PipelineRun,
   type Project,
 } from '@/lib/api';
@@ -61,8 +62,9 @@ export default function Hunt({ onNavigate }: HuntProps) {
   useEffect(() => {
     if (!running || pipelines.length === 0) return;
 
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${proto}//${location.host}/ws`);
+    // resolveWsBase (imported at top) handles Electron file:// (no
+    // location.host), vite proxy, and same-origin modes.
+    const ws = new WebSocket(resolveWsBase());
     wsRef.current = ws;
 
     ws.onmessage = (ev) => {
