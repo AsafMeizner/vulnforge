@@ -347,8 +347,91 @@ async function runPipelineAsync(
     emit('Config audit', `Skipped: ${err.message}`, 35);
   }
 
+  // ── Track F: Supply-chain & backdoor detection ────────────────────────
+  emit('Supply-chain scan', 'Looking for malicious deps, secrets-in-history, weak crypto, hidden routes, obfuscation...', 35);
+  try {
+    const { runSupplyChainScan } = await import('./supply-chain/index.js');
+    const scFindings = await runSupplyChainScan(projectPath, meta);
+    if (scFindings.length > 0) {
+      const { createScanFinding } = await import('../db.js');
+      for (const f of scFindings) {
+        createScanFinding({
+          project_id: projectId,
+          pipeline_id: pipelineId,
+          title: `[SupplyChain/${f.subcategory}] ${f.title}`,
+          severity: f.severity as any,
+          cwe: f.cwe,
+          file: f.file,
+          line_start: f.line_start,
+          description: `${f.evidence}${f.remediation ? '\n\nRemediation: ' + f.remediation : ''}`,
+          tool_name: 'supply_chain',
+          confidence: f.confidence >= 0.8 ? 'High' : f.confidence >= 0.5 ? 'Medium' : 'Low',
+          status: 'pending',
+        } as any);
+      }
+      emit('Supply-chain scan', `Found ${scFindings.length} supply-chain issues`, 36);
+    } else {
+      emit('Supply-chain scan', 'Clean - no supply-chain issues detected', 36);
+    }
+  } catch (err: any) {
+    emit('Supply-chain scan', `Skipped: ${err.message}`, 36);
+  }
+
+  // ── Track G + H: Injection + Web/API/IaC detectors ─────────────────────
+  emit('Code detectors', 'Running injection + web/API/IaC misconfig detectors...', 36);
+  try {
+    const { runInjectionDetectors } = await import('./detectors/injection/index.js');
+    const { runWebDetectors } = await import('./detectors/web/index.js');
+    const langs: string[] = Array.isArray(meta.languages) ? meta.languages : [];
+    const deps: string[] = Array.isArray(meta.dependencyFiles) ? meta.dependencyFiles : [];
+    const [injFindings, webFindings] = await Promise.all([
+      runInjectionDetectors(projectPath, langs, deps).catch(() => []),
+      runWebDetectors(projectPath, langs, deps).catch(() => []),
+    ]);
+    const all = [...injFindings, ...webFindings];
+    if (all.length > 0) {
+      const { createScanFinding } = await import('../db.js');
+      for (const f of injFindings) {
+        createScanFinding({
+          project_id: projectId,
+          pipeline_id: pipelineId,
+          title: `[Injection/${f.subcategory}] ${f.title}`,
+          severity: f.severity as any,
+          cwe: f.cwe,
+          file: f.file,
+          line_start: f.line_start,
+          description: `${f.evidence}`,
+          tool_name: 'injection_detectors',
+          confidence: f.confidence === 'high' ? 'High' : f.confidence === 'medium' ? 'Medium' : 'Low',
+          status: 'pending',
+        } as any);
+      }
+      for (const f of webFindings) {
+        createScanFinding({
+          project_id: projectId,
+          pipeline_id: pipelineId,
+          title: `[${f.category}/${f.subcategory}] ${f.title}`,
+          severity: f.severity as any,
+          cwe: f.cwe,
+          file: f.file,
+          line_start: f.line_start,
+          line_end: f.line_end,
+          description: `${f.evidence}`,
+          tool_name: 'web_detectors',
+          confidence: f.confidence,
+          status: 'pending',
+        } as any);
+      }
+      emit('Code detectors', `Found ${injFindings.length} injection + ${webFindings.length} web/IaC findings`, 37);
+    } else {
+      emit('Code detectors', 'No injection or web/IaC issues found', 37);
+    }
+  } catch (err: any) {
+    emit('Code detectors', `Skipped: ${err.message}`, 37);
+  }
+
   // Wait for all scan jobs to complete
-  emit('Running scans', `Waiting for ${scanJobIds.length} tool scans to complete...`, 36);
+  emit('Running scans', `Waiting for ${scanJobIds.length} tool scans to complete...`, 38);
 
   await waitForScansComplete(scanQueue, pipelineId, scanJobIds, emit, () => checkState() === 'cancelled');
 

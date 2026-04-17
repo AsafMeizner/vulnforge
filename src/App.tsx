@@ -4,6 +4,9 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { QuickCapture } from '@/components/QuickCapture';
 import { CommandPalette, type Command } from '@/components/CommandPalette';
 import { ShortcutOverlay } from '@/components/ShortcutOverlay';
+import { ThemeProvider } from '@/themes/ThemeProvider';
+import { I18nProvider } from '@/i18n/I18nProvider';
+import { TutorialProvider } from '@/components/onboarding/TutorialProvider';
 
 // Eager-load the landing page; lazy-load everything else for code splitting
 import Dashboard from '@/pages/Dashboard';
@@ -299,8 +302,11 @@ export default function App() {
   }, []);
 
   return (
-    <ToastProvider>
-      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <ThemeProvider>
+      <I18nProvider>
+        <TutorialProvider>
+          <ToastProvider>
+            <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
         {/* Sidebar */}
         <nav style={{
           width: 200,
@@ -408,7 +414,10 @@ export default function App() {
         open={shortcutOverlayOpen}
         onClose={() => setShortcutOverlayOpen(false)}
       />
-    </ToastProvider>
+          </ToastProvider>
+        </TutorialProvider>
+      </I18nProvider>
+    </ThemeProvider>
   );
 }
 
