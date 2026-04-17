@@ -36,6 +36,30 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # Ignore major bumps for packages that need coordinated migrations.
+    # Dependabot will still flag them via security advisories — these ignores
+    # only suppress noisy drive-by majors.
+    ignore:
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "electron"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "electron-builder"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "automated"
@@ -58,6 +82,11 @@ updates:
       - "automated"
     commit-message:
       prefix: "ci(deps)"
+    # upload-artifact@v7 has path-handling breaks that don't help us;
+    # stay on v4. Majors for other actions still get PRs.
+    ignore:
+      - dependency-name: "actions/upload-artifact"
+        update-types: ["version-update:semver-major"]
 
   # Docker — server image base + layer bumps
   - package-ecosystem: "docker"
@@ -73,3 +102,8 @@ updates:
       - "automated"
     commit-message:
       prefix: "docker(deps)"
+    # Stay on Node LTS — don't propose odd-numbered non-LTS majors.
+    # When a new LTS ships (e.g. 22), manually bump the Dockerfile.
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
