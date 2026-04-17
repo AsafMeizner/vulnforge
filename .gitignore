@@ -49,3 +49,10 @@ tmp/
 
 # Docs auto-generated reference output
 /docs/reference/
+
+# Claude Code session-local settings
+/.claude/
+
+# Compiled server output (from npm run build:server / tsc -p tsconfig.server.json)
+/dist-server/
+/dist-tarball-stage/
