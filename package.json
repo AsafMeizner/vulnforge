@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "AI-powered security research platform - find, triage, and fix vulnerabilities",
   "type": "module",
-  "main": "electron/main.ts",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"vite\" \"tsx watch server/index.ts\"",
     "dev:server": "tsx watch server/index.ts",
@@ -12,6 +12,7 @@
     "seed": "tsx seed.ts",
     "build": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
+    "build:electron": "tsc -p tsconfig.electron.json",
     "build:server:tar": "node scripts/build-server-tar.mjs",
     "build:server:docker": "node scripts/build-server-docker.mjs",
     "build:desktop": "node scripts/build-desktop.mjs",
@@ -19,10 +20,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "start": "node dist/server/index.js",
+    "start": "node dist-server/server/index.js",
     "start:server": "node dist-server/server/index.js",
-    "electron:dev": "concurrently \"vite\" \"tsx watch server/index.ts\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "vite build && electron-builder"
+    "electron:dev": "npm run build:electron && concurrently \"vite\" \"tsx watch server/index.ts\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "vite build && npm run build:server && npm run build:electron && electron-builder"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -72,10 +73,25 @@
       "buildResources": "public/brand"
     },
     "files": [
+      "!**/*.ts",
+      "!**/*.tsx",
+      "!**/*.test.*",
+      "!**/__fixtures__/**",
+      "!electron/*.map",
       "dist/**/*",
-      "server/**/*",
-      "electron/**/*",
-      "node_modules/**/*"
+      "dist-server/**/*",
+      "electron/main.js",
+      "electron/preload.js",
+      "server/data/**/*",
+      "server/ai/prompts/**/*.js",
+      "server/checklists/**/*.js",
+      "checklists/**/*.json",
+      "assets/**/*",
+      "public/brand/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/sql.js/dist/sql-wasm.wasm"
     ],
     "mac": {
       "target": "dmg",

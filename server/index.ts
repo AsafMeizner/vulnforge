@@ -506,6 +506,55 @@ Be technical, precise, and actionable.`;
     }
   });
 
+  // POST /api/ai/providers - create (or upsert-by-name) a provider. Without
+  // this, the UI has no way to add a provider from an empty database -
+  // PUT /:id requires an existing row.
+  app.post('/api/ai/providers', async (req, res) => {
+    try {
+      const { upsertAIProvider, getAllAIProviders } = await import('./db.js');
+      const body = req.body || {};
+      if (!body.name || typeof body.name !== 'string') {
+        res.status(400).json({ error: 'name is required' });
+        return;
+      }
+      upsertAIProvider({
+        name: body.name,
+        model: body.model || null,
+        api_key: body.api_key || null,
+        base_url: body.base_url || null,
+        enabled: body.enabled ? 1 : 0,
+        config: body.config || null,
+      } as any);
+      const all = getAllAIProviders();
+      const created = all.find((p) => p.name === body.name);
+      res.status(201).json({
+        success: true,
+        provider: created ? { ...created, api_key: created.api_key ? '***' : '' } : null,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // DELETE /api/ai/providers/:id - also missing from the original CRUD.
+  app.delete('/api/ai/providers/:id', async (req, res) => {
+    try {
+      const { getAIProviderById, getDb, persistDb } = await import('./db.js');
+      const id = Number(req.params.id);
+      const existing = getAIProviderById(id);
+      if (!existing) {
+        res.status(404).json({ error: 'Provider not found' });
+        return;
+      }
+      const db = getDb();
+      db.run('DELETE FROM ai_providers WHERE id = ?', [id]);
+      persistDb();
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Health check
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', ts: new Date().toISOString() });

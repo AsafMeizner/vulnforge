@@ -60,3 +60,10 @@ tmp/
 # Electron installer output (from npm run build:desktop)
 /release/
 /release2/
+/release3/
+
+# Electron main/preload compiled output (tsc from tsconfig.electron.json).
+# Generated files; the source of truth is electron/*.ts.
+/electron/main.js
+/electron/preload.js
+/electron/*.js.map

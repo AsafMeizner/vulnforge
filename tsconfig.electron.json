@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": false,
+    "sourceMap": false,
+    "declaration": false,
+    "resolveJsonModule": true,
+
+    // Compile electron/main.ts and electron/preload.ts in-place so the
+    // packaged app can load them as .js. The build-desktop script and
+    // the electron:dev script both run this config before launching
+    // Electron.
+    "outDir": "./electron",
+    "rootDir": "./electron",
+    "noEmitOnError": false
+  },
+  "include": ["electron/**/*.ts"],
+  "exclude": ["node_modules", "electron/**/*.test.ts"]
+}

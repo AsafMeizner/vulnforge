@@ -23,9 +23,17 @@ function run(cmd, args) {
   }
 }
 
-// Compile frontend first.
+// Compile frontend, server, and electron main/preload before packaging.
+// Order matters - electron-builder asserts against compiled outputs in
+// dist/, dist-server/, and electron/*.js.
 console.log('[build] vite build (frontend)…');
 run('npx', ['vite', 'build']);
+
+console.log('[build] tsc server (dist-server/)…');
+run('npx', ['tsc', '-p', 'tsconfig.server.json']);
+
+console.log('[build] tsc electron main + preload…');
+run('npx', ['tsc', '-p', 'tsconfig.electron.json']);
 
 // electron-builder flags.
 const args = ['electron-builder'];
