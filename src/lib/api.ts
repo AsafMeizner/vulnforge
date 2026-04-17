@@ -10,6 +10,10 @@ import type {
   AgentStep,
 } from './types';
 
+// Re-export so pages can `import { Project } from '@/lib/api'` without
+// separately reaching into ./types. Keeps call sites compact.
+export type { Stats, Vulnerability, Project, Scan, Tool, AIProvider, ChatMessage, Report, AgentStep };
+
 const BASE = '/api';
 
 async function request<T>(
@@ -257,9 +261,13 @@ export const markFalsePositive = (id: number) =>
 export const getAIModels = () => request<Record<string, { models: Array<{ id: string; name: string; tier: string; context: number }> }>>('/ai/models');
 
 // AI routing rules
-export const getAIRouting = () => request<Array<{ task: string; provider: string; model: string; priority: number }>>('/ai/routing');
+// Server returns rules with task as a string — callers narrow via the
+// RoutingRule type from ./types (which is a superset string union).
+// We cast through unknown so consumers get the narrowed shape.
+import type { RoutingRule } from './types';
+export const getAIRouting = () => request<RoutingRule[]>('/ai/routing');
 
-export const updateAIRouting = (rules: Array<{ task: string; provider: string; model: string; priority: number }>) =>
+export const updateAIRouting = (rules: RoutingRule[]) =>
   request<{ success: boolean; count: number }>('/ai/routing', {
     method: 'PUT',
     body: JSON.stringify(rules),

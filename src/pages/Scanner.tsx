@@ -626,9 +626,9 @@ export default function Scanner({ initialTool, onNavigateToFinding }: ScannerPro
                   >
                     <input
                       type="checkbox"
-                      checked={fullScan || selectedTools.has(t.id)}
+                      checked={fullScan || selectedTools.has(String(t.id))}
                       disabled={fullScan}
-                      onChange={() => toggleTool(t.id)}
+                      onChange={() => toggleTool(String(t.id))}
                       style={{ accentColor: 'var(--blue)' }}
                     />
                     <span style={{ color: 'var(--text)' }}>{t.name}</span>

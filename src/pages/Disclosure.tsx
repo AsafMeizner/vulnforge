@@ -32,7 +32,7 @@ const SLA_COLORS = {
 } as const;
 
 export default function DisclosurePage() {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [tab, setTab] = useState<Tab>('pipeline');
   const [disclosures, setDisclosures] = useState<Disclosure[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -274,7 +274,7 @@ export default function DisclosurePage() {
 function NewDisclosureModal({ vendors, onClose, onCreated }: {
   vendors: Vendor[]; onClose: () => void; onCreated: () => void;
 }) {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [title, setTitle] = useState('');
   const [vendorId, setVendorId] = useState<number | ''>('');
   const [findingId, setFindingId] = useState('');
@@ -311,7 +311,7 @@ function NewDisclosureModal({ vendors, onClose, onCreated }: {
 }
 
 function NewVendorModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [platform, setPlatform] = useState('direct');

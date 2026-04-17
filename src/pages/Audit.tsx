@@ -12,7 +12,7 @@ const ACTION_COLORS: Record<string, string> = {
 };
 
 export default function Audit() {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState('');

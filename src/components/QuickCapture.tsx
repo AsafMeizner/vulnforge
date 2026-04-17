@@ -77,7 +77,7 @@ export function QuickCapture({
   defaultType = 'note',
   onCreated,
 }: QuickCaptureProps) {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
 
   const [state, setState] = useState<DraftState>(() => emptyDraft(defaultType));
   const [submitting, setSubmitting] = useState(false);

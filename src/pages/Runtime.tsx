@@ -57,7 +57,7 @@ function relativeTime(iso: string): string {
 }
 
 export default function Runtime() {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [tab, setTab] = useState<SubTab>('all');
   const [jobs, setJobs] = useState<RuntimeJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -401,8 +401,8 @@ function JobDetail({ job }: { job: RuntimeJob }) {
 // ── New Job modal ──────────────────────────────────────────────────────────
 
 function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
-  const [jobType, setJobType] = useState<'fuzz' | 'debug' | 'capture' | 'portscan'>('fuzz');
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
+  const [jobType, setJobType] = useState<'fuzz' | 'debug' | 'capture' | 'portscan' | 'sandbox' | 'vm'>('fuzz');
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
 

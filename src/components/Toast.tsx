@@ -6,18 +6,31 @@ interface ToastItem {
   type: 'success' | 'error' | 'info';
 }
 
+type ToastType = ToastItem['type'];
+
 interface ToastContextValue {
-  toast: (message: string, type?: ToastItem['type']) => void;
+  // Single union signature — accepts either (type, message) or (message, type?).
+  // Historical call sites use both orders; detect at runtime via isToastType().
+  toast: (a: string, b?: string) => void;
 }
 
 const ToastContext = createContext<ToastContextValue>({ toast: () => {} });
 
 let _nextId = 1;
 
+const TOAST_TYPES: readonly ToastType[] = ['success', 'error', 'info'];
+
+function isToastType(v: unknown): v is ToastType {
+  return typeof v === 'string' && (TOAST_TYPES as readonly string[]).includes(v);
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const toast = useCallback((message: string, type: ToastItem['type'] = 'info') => {
+  const toast = useCallback((a: string, b?: string) => {
+    // Resolve arg order: if `a` is a known type, treat as (type, message).
+    const type: ToastType = isToastType(a) ? a : (isToastType(b) ? b : 'info');
+    const message: string = isToastType(a) ? (b ?? '') : a;
     const id = _nextId++;
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {

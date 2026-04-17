@@ -33,7 +33,7 @@ interface PipelineProgress {
 }
 
 export default function Hunt({ onNavigate }: HuntProps) {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [inputMode, setInputMode] = useState<InputMode>('url');
   const [url, setUrl] = useState('');
   const [localPath, setLocalPath] = useState('');

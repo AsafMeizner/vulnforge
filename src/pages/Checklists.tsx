@@ -39,7 +39,7 @@ interface ChecklistDetail extends ChecklistSummary {
 }
 
 export default function Checklists() {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [checklists, setChecklists] = useState<ChecklistSummary[]>([]);
   const [selected, setSelected] = useState<ChecklistDetail | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);

@@ -99,7 +99,7 @@ export default function Tools({ onNavigateToScanner }: ToolsProps) {
     if (!tool.docs) {
       setDetailLoading(true);
       try {
-        const full = await getTool(tool.id);
+        const full = await getTool(String(tool.id));
         setSelected(full);
       } catch {
         // use cached version
@@ -288,7 +288,7 @@ export default function Tools({ onNavigateToScanner }: ToolsProps) {
                   {onNavigateToScanner && (
                     <div style={{ marginTop: 10 }}>
                       <button
-                        onClick={e => { e.stopPropagation(); onNavigateToScanner(t.id); }}
+                        onClick={e => { e.stopPropagation(); onNavigateToScanner(String(t.id)); }}
                         style={{
                           background: 'var(--blue)22',
                           border: '1px solid var(--blue)44',
@@ -331,7 +331,7 @@ export default function Tools({ onNavigateToScanner }: ToolsProps) {
             {/* Run button in detail panel */}
             {onNavigateToScanner && (
               <button
-                onClick={() => onNavigateToScanner(selected.id)}
+                onClick={() => onNavigateToScanner(String(selected.id))}
                 style={{
                   background: 'var(--blue)',
                   border: 'none',

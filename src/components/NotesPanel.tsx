@@ -98,7 +98,7 @@ export function NotesPanel({
   onNoteClick,
   initiallyOpen = true,
 }: NotesPanelProps) {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
 
   const [open, setOpen] = useState<boolean>(initiallyOpen);
   const [notes, setNotes] = useState<Note[]>([]);

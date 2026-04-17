@@ -51,11 +51,7 @@ jobs:
           if [ "${{ matrix.target }}" = "server" ]; then
             npx tsc --noEmit -p tsconfig.server.json
           else
-            # Frontend: use the default tsconfig if present, else fall back to vite + tsc on src/
-            if [ -f tsconfig.json ]; then npx tsc --noEmit -p tsconfig.json
-            elif [ -f tsconfig.app.json ]; then npx tsc --noEmit -p tsconfig.app.json
-            else echo "no frontend tsconfig — skipping" && exit 0
-            fi
+            npx tsc --noEmit -p tsconfig.app.json
           fi
 
   # ── 3. Tests on three Node majors to catch version drift ──

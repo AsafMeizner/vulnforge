@@ -156,7 +156,7 @@ export function listServerJobs(limit = 100): Array<Record<string, any>> {
   while (stmt.step()) {
     const vals = stmt.get();
     const obj: Record<string, any> = {};
-    cols.forEach((c, i) => { obj[c] = vals[i]; });
+    cols.forEach((c: string, i: number) => { obj[c] = vals[i]; });
     rows.push(obj);
   }
   stmt.free();

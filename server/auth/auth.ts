@@ -54,13 +54,14 @@ export function generateToken(): string {
 
 // ── Auth middleware ────────────────────────────────────────────────────────
 
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    username: string;
-    role: string;
-  };
-}
+/**
+ * Legacy name kept for backward compatibility with phase 14/15 routes.
+ * Delegates to the Express Request augmentation in server/auth/middleware.ts
+ * (`AuthedUser` shape) — `username` and `device_id` are optional there
+ * because the JWT-session flow and the API-token flow populate different
+ * fields. Routes that read `req.user.username` must `?? ''` or guard.
+ */
+export type AuthenticatedRequest = Request;
 
 /**
  * Auth middleware — checks for Bearer token or session.

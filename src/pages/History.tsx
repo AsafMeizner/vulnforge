@@ -32,7 +32,7 @@ function severityColor(sev?: string): string {
 }
 
 export default function History() {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [tab, setTab] = useState<SubTab>('cves');
   const [cves, setCves] = useState<CveIntel[]>([]);
   const [matches, setMatches] = useState<CveProjectMatch[]>([]);

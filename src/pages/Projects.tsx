@@ -234,7 +234,7 @@ export default function Projects() {
       {/* Import modal — Local Path or Git URL */}
       <Modal open={importOpen} onClose={() => setImportOpen(false)} title="Import Project" width={520}>
         <ImportProjectForm
-          onImported={() => { setImportOpen(false); loadProjects(); }}
+          onImported={() => { setImportOpen(false); load(); }}
           onCancel={() => setImportOpen(false)}
         />
       </Modal>

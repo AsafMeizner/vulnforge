@@ -83,13 +83,19 @@ export interface Scan {
 }
 
 export interface Tool {
-  id: string;
+  // DB primary-key id is INTEGER. src/pages/Tools.tsx also mints synthetic
+  // ids in the 10000+ / 20000+ range for plugin-derived entries.
+  id: number;
   name: string;
   category: string;
   description: string;
   docs: string | null;
   track_record: string | null;
-  enabled: boolean;
+  // SQLite stores boolean as 0/1 — the API surfaces it numerically.
+  // Treat as truthy everywhere (0 = false, non-zero = true).
+  enabled: number | boolean;
+  file_path?: string;
+  config_schema?: string;
 }
 
 export interface ModelInfo {
@@ -108,8 +114,18 @@ export interface AIProvider {
   base_url?: string | null;
 }
 
+export type RoutingTask =
+  | 'triage'
+  | 'suggest-fix'
+  | 'deep-analyze'
+  | 'report'
+  | 'chat'
+  | 'simple'
+  | 'verify'
+  | 'batch-filter';
+
 export interface RoutingRule {
-  task: 'triage' | 'suggest-fix' | 'deep-analyze' | 'report' | 'chat' | 'simple';
+  task: RoutingTask;
   provider: string;
   model: string;
   priority: number;

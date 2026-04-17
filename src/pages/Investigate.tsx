@@ -27,7 +27,7 @@ function statusColor(status: string): string {
 }
 
 export default function Investigate() {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [sessions, setSessions] = useState<InvestigateSession[]>([]);
   const [selected, setSelected] = useState<InvestigateSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -295,7 +295,7 @@ function NewSessionModal({ onClose, onCreated }: {
   onClose: () => void;
   onCreated: (s: InvestigateSession) => void;
 }) {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [goal, setGoal] = useState('');
   const [findingId, setFindingId] = useState('');
 

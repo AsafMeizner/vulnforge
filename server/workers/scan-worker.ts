@@ -92,7 +92,7 @@ export class ScanWorker {
       const cols = findStmt.getColumnNames();
       const vals = findStmt.get();
       const row: Record<string, any> = {};
-      cols.forEach((c, i) => { row[c] = vals[i]; });
+      cols.forEach((c: string, i: number) => { row[c] = vals[i]; });
       findStmt.free();
 
       // Fairness check — optional, enabled by fairnessCap>0

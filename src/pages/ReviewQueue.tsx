@@ -17,7 +17,7 @@ interface ReviewQueueProps {
 }
 
 export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps) {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [findings, setFindings] = useState<ScanFinding[]>([]);
   const [pipeline, setPipeline] = useState<PipelineRun | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);

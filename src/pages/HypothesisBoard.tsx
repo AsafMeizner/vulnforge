@@ -73,7 +73,7 @@ function confidencePercent(c: number | undefined): number {
 }
 
 export default function HypothesisBoard() {
-  const { toast } = useToast() as { toast: (msg: string, type?: 'success' | 'error' | 'info') => void };
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState<boolean>(true);

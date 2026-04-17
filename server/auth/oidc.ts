@@ -102,7 +102,7 @@ export function getOidcProvider(name: string): OidcProviderRow | null {
     const vals = stmt.get();
     stmt.free();
     const row: Record<string, any> = {};
-    cols.forEach((c, i) => { row[c] = vals[i]; });
+    cols.forEach((c: string, i: number) => { row[c] = vals[i]; });
     return row as OidcProviderRow;
   } catch { return null; }
 }
@@ -302,7 +302,7 @@ export function listOidcProviders(): OidcProviderRow[] {
       const cols = stmt.getColumnNames();
       const vals = stmt.get();
       const obj: Record<string, any> = {};
-      cols.forEach((c, i) => { obj[c] = vals[i]; });
+      cols.forEach((c: string, i: number) => { obj[c] = vals[i]; });
       rows.push(obj as OidcProviderRow);
     }
     stmt.free();
