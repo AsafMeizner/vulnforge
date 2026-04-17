@@ -1,7 +1,7 @@
 version: 2
 
 updates:
-  # npm — group minor/patch updates into one PR/week to reduce noise
+  # npm - group minor/patch updates into one PR/week to reduce noise
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -37,50 +37,49 @@ updates:
           - "minor"
           - "patch"
     # Ignore major bumps for packages that need coordinated migrations.
-    # Dependabot will still flag them via security advisories — these ignores
+    # Dependabot will still flag them via security advisories - these ignores
     # only suppress noisy drive-by majors.
     ignore:
-      # Test runner + coverage — must bump together with test rewrite.
+      # Test runner + coverage - must bump together with test rewrite.
       - dependency-name: "vitest"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@vitest/*"
         update-types: ["version-update:semver-major"]
-      # Electron desktop shell — 9-major jumps (e.g. 32→41) cross native ABI breaks.
-      - dependency-name: "electron"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "electron-builder"
-        update-types: ["version-update:semver-major"]
-      # Build toolchain — plugin-react & vite version lockstep.
+      # Electron major bumps now flow freely - security advisories on Electron
+      # have repeatedly required major-version jumps (2026-04). Majors are
+      # reviewed as PRs but no longer blocked by the ignore rule.
+      # Build toolchain - plugin-react & vite version lockstep.
       - dependency-name: "vite"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@vitejs/*"
         update-types: ["version-update:semver-major"]
-      # UI framework — React majors have runtime + type changes.
+      # UI framework - React majors have runtime + type changes.
       - dependency-name: "react"
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
-      # Web framework — Express 5 middleware semantics differ.
+      # Web framework - Express 5 middleware semantics differ.
       - dependency-name: "express"
         update-types: ["version-update:semver-major"]
-      # TS compiler — major bumps can surface new diagnostics.
+      # TS compiler - major bumps can surface new diagnostics.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
-      # AI SDKs — prod runtime deps. Major bumps (0.x→0.y with 50+ versions,
+      # AI SDKs - prod runtime deps. Major bumps (0.x→0.y with 50+ versions,
       # or v4→v6) rewrite the provider-invocation shapes. Requires coordinated
       # migration of server/ai/providers and the routing layer.
       - dependency-name: "@anthropic-ai/sdk"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+        update-types:
+          ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "openai"
         update-types: ["version-update:semver-major"]
-      # Zod — schema validation used by MCP tools + auth + sync routes.
+      # Zod - schema validation used by MCP tools + auth + sync routes.
       # v4 rewrote the parse API surface; needs a deliberate pass.
       - dependency-name: "zod"
         update-types: ["version-update:semver-major"]
-      # @modelcontextprotocol/sdk — MCP server protocol bumps need review.
+      # @modelcontextprotocol/sdk - MCP server protocol bumps need review.
       - dependency-name: "@modelcontextprotocol/sdk"
         update-types: ["version-update:semver-major"]
-      # @types/node — must track the Node runtime majors we actually run
+      # @types/node - must track the Node runtime majors we actually run
       # (Node 20 LTS now, 22 coming). Don't drift to unreleased Node types.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
@@ -91,7 +90,7 @@ updates:
       prefix: "deps"
       include: "scope"
 
-  # GitHub Actions — keep action versions current
+  # GitHub Actions - keep action versions current
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -114,7 +113,7 @@ updates:
       - dependency-name: "actions/download-artifact"
         update-types: ["version-update:semver-major"]
 
-  # Docker — server image base + layer bumps
+  # Docker - server image base + layer bumps
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -128,7 +127,7 @@ updates:
       - "automated"
     commit-message:
       prefix: "docker(deps)"
-    # Stay on Node LTS — don't propose odd-numbered non-LTS majors.
+    # Stay on Node LTS - don't propose odd-numbered non-LTS majors.
     # When a new LTS ships (e.g. 22), manually bump the Dockerfile.
     ignore:
       - dependency-name: "node"
