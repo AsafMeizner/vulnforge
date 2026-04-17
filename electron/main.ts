@@ -465,7 +465,7 @@ app.on('ready', async () => {
     createWindow();
   } else {
     console.log(
-      '[Electron] Headless mode. Backend at http://localhost:3001; tray icon is your control surface.'
+      `[Electron] Headless mode. Backend at http://localhost:${actualPort}; tray icon is your control surface.`
     );
   }
 });

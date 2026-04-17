@@ -103,6 +103,90 @@ async function main(): Promise<void> {
     console.warn('[Checklists] Failed to load checklists on startup:', err.message);
   }
 
+  // Auto-register the 10 built-in plugin integrations on first boot so a
+  // fresh user sees them on the Plugins page instead of an empty list.
+  // They land as `enabled=1` (the backend will still gate each run on
+  // whether the binary/package is actually installed on the host).
+  try {
+    const { getAllPlugins, createPlugin } = await import('./db.js');
+    const installed = getAllPlugins();
+    if (installed.length === 0) {
+      const { PLUGIN_CATALOG } = await import('./plugins/registry.js');
+      for (const entry of PLUGIN_CATALOG) {
+        try {
+          createPlugin({
+            name: entry.name,
+            type: entry.type,
+            source_url: entry.source_url,
+            version: entry.version,
+            manifest: JSON.stringify(entry),
+            enabled: 1,
+          } as any);
+        } catch {
+          /* skip duplicates */
+        }
+      }
+      console.log(
+        `[Plugins] Auto-registered ${PLUGIN_CATALOG.length} built-in plugin(s). ` +
+        `Enable/disable from the Plugins page; each will still be gated on ` +
+        `whether its binary is available.`
+      );
+    }
+  } catch (err: any) {
+    console.warn('[Plugins] Auto-register failed:', err.message);
+  }
+
+  // Auto-seed tools on first boot if the tools table is empty AND
+  // VULNFORGE_TOOLS_DIR (or its default) points at an existing directory.
+  // Without this, a fresh install shows an empty Tools page with no hint
+  // that the user needs to configure a scanner directory.
+  try {
+    const { getAllTools, upsertTool } = await import('./db.js');
+    const existingTools = getAllTools();
+    if (existingTools.length === 0) {
+      const fs = await import('fs');
+      const toolsDir =
+        process.env.VULNFORGE_TOOLS_DIR || 'X:/security-solver/tools';
+      if (fs.existsSync(toolsDir)) {
+        const files = fs
+          .readdirSync(toolsDir)
+          .filter((f) => f.endsWith('.py') && !f.startsWith('_'));
+        if (files.length > 0) {
+          for (const file of files) {
+            const name = file.replace(/\.py$/, '');
+            try {
+              const body = fs.readFileSync(
+                `${toolsDir}/${file}`,
+                'utf8'
+              );
+              const docMatch = body.match(/"""([\s\S]*?)"""/);
+              const doc = (docMatch?.[1] || '').trim();
+              const firstLine = doc.split('\n')[0]?.trim() || '';
+              upsertTool({
+                name,
+                path: `${toolsDir}/${file}`,
+                description: firstLine || `${name} analyzer`,
+                docs: doc || undefined,
+                category: 'static',
+                enabled: 1,
+              } as any);
+            } catch {
+              /* skip unreadable */
+            }
+          }
+          console.log(`[Tools] Auto-seeded ${files.length} tool(s) from ${toolsDir}`);
+        }
+      } else {
+        console.log(
+          `[Tools] Tools table is empty and ${toolsDir} does not exist. ` +
+          `Set VULNFORGE_TOOLS_DIR env var to point at your scanner directory.`
+        );
+      }
+    }
+  } catch (err: any) {
+    console.warn('[Tools] Auto-seed failed:', err.message);
+  }
+
   // Express app
   const app = express();
 
@@ -607,6 +691,16 @@ Be technical, precise, and actionable.`;
                            // for a port that was already superseded on retry.
     finalized = true;
     const mode = HEADLESS ? 'HEADLESS' : 'FULL';
+    // Write the port to a file next to package.json so the vite dev
+    // config (and anything else that starts AFTER the server) can find
+    // the actual port without needing an env var. Best-effort - if the
+    // cwd is read-only we just skip.
+    try {
+      const fs = require('fs');
+      fs.writeFileSync('.vulnforge-port', String(boundPort), 'utf8');
+    } catch {
+      /* non-fatal */
+    }
     // Structured marker for parent processes (Electron main) to parse.
     // Keep the literal token stable; main.ts greps for this prefix.
     console.log(`VULNFORGE_READY_PORT=${boundPort}`);

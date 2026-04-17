@@ -8,9 +8,13 @@ import path from 'path';
 import { initDb, upsertTool, createProject, createVulnerability, upsertAIProvider, getAllProjects, getAllVulnerabilities } from './server/db.js';
 import { loadAllChecklists } from './server/checklists/loader.js';
 
-const TOOLS_DIR = 'X:/security-solver/tools';
-const TARGETS_DIR = 'X:/security-solver/targets';
-const DISCLOSURES_DIR = 'X:/security-solver/disclosures';
+// Paths are env-configurable so fresh installs on different machines can
+// point at wherever the user has their Python scanner library. Defaults
+// match the original developer's layout; any fresh install without those
+// env vars will get an empty tools table plus a helpful server log.
+const TOOLS_DIR = process.env.VULNFORGE_TOOLS_DIR || 'X:/security-solver/tools';
+const TARGETS_DIR = process.env.VULNFORGE_TARGETS_DIR || 'X:/security-solver/targets';
+const DISCLOSURES_DIR = process.env.VULNFORGE_DISCLOSURES_DIR || 'X:/security-solver/disclosures';
 
 // ── Helper: extract Python docstring ──────────────────────────────────────
 

@@ -63,7 +63,10 @@ tmp/
 /release3/
 /release4/
 /release5/
+/release6/
 /release-artifacts/
+# Runtime port discovery file written by server startup for vite to read
+/.vulnforge-port
 
 # Playwright MCP scratch dir + screenshots from local probing
 /.playwright-mcp/

@@ -4,7 +4,9 @@ import { mkdtempSync, writeFileSync, readFileSync, existsSync, unlinkSync } from
 import { tmpdir } from 'os';
 import path from 'path';
 
-const TOOLS_DIR = 'X:/security-solver/tools';
+// TOOLS_DIR is env-configurable. Points at the directory containing
+// Python scanner .py files. Default retained for dev backward-compat.
+const TOOLS_DIR = process.env.VULNFORGE_TOOLS_DIR || 'X:/security-solver/tools';
 
 export interface RunOptions {
   language?: string;

@@ -21,7 +21,7 @@ import { apiFetch } from '@/lib/api';
 export const SETUP_COMPLETE_KEY = 'vulnforge.setup.complete';
 export const SETUP_DRAFT_KEY = 'vulnforge.setup.draft';
 
-type ProviderKey = 'claude' | 'openai' | 'gemini' | 'ollama' | 'claude_cli';
+type ProviderKey = 'claude' | 'openai' | 'gemini' | 'ollama' | 'claude_cli' | 'skip';
 
 interface ProviderOption {
   key: ProviderKey;
@@ -40,6 +40,7 @@ const PROVIDERS: ProviderOption[] = [
   { key: 'gemini', label: 'Google Gemini', hint: 'aistudio.google.com', requiresKey: true, keyPlaceholder: 'AI...' },
   { key: 'ollama', label: 'Local Ollama', hint: 'runs locally — no key required', requiresKey: false },
   { key: 'claude_cli', label: 'Claude CLI', hint: 'delegates to the `claude` binary on PATH', requiresKey: false },
+  { key: 'skip' as any, label: 'Skip — manual review only', hint: 'review raw scanner findings by hand; add AI later', requiresKey: false },
 ];
 
 export type DeploymentPick = 'solo' | 'team' | 'skip';
@@ -264,6 +265,13 @@ export function SetupWizard(props: SetupWizardProps) {
   const runTest = useCallback(async () => {
     if (!draft.provider) {
       setTestResult({ ok: false, message: 'Pick a provider first.' });
+      return;
+    }
+    // "skip" = no AI. Mark the test as a pseudo-success so the wizard
+    // lets the user move on. The actual skip is recorded when the user
+    // clicks Finish - no provider row is inserted.
+    if (draft.provider === 'skip') {
+      setTestResult({ ok: true, message: 'Running without AI — findings will come back as pending for manual review.' });
       return;
     }
     const pOpt = PROVIDERS.find(p => p.key === draft.provider);

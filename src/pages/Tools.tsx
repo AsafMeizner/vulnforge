@@ -238,7 +238,33 @@ export default function Tools({ onNavigateToScanner }: ToolsProps) {
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Loading...</div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-              No tools match your search.
+              {tools.length === 0 ? (
+                <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'left' }}>
+                  <div style={{ fontSize: 15, color: 'var(--fg)', marginBottom: 12, fontWeight: 600 }}>
+                    No analysis tools configured
+                  </div>
+                  <p style={{ margin: '0 0 10px' }}>
+                    VulnForge orchestrates external Python static-analysis tools.
+                    They live in a directory on your machine - VulnForge doesn't
+                    ship the tools themselves.
+                  </p>
+                  <p style={{ margin: '0 0 10px' }}>
+                    <strong style={{ color: 'var(--fg)' }}>To populate this page:</strong>
+                  </p>
+                  <ol style={{ margin: '0 0 12px 20px', padding: 0, lineHeight: 1.8 }}>
+                    <li>Point <code style={{ background: 'var(--surface)', padding: '2px 6px', borderRadius: 3 }}>VULNFORGE_TOOLS_DIR</code>{' '}
+                      at the directory containing your <code>*.py</code> scanners</li>
+                    <li>Restart the server - tools are auto-seeded on first boot if the directory exists</li>
+                    <li>Or install plugins (Semgrep, Trivy, etc.) from the <a href="#plugins" style={{ color: 'var(--accent)' }}>Plugins page</a></li>
+                  </ol>
+                  <p style={{ fontSize: 12, color: 'var(--muted)', margin: 0 }}>
+                    Tip: running <code>npm run seed</code> from the project root also populates
+                    tools from the default dev path.
+                  </p>
+                </div>
+              ) : (
+                <>No tools match your search.</>
+              )}
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>

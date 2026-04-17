@@ -789,6 +789,11 @@ export default function Plugins() {
       {/* -- CATALOG TAB -- */}
       {activeTab === 'catalog' && (
         <>
+          {/* Add-from-URL - lets the user register an external plugin from
+              any git URL. Server endpoint validates + records it; the
+              actual clone/install happens when the user clicks Enable. */}
+          <AddFromUrl onInstalled={() => { setActiveTab('installed'); load(); }} />
+
           {/* Filters */}
           <div style={{ display: 'flex', gap: 8 }}>
             <input
@@ -1183,3 +1188,96 @@ const secondaryBtnSt: React.CSSProperties = {
   fontSize: 13,
   cursor: 'pointer',
 };
+
+// -- AddFromUrl ----------------------------------------------------------------
+// Collapsible "Add external plugin from URL" widget shown at the top of
+// the Catalog tab. Accepts any git URL and POSTs to
+// /api/plugins/install-from-url. Server validates + records; the clone
+// happens when the user clicks Enable.
+
+function AddFromUrl({ onInstalled }: { onInstalled: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState('');
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async () => {
+    setErr(null);
+    setBusy(true);
+    try {
+      const res = await apiFetch('/api/plugins/install-from-url', {
+        method: 'POST',
+        body: JSON.stringify({ url: url.trim(), name: name.trim() || undefined, description: description.trim() || undefined }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      setUrl(''); setName(''); setDescription('');
+      setOpen(false);
+      onInstalled();
+    } catch (e: any) {
+      setErr(e.message || 'Failed to add plugin');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{
+      background: 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 8,
+      padding: '12px 14px',
+      marginBottom: 12,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+           onClick={() => setOpen(v => !v)}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>
+            {open ? '▾' : '▸'} Add external plugin from URL
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+            Register a git URL as a plugin. Validated + recorded on the server.
+          </div>
+        </div>
+      </div>
+      {open && (
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input
+            type="text"
+            placeholder="https://github.com/user/plugin-repo (required)"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '7px 10px', color: 'var(--fg)', fontSize: 13 }}
+          />
+          <input
+            type="text"
+            placeholder="Display name (optional, defaults to repo name)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '7px 10px', color: 'var(--fg)', fontSize: 13 }}
+          />
+          <input
+            type="text"
+            placeholder="Short description (optional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, padding: '7px 10px', color: 'var(--fg)', fontSize: 13 }}
+          />
+          {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={submit} disabled={!url.trim() || busy} style={{ ...primaryBtnSt, opacity: !url.trim() || busy ? 0.5 : 1 }}>
+              {busy ? 'Adding…' : 'Add plugin'}
+            </button>
+            <button onClick={() => { setOpen(false); setErr(null); }} style={secondaryBtnSt}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

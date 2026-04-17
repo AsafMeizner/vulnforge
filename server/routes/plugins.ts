@@ -138,6 +138,78 @@ router.post('/install', async (req: Request, res: Response) => {
   }
 });
 
+// -- POST /api/plugins/install-from-url ---------------------------------------
+// Register an external plugin from a user-supplied git URL.
+//
+// Request: { url: string; name?: string; description?: string; type?: string }
+//
+// Validation:
+//   - URL must start with https:// or git@
+//   - Forbid path traversal characters in URL
+//
+// Note: this endpoint records the plugin in the catalog + installed lists
+// with a "pending" flag. A follow-up "enable" click triggers the actual
+// clone + any install steps the manifest specifies. Keeping the two
+// phases apart means a malformed URL fails fast without any filesystem
+// state change.
+
+router.post('/install-from-url', async (req: Request, res: Response) => {
+  try {
+    const { url, name, description, type } = req.body as {
+      url?: string;
+      name?: string;
+      description?: string;
+      type?: string;
+    };
+    if (!url || typeof url !== 'string') {
+      res.status(400).json({ error: 'url is required' });
+      return;
+    }
+    const safe = /^(https?:\/\/|git@)[^\s]+$/.test(url) && !/\.\./.test(url);
+    if (!safe) {
+      res.status(400).json({ error: 'url must be http(s):// or git@ and must not contain ".."' });
+      return;
+    }
+    // Derive a name from the URL if the user didn't supply one
+    const derivedName =
+      name ||
+      url.replace(/\.git$/, '').replace(/\/$/, '').split('/').slice(-1)[0] ||
+      'custom-plugin';
+    const { createPlugin } = await import('../db.js');
+    const id = createPlugin({
+      name: derivedName,
+      type: (type as any) || 'scanner',
+      source_url: url,
+      version: 'latest',
+      manifest: JSON.stringify({
+        name: derivedName,
+        source_url: url,
+        description: description || `Custom plugin from ${url}`,
+        install_command: `git clone ${url}`,
+        run_command: '',
+        parse_output: 'text',
+        requires: ['git'],
+        type: (type as any) || 'scanner',
+        category: 'Custom',
+        stars: '—',
+        long_description: description || `User-added plugin from ${url}.`,
+        version: 'latest',
+        website_url: url,
+      }),
+      enabled: 0,
+    } as any);
+    res.status(201).json({
+      success: true,
+      id,
+      name: derivedName,
+      message: 'Plugin registered. Click Install to clone and enable.',
+    });
+  } catch (err: any) {
+    console.error('[POST /plugins/install-from-url] error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // -- POST /api/plugins/install-dep --------------------------------------------
 // Install a missing system dependency (go, gh, etc.)
 

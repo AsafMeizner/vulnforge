@@ -43,7 +43,7 @@ interface ValidationOptions {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const DEFAULT_TOOLS_DIR = 'X:/security-solver/tools';
+const DEFAULT_TOOLS_DIR = process.env.VULNFORGE_TOOLS_DIR || 'X:/security-solver/tools';
 const DEFAULT_PYTHON_BIN = process.platform === 'win32' ? 'python' : 'python3';
 const DEFAULT_TIMEOUT_MS = 5_000;
 const CACHE_TTL_MS = 5 * 60 * 1_000; // 5 minutes
