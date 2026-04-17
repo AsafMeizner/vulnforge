@@ -1,11 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getProjects, importProject, importProjectFromUrl, getVulnerabilities } from '@/lib/api';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { getProjects, importProject, importProjectFromUrl, getVulnerabilities, apiFetch } from '@/lib/api';
 import type { Project, Vulnerability } from '@/lib/types';
 import { SeverityBadge, StatusBadge } from '@/components/Badge';
 import { Modal } from '@/components/Modal';
 import { FindingDetailModal } from './FindingDetail';
 import { useToast } from '@/components/Toast';
 import { NotesPanel } from '@/components/NotesPanel';
+
+// Electron preload injects `window.vulnforge.openDirectoryDialog()` so the
+// renderer can trigger a native folder picker. When running in a plain
+// browser the bridge is absent and we fall back to the text input.
+function getElectronBridge(): { openDirectoryDialog: () => Promise<string | null> } | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as any;
+  return w.vulnforge && typeof w.vulnforge.openDirectoryDialog === 'function' ? w.vulnforge : null;
+}
 
 function relativeTime(iso: string | null) {
   if (!iso) return 'Never';
@@ -95,21 +104,25 @@ export default function Projects() {
             {loading ? 'Loading...' : `${projects.length} projects`}
           </p>
         </div>
-        <button
-          onClick={() => setImportOpen(true)}
-          style={{
-            background: 'var(--blue)',
-            border: 'none',
-            borderRadius: 6,
-            padding: '8px 16px',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          Import Project
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <ImportProjectsJson onImported={() => { load(); }} />
+          <ExportProjectsJson projects={projects} />
+          <button
+            onClick={() => setImportOpen(true)}
+            style={{
+              background: 'var(--blue)',
+              border: 'none',
+              borderRadius: 6,
+              padding: '8px 16px',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Import Project
+          </button>
+        </div>
       </div>
 
       {/* Projects grid */}
@@ -250,6 +263,158 @@ export default function Projects() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+//  BrowseFolderButton - native folder picker in Electron, disabled in web
+// ─────────────────────────────────────────────────────────────────────────
+function BrowseFolderButton({ onPick }: { onPick: (path: string) => void }) {
+  const bridge = getElectronBridge();
+  const onClick = async () => {
+    if (!bridge) return;
+    const picked = await bridge.openDirectoryDialog();
+    if (picked) onPick(picked);
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!bridge}
+      title={bridge ? 'Pick a folder' : 'Only available in the desktop app'}
+      style={{
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
+        borderRadius: 5,
+        padding: '0 14px',
+        color: bridge ? 'var(--text)' : 'var(--muted)',
+        fontSize: 13,
+        cursor: bridge ? 'pointer' : 'not-allowed',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      Browse…
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  Import / Export - round-trip all projects as JSON so the user can move
+//  a workspace between machines without re-cloning everything.
+// ─────────────────────────────────────────────────────────────────────────
+
+function ExportProjectsJson({ projects }: { projects: Project[] }) {
+  const { toast } = useToast();
+  const onClick = () => {
+    try {
+      const payload = {
+        schema: 'vulnforge.projects.v1',
+        exported_at: new Date().toISOString(),
+        count: projects.length,
+        projects: projects.map(p => ({
+          name: p.name,
+          path: p.path,
+          repo_url: p.repo_url,
+          branch: p.branch,
+          language: p.language,
+        })),
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vulnforge-projects-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast(`Exported ${projects.length} project(s)`, 'success');
+    } catch (err: any) {
+      toast(`Export failed: ${err.message}`, 'error');
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={projects.length === 0}
+      style={{
+        background: 'var(--surface-2)',
+        border: '1px solid var(--border)',
+        borderRadius: 6,
+        padding: '8px 14px',
+        color: projects.length === 0 ? 'var(--muted)' : 'var(--text)',
+        fontSize: 13,
+        cursor: projects.length === 0 ? 'not-allowed' : 'pointer',
+      }}
+    >
+      Export
+    </button>
+  );
+}
+
+function ImportProjectsJson({ onImported }: { onImported: () => void }) {
+  const { toast } = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const projects = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.projects)
+          ? parsed.projects
+          : null;
+      if (!projects) {
+        throw new Error('File does not look like a VulnForge projects export');
+      }
+      const res = await apiFetch('/api/projects/import-bulk', {
+        method: 'POST',
+        body: JSON.stringify({ projects }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      toast(`Imported ${data.imported} / ${projects.length} project(s)`, 'success');
+      onImported();
+    } catch (err: any) {
+      toast(`Import failed: ${err.message}`, 'error');
+    } finally {
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/json,.json"
+        onChange={e => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+        }}
+        style={{ display: 'none' }}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        style={{
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border)',
+          borderRadius: 6,
+          padding: '8px 14px',
+          color: 'var(--text)',
+          fontSize: 13,
+          cursor: 'pointer',
+        }}
+      >
+        Import JSON
+      </button>
+    </>
+  );
+}
+
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
   color: 'var(--muted)',
@@ -337,12 +502,20 @@ function ImportProjectForm({ onImported, onCancel }: { onImported: () => void; o
       ) : (
         <div>
           <label style={labelStyle}>Project Path</label>
-          <input value={localPath} onChange={e => setLocalPath(e.target.value)}
-            placeholder="/path/to/project or C:\projects\target"
-            onKeyDown={e => e.key === 'Enter' && handleImport()}
-            autoFocus style={inputStyle} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={localPath} onChange={e => setLocalPath(e.target.value)}
+              placeholder="/path/to/project or C:\projects\target"
+              onKeyDown={e => e.key === 'Enter' && handleImport()}
+              autoFocus style={{ ...inputStyle, flex: 1 }} />
+            <BrowseFolderButton
+              onPick={(path) => setLocalPath(path)}
+            />
+          </div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
             Absolute path to an existing local repository.
+            {!getElectronBridge() && (
+              <span> Browse button only works in the desktop app.</span>
+            )}
           </div>
         </div>
       )}

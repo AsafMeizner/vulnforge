@@ -68,6 +68,11 @@ export interface Project {
   language: string | null;
   last_scanned: string | null;
   vuln_count?: number;
+  // Optional fields populated when the project was imported from a git URL.
+  // Preserved on the Projects page card and round-tripped through
+  // import/export JSON so users can move a workspace between machines.
+  repo_url?: string | null;
+  branch?: string | null;
 }
 
 export interface Scan {

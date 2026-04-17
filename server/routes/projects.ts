@@ -87,6 +87,34 @@ router.get('/', (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/projects/export - returns all projects as a JSON document
+// suitable for re-importing via POST /import-bulk. Includes a schema
+// version so the server can evolve the shape without breaking clients.
+//
+// IMPORTANT: this route MUST be declared before `/:id` below or Express
+// matches `/:id` first and tries to parse the literal "export" as a
+// project ID (returns 400 "Invalid ID").
+router.get('/export', (_req: Request, res: Response) => {
+  try {
+    const projects = (getAllProjects() as any[]).map((p: any) => ({
+      name: p.name,
+      path: p.path,
+      repo_url: p.repo_url,
+      branch: p.branch,
+      language: p.language,
+    }));
+    res.json({
+      schema: 'vulnforge.projects.v1',
+      exported_at: new Date().toISOString(),
+      count: projects.length,
+      projects,
+    });
+  } catch (err: any) {
+    console.error('GET /projects/export error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/projects/:id
 router.get('/:id', (req: Request, res: Response) => {
   try {
@@ -133,6 +161,56 @@ router.post('/', (req: Request, res: Response) => {
     res.status(201).json(created);
   } catch (err: any) {
     console.error('POST /projects error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/import-bulk - bulk-insert projects from an export JSON.
+// Body: { projects: [{ name, path, repo_url?, branch?, language? }, ...] }
+// Returns: { imported, skipped, errors }
+//
+// Used by the Projects page Import JSON flow (round-trip with /export).
+// Skips rows whose name already exists so re-importing is idempotent.
+router.post('/import-bulk', (req: Request, res: Response) => {
+  try {
+    const body = req.body as { projects?: any };
+    const projects = Array.isArray(body?.projects) ? body.projects : null;
+    if (!projects) {
+      res.status(400).json({ error: 'body must have a projects array' });
+      return;
+    }
+    let imported = 0;
+    const skipped: string[] = [];
+    const errors: Array<{ name: string; error: string }> = [];
+    const existing = new Set(
+      (getAllProjects() as any[]).map((p) => (p.name || '').toLowerCase())
+    );
+    for (const row of projects) {
+      try {
+        if (!row || typeof row !== 'object') continue;
+        if (!row.name || (!row.path && !row.repo_url)) {
+          errors.push({ name: row?.name || '(unnamed)', error: 'name plus path or repo_url required' });
+          continue;
+        }
+        if (existing.has(String(row.name).toLowerCase())) {
+          skipped.push(row.name);
+          continue;
+        }
+        createProject({
+          name: String(row.name),
+          path: row.path || null,
+          repo_url: row.repo_url || null,
+          branch: row.branch || null,
+          language: row.language || detectLanguage(row.path || ''),
+        } as any);
+        imported++;
+      } catch (e: any) {
+        errors.push({ name: row?.name || '(unnamed)', error: e.message });
+      }
+    }
+    res.json({ imported, skipped: skipped.length, skippedNames: skipped, errors });
+  } catch (err: any) {
+    console.error('POST /projects/import-bulk error:', err);
     res.status(500).json({ error: err.message });
   }
 });
