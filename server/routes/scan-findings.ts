@@ -7,8 +7,21 @@ import {
   createVulnerability,
   getVulnerabilityById,
 } from '../db.js';
+import { recordTriageDecision } from '../ai/triage-memory.js';
 
 const router = Router();
+
+// Record a user's accept/reject/ignore into the triage-memory store so
+// future scans of this pattern can auto-triage. Safe: errors swallowed,
+// never blocks the primary response.
+function rememberTriage(findingId: number, decision: 'accept' | 'reject' | 'ignore'): void {
+  try {
+    const f = getScanFindingById(findingId);
+    if (f) recordTriageDecision(f, decision);
+  } catch (err) {
+    console.warn('[triage-memory] record failed:', (err as Error).message);
+  }
+}
 
 // ── GET /api/scan-findings?scan_id=X ──────────────────────────────────────
 
@@ -83,6 +96,7 @@ router.put('/:id/reject', (req: Request, res: Response) => {
 
     const reason = req.body?.reason || 'Manually rejected';
     updateScanFinding(id, { status: 'rejected', rejection_reason: reason });
+    rememberTriage(id, 'reject');
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -125,6 +139,7 @@ router.post('/bulk-accept', (req: Request, res: Response) => {
           false_positive: 0,
         });
         updateScanFinding(id, { status: 'accepted' });
+        rememberTriage(id, 'accept');
         vulnIds.push(vulnId);
       } catch (e: any) {
         errors.push(`id ${id}: ${e.message}`);
@@ -152,6 +167,7 @@ router.post('/bulk-reject', (req: Request, res: Response) => {
       const sf = getScanFindingById(id);
       if (!sf) continue;
       updateScanFinding(id, { status: 'rejected', rejection_reason: reason || 'Bulk rejected' });
+      rememberTriage(id, 'reject');
       count++;
     }
 

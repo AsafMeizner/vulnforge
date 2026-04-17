@@ -40,6 +40,9 @@ import exploitsRouter from './routes/exploits.js';
 // AI Copilot Upgrade (Theme 8)
 import aiInvestigateRouter from './routes/ai-investigate.js';
 
+// Parasoft-inspired AI workflows (Track P)
+import aiWorkflowRouter from './routes/ai-workflow.js';
+
 // Auth + RBAC (Phase 14)
 import authRouter from './routes/auth.js';
 import authSessionRouter from './routes/auth-session.js';
@@ -170,6 +173,7 @@ async function main(): Promise<void> {
   app.use('/api/history', historyRouter);
   app.use('/api/exploits', exploitsRouter);
   app.use('/api/ai-investigate', aiInvestigateRouter);
+  app.use('/api/ai-workflow', aiWorkflowRouter);
   app.use('/api/teach', teachRouter);
   app.use('/api/integrations', integrationsRouter);
   app.use('/api/disclosure', disclosureRouter);

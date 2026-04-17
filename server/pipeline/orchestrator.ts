@@ -447,6 +447,33 @@ async function runPipelineAsync(
   updatePipelineRun(pipelineId, { current_stage: 'filtering', progress: 55 });
   emit('Filtering false positives', '5-tier filtering: regex → dedup → AI → dep reachability → chain detection', 55);
 
+  // ── Stage 4-pre: Triage memory (Parasoft-style history-aware auto-triage) ──
+  try {
+    const { applyTriageMemoryToBatch } = await import('../ai/triage-memory.js');
+    const { updateScanFinding } = await import('../db.js');
+    const pendingBeforeMemory = getScanFindings({ pipeline_id: pipelineId, status: 'pending' });
+    const memResult = applyTriageMemoryToBatch(pendingBeforeMemory);
+    // Persist any auto-applied decisions back to the DB
+    if (memResult.applied > 0) {
+      for (const f of pendingBeforeMemory) {
+        if (f.status === 'auto_rejected' && f.id) {
+          updateScanFinding(f.id, {
+            status: 'auto_rejected',
+            rejection_reason: f.rejection_reason,
+            ai_filter_reason: f.ai_filter_reason,
+          } as any);
+        }
+      }
+    }
+    emit(
+      'Triage memory',
+      `Auto-applied ${memResult.applied} historical decisions, ${memResult.hinted} low-confidence hints`,
+      54
+    );
+  } catch (err: any) {
+    emit('Triage memory', `Skipped: ${err.message}`, 54);
+  }
+
   const filterResult = await runSmartFilter(pipelineId, projectPath);
 
   // ── Stage 4b: Dependency Reachability ─────────────────────────────────
