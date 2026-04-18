@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/components/Toast';
 import { SeverityBadge } from '@/components/Badge';
+import { FolderPickerInput } from '@/components/FolderPickerInput';
 import {
   startPipeline,
   startBatchPipeline,
@@ -279,12 +280,11 @@ export default function Hunt({ onNavigate }: HuntProps) {
           )}
 
           {inputMode === 'local' && (
-            <input
-              autoFocus
+            <FolderPickerInput
+              kind="directory"
               value={localPath}
-              onChange={e => setLocalPath(e.target.value)}
+              onChange={setLocalPath}
               placeholder="C:\projects\my-app  or  /home/user/code"
-              onKeyDown={e => e.key === 'Enter' && handleStart()}
               style={inputStyle}
             />
           )}

@@ -23,6 +23,7 @@ import {
   nativeImage,
   ipcMain,
   dialog,
+  nativeTheme,
 } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -214,7 +215,7 @@ function createWindow(): void {
   }
 
   const preloadPath = path.join(__dirname, 'preload.js');
-  const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
+  const iconPath = resolveWindowIcon();
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -224,7 +225,7 @@ function createWindow(): void {
     title: 'VulnForge',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     backgroundColor: '#0d1117',
-    icon: existsSync(iconPath) ? iconPath : undefined,
+    icon: iconPath ? iconPath : undefined,
     show: !startHeadless,
     webPreferences: {
       nodeIntegration: false,
@@ -292,12 +293,47 @@ function navigate(hash: string): void {
   ).catch(() => { /* renderer may not be ready yet */ });
 }
 
+// ── Theme-aware icon resolution ─────────────────────────────────────────
+
+/**
+ * Return a PNG path for the window/tray icon that matches the OS
+ * dark/light theme - light logo on dark themes, dark logo on light
+ * themes - so the icon stays readable against the taskbar/titlebar.
+ *
+ * Falls back through candidates so the app still launches if some
+ * assets are missing in a stripped-down package.
+ */
+function resolveWindowIcon(): string | null {
+  const dark = nativeTheme.shouldUseDarkColors;
+  const base = path.join(__dirname, '..');
+  const candidates = [
+    // Packaged + dev: brand assets copied into the app
+    path.join(base, 'public', 'brand', dark ? 'logo-square-white.png' : 'logo-square.png'),
+    // Legacy single icon
+    path.join(base, 'assets', 'icon.png'),
+    // Always-white fallback (light theme looks fine with it too)
+    path.join(base, 'public', 'brand', 'logo-square-white.png'),
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
 // ── System tray ─────────────────────────────────────────────────────────
 
 function loadTrayIcon() {
-  // Try the asset first, fall back to a bundled 16x16 data URL.
-  const iconPath = path.join(__dirname, '..', 'assets', 'icon.png');
-  let icon = nativeImage.createFromPath(iconPath);
+  // Picks a theme-matched icon first; falls through to the legacy
+  // asset, then a baked-in 16x16 data URL if nothing else resolves.
+  let icon: Electron.NativeImage;
+  const themed = resolveWindowIcon();
+  if (themed) {
+    icon = nativeImage.createFromPath(themed);
+  } else {
+    icon = nativeImage.createFromDataURL(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAADxJREFUOI1j/P///38GKgImahkAAENjwCgYKGAUDFgwYOZiYGD4T6YLGBkZGRjINwCbCyiPBlIMGJ0XBgoAAI7+E/Go+GdCAAAAAElFTkSuQmCC'
+    );
+  }
   if (icon.isEmpty()) {
     icon = nativeImage.createFromDataURL(
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAADxJREFUOI1j/P///38GKgImahkAAENjwCgYKGAUDFgwYOZiYGD4T6YLGBkZGRjINwCbCyiPBlIMGJ0XBgoAAI7+E/Go+GdCAAAAAElFTkSuQmCC'
@@ -307,6 +343,20 @@ function loadTrayIcon() {
     icon = icon.resize({ width: 16, height: 16 });
   }
   return icon;
+}
+
+/**
+ * Swap window + tray icon whenever the OS theme flips. Called from the
+ * `ready` handler via nativeTheme.on('updated', ...).
+ */
+function refreshThemeAwareIcons(): void {
+  const windowIconPath = resolveWindowIcon();
+  if (windowIconPath && mainWindow) {
+    try { mainWindow.setIcon(windowIconPath); } catch { /* ignore */ }
+  }
+  if (tray) {
+    try { tray.setImage(loadTrayIcon()); } catch { /* ignore */ }
+  }
 }
 
 function buildTrayMenu(): Menu {
@@ -460,6 +510,11 @@ app.on('ready', async () => {
   }
 
   createTray();
+
+  // React to OS theme flips: swap the window + tray icon so the app
+  // matches the taskbar/titlebar contrast the user just switched into.
+  // Registered once here at app ready so it fires for every future flip.
+  nativeTheme.on('updated', refreshThemeAwareIcons);
 
   if (!startHeadless) {
     createWindow();

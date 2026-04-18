@@ -66,6 +66,7 @@ import disclosureRouter from './routes/disclosure.js';
 
 // Export + Audit (Themes 7+9)
 import exportRouter from './routes/export.js';
+import systemRouter from './routes/system.js';
 
 // MCP
 import { setupMcpServer } from './mcp/index.js';
@@ -265,6 +266,7 @@ async function main(): Promise<void> {
   app.use('/api/sync', syncRouter);
   app.use('/api/server', serverProxyRouter);
   app.use('/api/jobs', jobsRouter);
+  app.use('/api/system', systemRouter);
   app.use('/api/pool', poolRouter);
 
   // Start the worker pool - no-op in desktop mode.
