@@ -266,7 +266,13 @@ export default function DisclosurePage() {
 
       {newDisclosureOpen && <NewDisclosureModal vendors={vendors} onClose={() => setNewDisclosureOpen(false)} onCreated={() => { setNewDisclosureOpen(false); load(); }} />}
       {newVendorOpen && <NewVendorModal onClose={() => setNewVendorOpen(false)} onCreated={() => { setNewVendorOpen(false); load(); }} />}
-      {selected && <DisclosureDetailModal disclosure={selected} vendor={vendors.find(v => v.id === selected.vendor_id) || null} onClose={() => setSelected(null)} />}
+      {selected && <DisclosureDetailModal
+        disclosure={selected}
+        vendor={vendors.find(v => v.id === selected.vendor_id) || null}
+        vendors={vendors}
+        onClose={() => setSelected(null)}
+        onUpdated={(next) => { setSelected(next); load(); }}
+      />}
     </div>
   );
 }
@@ -349,30 +355,181 @@ function NewVendorModal({ onClose, onCreated }: { onClose: () => void; onCreated
   );
 }
 
-function DisclosureDetailModal({ disclosure, vendor, onClose }: {
+function DisclosureDetailModal({ disclosure, vendor, vendors, onClose, onUpdated }: {
   disclosure: Disclosure;
   vendor: Vendor | null;
+  vendors: Vendor[];
   onClose: () => void;
+  onUpdated: (next: Disclosure) => void;
 }) {
-  return (
-    <ModalShell title={disclosure.title} onClose={onClose}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 14 }}>
-        <Info label="Status" value={disclosure.status} />
-        <Info label="Vendor" value={vendor?.name || '-'} />
-        <Info label="CVE" value={disclosure.cve_id || '-'} />
-        <Info label="Tracking ID" value={disclosure.tracking_id || '-'} />
-        <Info label="Submitted" value={disclosure.submission_date?.split('T')[0] || '-'} />
-        <Info label="SLA" value={disclosure.sla_days ? `${disclosure.sla_days} days` : '-'} />
-        <Info label="Bounty" value={disclosure.bounty_amount ? `$${disclosure.bounty_amount}` : '-'} />
-        <Info label="Paid" value={disclosure.bounty_paid_date?.split('T')[0] || '-'} />
-      </div>
-      {disclosure.notes && (
-        <div>
-          <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Notes</div>
-          <div style={{ color: 'var(--text)', fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{disclosure.notes}</div>
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
+  // Dual-mode: view vs edit. Starts in view; user clicks Edit to switch.
+  // The form's state is the editable projection of the record; changes
+  // are committed via PUT only on Save, so Cancel can discard cleanly.
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Disclosure>(disclosure);
+  const [saving, setSaving] = useState(false);
+
+  // Re-sync the draft when the parent passes a fresh row (e.g. after
+  // another tab updates this disclosure, or after our own save).
+  useEffect(() => { setDraft(disclosure); }, [disclosure]);
+
+  const setField = <K extends keyof Disclosure>(key: K, value: Disclosure[K]) => {
+    setDraft((d) => ({ ...d, [key]: value }));
+  };
+
+  const save = async () => {
+    if (!draft.title?.trim()) { toast('Title required', 'error'); return; }
+    setSaving(true);
+    try {
+      // Normalise dates: the <input type="date"> control gives
+      // yyyy-mm-dd; the backend expects an ISO string or null. Empty
+      // strings become undefined so they don't clobber nulls.
+      const toIsoOrUndef = (v?: string | null) => v && v.trim() ? v : undefined;
+      const payload: Partial<Disclosure> & { status_note?: string } = {
+        title: draft.title.trim(),
+        vendor_id: draft.vendor_id || undefined,
+        finding_id: draft.finding_id || undefined,
+        status: draft.status,
+        cve_id: toIsoOrUndef(draft.cve_id),
+        tracking_id: toIsoOrUndef(draft.tracking_id),
+        sla_days: draft.sla_days || undefined,
+        submission_date: toIsoOrUndef(draft.submission_date),
+        response_date: toIsoOrUndef(draft.response_date),
+        patch_date: toIsoOrUndef(draft.patch_date),
+        public_date: toIsoOrUndef(draft.public_date),
+        bounty_amount: draft.bounty_amount || undefined,
+        bounty_currency: draft.bounty_currency || undefined,
+        bounty_paid_date: toIsoOrUndef(draft.bounty_paid_date),
+        notes: draft.notes || undefined,
+      };
+      const next = await updateDisclosure(disclosure.id, payload);
+      onUpdated(next);
+      setEditing(false);
+      toast('Disclosure saved', 'success');
+    } catch (err: any) {
+      toast(`Save failed: ${err.message || err}`, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancel = () => {
+    setDraft(disclosure);
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <ModalShell title={disclosure.title} onClose={onClose}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 14 }}>
+          <Info label="Status" value={disclosure.status} />
+          <Info label="Vendor" value={vendor?.name || '-'} />
+          <Info label="CVE" value={disclosure.cve_id || '-'} />
+          <Info label="Tracking ID" value={disclosure.tracking_id || '-'} />
+          <Info label="Submitted" value={disclosure.submission_date?.split('T')[0] || '-'} />
+          <Info label="SLA" value={disclosure.sla_days ? `${disclosure.sla_days} days` : '-'} />
+          <Info label="Bounty" value={disclosure.bounty_amount ? `$${disclosure.bounty_amount}` : '-'} />
+          <Info label="Paid" value={disclosure.bounty_paid_date?.split('T')[0] || '-'} />
         </div>
-      )}
-      <ModalActions onCancel={onClose} confirmLabel="" />
+        {disclosure.notes && (
+          <div>
+            <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Notes</div>
+            <div style={{ color: 'var(--text)', fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{disclosure.notes}</div>
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+          <button onClick={onClose} style={{
+            padding: '8px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)',
+            borderRadius: 5, color: 'var(--text)', fontSize: 13, cursor: 'pointer',
+          }}>Close</button>
+          <button onClick={() => setEditing(true)} style={primaryBtn}>Edit</button>
+        </div>
+      </ModalShell>
+    );
+  }
+
+  // Edit mode. Every field the NewDisclosureModal created is here, plus
+  // the ones that only existed as read-only Info rows before.
+  const dateVal = (v?: string) => (v ? v.split('T')[0] : '');
+  return (
+    <ModalShell title={`Edit: ${disclosure.title}`} onClose={cancel}>
+      <Field label="Title">
+        <input value={draft.title} onChange={(e) => setField('title', e.target.value)} style={inputStyle} />
+      </Field>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+        <Field label="Vendor">
+          <select
+            value={draft.vendor_id || ''}
+            onChange={(e) => setField('vendor_id', e.target.value ? Number(e.target.value) : undefined)}
+            style={inputStyle}
+          >
+            <option value="">- none -</option>
+            {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Status">
+          <select value={draft.status} onChange={(e) => setField('status', e.target.value)} style={inputStyle}>
+            {['draft', 'submitted', 'acknowledged', 'triaging', 'fixed', 'disclosed', 'rejected', 'withdrawn'].map(s => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="CVE ID">
+          <input value={draft.cve_id || ''} onChange={(e) => setField('cve_id', e.target.value)} placeholder="CVE-2026-nnnnn" style={inputStyle} />
+        </Field>
+        <Field label="Tracking ID">
+          <input value={draft.tracking_id || ''} onChange={(e) => setField('tracking_id', e.target.value)} placeholder="H1-123456" style={inputStyle} />
+        </Field>
+        <Field label="SLA (days)">
+          <input type="number" value={draft.sla_days || ''} onChange={(e) => setField('sla_days', e.target.value ? Number(e.target.value) : undefined)} style={inputStyle} />
+        </Field>
+        <Field label="Linked finding ID">
+          <input type="number" value={draft.finding_id || ''} onChange={(e) => setField('finding_id', e.target.value ? Number(e.target.value) : undefined)} style={inputStyle} />
+        </Field>
+        <Field label="Submitted">
+          <input type="date" value={dateVal(draft.submission_date)} onChange={(e) => setField('submission_date', e.target.value || undefined)} style={inputStyle} />
+        </Field>
+        <Field label="Response">
+          <input type="date" value={dateVal(draft.response_date)} onChange={(e) => setField('response_date', e.target.value || undefined)} style={inputStyle} />
+        </Field>
+        <Field label="Patched">
+          <input type="date" value={dateVal(draft.patch_date)} onChange={(e) => setField('patch_date', e.target.value || undefined)} style={inputStyle} />
+        </Field>
+        <Field label="Public">
+          <input type="date" value={dateVal(draft.public_date)} onChange={(e) => setField('public_date', e.target.value || undefined)} style={inputStyle} />
+        </Field>
+        <Field label="Bounty amount">
+          <input type="number" value={draft.bounty_amount || ''} onChange={(e) => setField('bounty_amount', e.target.value ? Number(e.target.value) : undefined)} placeholder="USD" style={inputStyle} />
+        </Field>
+        <Field label="Bounty paid">
+          <input type="date" value={dateVal(draft.bounty_paid_date)} onChange={(e) => setField('bounty_paid_date', e.target.value || undefined)} style={inputStyle} />
+        </Field>
+      </div>
+      <Field label="Notes">
+        <textarea
+          value={draft.notes || ''}
+          onChange={(e) => setField('notes', e.target.value)}
+          rows={5}
+          style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
+          placeholder="Free-form notes; markdown is fine."
+        />
+      </Field>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+        <button onClick={cancel} disabled={saving} style={{
+          padding: '8px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)',
+          borderRadius: 5, color: 'var(--text)', fontSize: 13, cursor: 'pointer',
+        }}>Cancel</button>
+        <button
+          onClick={save}
+          disabled={saving || !draft.title?.trim()}
+          style={{
+            ...primaryBtn,
+            opacity: (saving || !draft.title?.trim()) ? 0.6 : 1,
+            cursor: (saving || !draft.title?.trim()) ? 'not-allowed' : 'pointer',
+          }}
+        >{saving ? 'Saving...' : 'Save'}</button>
+      </div>
     </ModalShell>
   );
 }
