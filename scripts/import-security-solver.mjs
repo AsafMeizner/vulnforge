@@ -47,10 +47,14 @@ function normSeverity(raw) {
 }
 
 function normStatus(_raw) {
-  // Mark everything Triaged - these are post-audit findings, not raw
-  // scanner output. Using a single status keeps the Findings page
-  // counts honest.
-  return 'Triaged';
+  // Import as 'New' so the user's own workflow status reflects their
+  // progress inside VulnForge: they walk through each finding, run AI
+  // triage or write manual notes, and the server auto-promotes to
+  // 'Triaged' the moment either field fills in. Before the
+  // auto-promote existed, the importer hardcoded 'Triaged' which
+  // falsely showed all 18 as done even though the user hadn't looked
+  // at most of them.
+  return 'New';
 }
 
 /**

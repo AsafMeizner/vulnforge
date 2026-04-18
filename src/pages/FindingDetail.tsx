@@ -173,22 +173,44 @@ function EmptyState({ children, action }: { children: React.ReactNode; action?: 
  * can paste/write headings and code blocks just like AI output.
  */
 function ManualTriageField({
-  value, onSave,
+  value, onSave, openSignal,
 }: {
   value: string;
   onSave: (next: string) => Promise<void>;
+  /**
+   * When this number increases, the field enters edit mode and scrolls
+   * into view. Used by the "Write Manually" button in the empty state
+   * — parent bumps the signal to imperatively trigger editing.
+   */
+  openSignal?: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   // Sync when the parent vuln reloads (e.g. after save).
   useEffect(() => { setDraft(value); }, [value]);
+  // Parent-triggered open. Ignores the initial render (openSignal=0).
+  useEffect(() => {
+    if (openSignal && openSignal > 0) {
+      setEditing(true);
+      // Give the textarea a beat to mount, then scroll so the user
+      // sees what they just opened.
+      setTimeout(() => {
+        rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    }
+  }, [openSignal]);
+
+  // When there's nothing to show AND we're not editing, render nothing
+  // at all. The empty state in the parent owns the CTA.
+  if (!editing && !value) return null;
 
   return (
-    <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div ref={rootRef} style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          Manual Triage{value ? '' : ' (optional)'}
+          Manual Triage
         </div>
         {!editing && (
           <button
@@ -200,7 +222,7 @@ function ManualTriageField({
               background: 'var(--surface-2)', color: 'var(--text)', cursor: 'pointer',
             }}
           >
-            {value ? 'Edit' : 'Write manually'}
+            Edit
           </button>
         )}
       </div>
@@ -249,15 +271,7 @@ function ManualTriageField({
       ) : value ? (
         // Render as markdown so users can write structured notes.
         <InfoBox color="var(--blue)">{value}</InfoBox>
-      ) : (
-        <div style={{
-          fontSize: 12, color: 'var(--muted)',
-          padding: '10px 12px', border: '1px dashed var(--border)', borderRadius: 6,
-        }}>
-          Write your own analysis — root cause, repro steps, verdict —
-          without any AI. Visible only to you, editable anytime.
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -402,6 +416,11 @@ export default function FindingDetail({ vulnId, onClose }: FindingDetailProps) {
   const [reportSubTab, setReportSubTab] = useState<ReportSubTab>('email');
   // "View file in full" modal, triggered from the Suggested Fix section.
   const [fileViewerOpen, setFileViewerOpen] = useState(false);
+  // Incremented by the "Write Manually" empty-state button to force
+  // the ManualTriageField into edit mode without it living higher up
+  // in state. Just a monotonic counter — ManualTriageField's useEffect
+  // reacts to the change.
+  const [manualTriageOpenSignal, setManualTriageOpenSignal] = useState(0);
 
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Vulnerability>>({});
@@ -1266,22 +1285,28 @@ Question: `;
                       <InfoBox color="var(--purple)">{vuln.ai_triage}</InfoBox>
                     </div>
                   ) : (
-                    <EmptyState>
-                      {/* AI is optional - distinguish "no AI run" from
-                          workflow status so users who triaged manually
-                          don't see a contradictory "No triage yet". */}
-                      <div style={{ textAlign: 'center' }}>
-                        No AI analysis yet. AI triage is <em>optional</em> —
-                        you can also write your own analysis in the Manual Triage box below.
-                      </div>
+                    // Two buttons side-by-side, no paragraph. The user
+                    // picks the path they want — nothing is implied
+                    // about which is "default" or "preferred".
+                    <div style={{ display: 'flex', gap: 10, padding: '24px 0', justifyContent: 'center' }}>
                       <button
                         onClick={runTriage}
                         disabled={triaging}
                         style={{ ...actionBtn('var(--purple)'), display: 'flex', alignItems: 'center', gap: 6, color: '#fff', opacity: triaging ? 0.6 : 1 }}
                       >
-                        {triaging ? <><Spinner size={12} /> Triaging...</> : 'Run AI Triage'}
+                        {triaging ? <><Spinner size={12} /> Triaging...</> : 'AI Triage'}
                       </button>
-                    </EmptyState>
+                      <button
+                        onClick={() => setManualTriageOpenSignal((s) => s + 1)}
+                        style={{
+                          padding: '8px 18px', fontSize: 13, fontWeight: 600,
+                          border: '1px solid var(--border)', borderRadius: 6,
+                          background: 'var(--surface-2)', color: 'var(--text)', cursor: 'pointer',
+                        }}
+                      >
+                        Write Manually
+                      </button>
+                    </div>
                   )}
 
                   {/* Manual Triage - always shown, always editable,
@@ -1290,6 +1315,7 @@ Question: `;
                       their own verdict without touching a provider. */}
                   <ManualTriageField
                     value={vuln.manual_triage || ''}
+                    openSignal={manualTriageOpenSignal}
                     onSave={async (next) => {
                       try {
                         await updateVulnerability(vuln.id, { manual_triage: next } as any);

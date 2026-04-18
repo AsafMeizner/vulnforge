@@ -1219,10 +1219,31 @@ export function updateVulnerability(id: number, v: Partial<Vulnerability>): void
   // was never a real column) and provides a cheap safety net against
   // SQL injection via column names (only whitelisted identifiers can
   // reach the SET clause).
-  const fields = Object.keys(v).filter((k) => VULN_COLUMNS.has(k));
+  const mut: Record<string, unknown> = {};
+  for (const k of Object.keys(v)) {
+    if (VULN_COLUMNS.has(k)) mut[k] = (v as any)[k];
+  }
+
+  // Auto-promote status from New/Open -> Triaged the moment a user
+  // records triage content. This keeps the status column meaningful
+  // without requiring a separate "mark triaged" click: if you've
+  // written analysis (manual or AI), the finding has been triaged.
+  // Explicit status in the update still wins — callers that want to
+  // set Submitted/Fixed/Rejected/etc. are never overridden.
+  const addsManual = typeof mut.manual_triage === 'string' && mut.manual_triage.trim().length > 0;
+  const addsAi = typeof mut.ai_triage === 'string' && mut.ai_triage.trim().length > 0;
+  if ((addsManual || addsAi) && mut.status === undefined) {
+    const rows = execQuery('SELECT status FROM vulnerabilities WHERE id = ?', [id]);
+    const current = (rows[0] as { status?: string } | undefined)?.status;
+    if (current === 'New' || current === 'Open' || !current) {
+      mut.status = 'Triaged';
+    }
+  }
+
+  const fields = Object.keys(mut);
   if (fields.length === 0) return;
   const setClause = fields.map((f) => `${f} = ?`).join(', ');
-  const values = fields.map((f) => (v as any)[f]);
+  const values = fields.map((f) => mut[f]);
   db.run(
     `UPDATE vulnerabilities SET ${setClause}, updated_at = datetime('now') WHERE id = ?`,
     [...values, id]
