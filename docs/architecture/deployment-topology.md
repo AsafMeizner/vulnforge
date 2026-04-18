@@ -52,4 +52,3 @@ Pipelines carry `executor: 'local' | 'server'`. The client chooses per run in th
 
 - Sync protocol: [`sync-protocol.md`](sync-protocol.md)
 - Data model: [`data-model.md`](data-model.md)
-- Full design record: [`../superpowers/specs/2026-04-16-deployment-topology-design.md`](../superpowers/specs/2026-04-16-deployment-topology-design.md)

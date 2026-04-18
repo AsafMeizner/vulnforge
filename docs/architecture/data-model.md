@@ -71,4 +71,3 @@ The 7 sync columns were added to existing tables via idempotent `ALTER TABLE` st
 ## References
 
 - Server code: `server/sync/model.ts` (constants + helpers), `server/db.ts` (schema + backfill)
-- Full design: [`../superpowers/specs/2026-04-16-deployment-topology-design.md`](../superpowers/specs/2026-04-16-deployment-topology-design.md)

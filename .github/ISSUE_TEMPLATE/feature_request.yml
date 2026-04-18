@@ -47,5 +47,5 @@ body:
     attributes:
       label: Prior art
       options:
-        - label: I checked `docs/superpowers/specs/` for existing design discussions
+        - label: I checked `docs/architecture/` for existing design notes
         - label: I searched open and closed issues

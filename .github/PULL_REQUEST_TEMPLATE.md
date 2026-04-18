@@ -44,4 +44,4 @@ feeds directly into the review checklist in .github/copilot-instructions.md.
 
 ## Related
 
-<!-- Links to issues, design specs (docs/superpowers/specs/…), prior PRs. -->
+<!-- Links to issues, design notes (docs/architecture/…), prior PRs. -->

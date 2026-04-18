@@ -81,5 +81,4 @@ Writes while disconnected land in the local `sync_outbox` table (`sync_id` uniqu
 
 ## References
 
-- Design spec: [`../superpowers/specs/2026-04-16-deployment-topology-design.md`](../superpowers/specs/2026-04-16-deployment-topology-design.md)
 - Server code: `server/sync/model.ts`, `server/sync/repo.ts`, `server/sync/ws.ts`, `server/routes/sync.ts`

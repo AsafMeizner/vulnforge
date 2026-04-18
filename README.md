@@ -37,7 +37,8 @@ It combines static analysis, dynamic analysis, historical intelligence, and an A
 - **Dynamic:** libFuzzer, gdb, tcpdump, nmap, angr, radare2, Docker sandboxes, git bisect, core-dump analysis.
 - **AI:** Claude, OpenAI, Gemini, Ollama, or Claude CLI - task-based routing with per-task fallback chains.
 - **Integrations:** Jira, Linear, Trello, Slack, GitHub Issues. Team-mode can proxy them through the server so keys stay central.
-- **Interop:** MCP server exposes **93 tools** to external AI agents (Claude Code, custom orchestrators).
+- **Interop:** MCP server exposes **101 tools** to external AI agents (Claude Code, custom orchestrators).
+- **CLI:** Zero-dep `vulnforge` binary (Node) for headless status / findings / triage / hunt / chat from any terminal.
 
 > **Status:** alpha. Foundations and data model are stable; some UI surfaces for subsystem B (team-mode wizard wiring, worker pool UI) are still landing.
 
@@ -313,17 +314,18 @@ All long-form docs live under [`docs/`](docs/):
 | **Developer**    | [building](docs/developer/building.md) · [migrations](docs/developer/migrations.md) · [MCP tools](docs/developer/mcp-tools.md)                                                                                                                        |
 | **Security**     | [threat model](docs/security/threat-model.md) · [secret handling](docs/security/secret-handling.md) · [sync security](docs/security/sync-security.md)                                                                                                 |
 
-Architectural decision records: [`docs/superpowers/specs/`](docs/superpowers/specs/).
+Architectural notes live under [`docs/architecture/`](docs/architecture/).
 
 ---
 
 ## Stats
 
 - **Frontend:** 22 pages · React 19 · hash routing · inline styles + CSS vars
-- **Backend:** 27 REST route modules · 38 DB tables · 93 MCP tools
+- **Backend:** 29 REST route modules · 39 DB tables · 101 MCP tools
 - **Static analysis:** 48 Python tools + 10 integrated plugins + 17 CVE patterns + 15 config checks
 - **Runtime:** 10 executor types - libFuzzer, gdb, tcpdump, nmap, angr, radare2, core-dump, git-bisect, Docker sandbox, QEMU stub
-- **Tests:** 82 vitest tests across 9 files (unit + integration against real SQLite)
+- **Tests:** 252 vitest tests across 21 files (unit + integration against real SQLite)
+- **Security:** AES-256-GCM at-rest encryption for AI keys / OIDC client secrets / integration configs · SSRF guard on all outbound URLs · prompt-injection fences on every AI prompt · IPC path-allowlist on Electron shell.openPath
 
 ---
 

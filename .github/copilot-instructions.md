@@ -14,8 +14,8 @@ modes:
 - **Team server** (Docker or bare-metal): the same `server/` code, without
   Electron. Desktops stay local-first and sync rows over WebSocket.
 
-Full design specs live under `docs/superpowers/specs/` and user/operator/dev
-docs under `docs/`.
+User / operator / developer / security docs live under `docs/`. Start at
+`docs/README.md`.
 
 ## Conventions to enforce in review
 
@@ -67,8 +67,43 @@ docs under `docs/`.
 
 - Never shell out with user-influenced input. Use the repo's
   `execFileNoThrow.ts` helper or `spawn(cmd, [argv...], { shell: false })`.
-- The unsafe `exec()` pattern (literal `child_process` dot `exec`) is banned
-  outside vetted scripts.
+- Direct shell invocation via `child_process` is banned outside vetted
+  scripts - the review checklist catches this.
+
+### Secrets at rest (CR-08/09/10)
+
+- Any column holding an API key, OIDC client secret, or integration config
+  MUST be passed through `encryptSecret()` on the way in and
+  `decryptSecret()` on the way out. Helpers live in `server/lib/crypto.ts`.
+- Both helpers are idempotent via the `vf1:` prefix check, so re-encrypting
+  an already-encrypted value is a no-op.
+- Every new boot-time migration that wraps plaintext rows must check
+  `isEncrypted(row.value)` before calling `encryptSecret()`.
+
+### Outbound URLs (SSRF - CR-12)
+
+- Any user-controlled URL (AI `base_url`, OIDC `issuer_url`, integration
+  webhooks, etc.) MUST be validated via
+  `await assertSafeExternalUrl(raw, { field })` from `server/lib/net.ts`
+  BEFORE the value is stored OR before the fetch fires.
+- The helper rejects RFC1918, loopback, CGNAT, link-local, cloud-metadata,
+  and IPv4-mapped-IPv6 bypasses. Desktop mode transparently allows loopback
+  (Ollama); server mode refuses.
+- If the caller receives URLs from an untrusted response (e.g. an IdP's
+  OIDC discovery doc), every URL that the server will subsequently fetch
+  must be re-validated the same way.
+
+### Prompt injection (CR-14)
+
+- Every AI prompt builder that interpolates user / attacker-controllable
+  data MUST:
+  1. Wrap the system prompt in `withInjectionGuard(...)` from
+     `server/ai/prompts/fence.ts`.
+  2. Wrap each untrusted field in `fenceUntrusted('label', text)`.
+  3. Run short inline fields through a local `sanitizeInline()` to strip
+     tag syntax + newlines.
+- Code snippets, file contents, scan tool output, finding descriptions,
+  agent tool results - all count as untrusted.
 
 ### Tests
 
