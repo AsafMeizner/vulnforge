@@ -34,6 +34,10 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
   const [severity, setSeverity] = useState('');
   const [status, setStatus] = useState('');
   const [localSearch, setLocalSearch] = useState('');
+  // Debounced mirror of localSearch - this is what actually feeds
+  // effectiveSearch/load(). Without this, every keystroke fires a
+  // network GET; typing a 20-char query sent 20 requests.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('found_at');
   const [sortAsc, setSortAsc] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(initialVulnId ?? null);
@@ -42,7 +46,13 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
   const tableRef = useRef<HTMLTableSectionElement>(null);
   const { toast } = useToast();
 
-  const effectiveSearch = searchQuery || localSearch;
+  // 300ms debounce between the user typing and hitting the server.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(localSearch), 300);
+    return () => clearTimeout(t);
+  }, [localSearch]);
+
+  const effectiveSearch = searchQuery || debouncedSearch;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const load = useCallback(async () => {
@@ -96,7 +106,10 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  });
+    // Re-subscribe only when the navigation target set changes. Without
+    // a dep array the listener was re-registered every render; with an
+    // empty array the handler would close over stale vulns/focusedIdx.
+  }, [vulns, focusedIdx, selectedId]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(a => !a);

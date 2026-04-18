@@ -25,7 +25,11 @@ export interface LocalNotesProviderConfig {
   base_path?: string;
 }
 
-const DEFAULT_BASE_PATH = 'X:/vulnforge/data/notes';
+// Notes live here when no explicit `base_path` is configured. Same
+// env-var pattern as the other data dirs so a portable install works
+// without hand-editing the DB seed row.
+const DEFAULT_BASE_PATH =
+  process.env.VULNFORGE_NOTES_DIR || path.join(process.cwd(), 'data/notes');
 
 export class LocalNotesProvider implements NotesProvider {
   readonly name: string;

@@ -3,6 +3,7 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import { writeFileSync } from 'fs';
 
 import { initDb } from './db.js';
 import { initWebSocket, getWsServer } from './ws.js';
@@ -313,9 +314,14 @@ async function main(): Promise<void> {
         res.status(404).json({ error: 'Vulnerability not found' });
         return;
       }
-      // Run triage asynchronously; return 202 immediately
+      // Fire-and-forget: return 202 immediately, then run triage in a
+      // detached promise with its own error handler. The previous
+      // `await` after the response was sent leaked any post-response
+      // rejection as an unhandled-promise warning.
       res.status(202).json({ id, message: 'Triage started' });
-      await triageFinding(id);
+      void triageFinding(id).catch((e) =>
+        console.error('[AI] Triage error (detached):', e?.message || e),
+      );
     } catch (err: any) {
       console.error('[AI] Triage error:', err.message);
       // Response may already be sent; swallow any write-after-end errors
@@ -694,10 +700,10 @@ Be technical, precise, and actionable.`;
     // Write the port to a file next to package.json so the vite dev
     // config (and anything else that starts AFTER the server) can find
     // the actual port without needing an env var. Best-effort - if the
-    // cwd is read-only we just skip.
+    // cwd is read-only we just skip. Uses the statically-imported fs
+    // helper instead of an ESM-illegal `require` call.
     try {
-      const fs = require('fs');
-      fs.writeFileSync('.vulnforge-port', String(boundPort), 'utf8');
+      writeFileSync('.vulnforge-port', String(boundPort), 'utf8');
     } catch {
       /* non-fatal */
     }

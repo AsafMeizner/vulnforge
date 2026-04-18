@@ -606,8 +606,18 @@ export default function Plugins() {
 
   const handleUninstall = async (id: number, name: string) => {
     if (!window.confirm(`Uninstall "${name}"? The plugin files will remain on disk.`)) return;
-    await apiFetch(`/api/plugins/${id}`, { method: 'DELETE' });
-    await load();
+    try {
+      const res = await apiFetch(`/api/plugins/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setInstallError(`Failed to uninstall ${name}: ${body.error || `HTTP ${res.status}`}`);
+        return;
+      }
+      setInstallError(null);
+      await load();
+    } catch (err: any) {
+      setInstallError(`Failed to uninstall ${name}: ${err.message}`);
+    }
   };
 
   const handleOpenRun = async (plugin: InstalledPlugin) => {

@@ -188,13 +188,14 @@ export async function validatePoCInSandbox(params: {
   if (!exploit) throw new Error(`Exploit ${params.exploitId} not found`);
   if (!exploit.code) throw new Error('Exploit has no code');
 
-  const { runtimeJobRunner } = await import('../runtime/job-runner.js');
+  const { runtimeJobRunner, RUNTIME_DATA_ROOT } = await import('../runtime/job-runner.js');
   const { promises: fs } = await import('fs');
   const path = await import('path');
   const crypto = await import('crypto');
 
-  // Write exploit code to a temp file
-  const tmpDir = path.join('X:/vulnforge/data/runtime', `poc-${crypto.randomBytes(4).toString('hex')}`);
+  // Write exploit code to a temp file under the env-configurable runtime
+  // data root (reused from job-runner so there's a single source of truth).
+  const tmpDir = path.join(RUNTIME_DATA_ROOT, `poc-${crypto.randomBytes(4).toString('hex')}`);
   await fs.mkdir(tmpDir, { recursive: true });
 
   const ext = exploit.language === 'python' ? '.py' : exploit.language === 'c' ? '.c' : '.sh';

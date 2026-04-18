@@ -29,7 +29,11 @@ import type {
   JobEvent,
 } from './types.js';
 
-const RUNTIME_DATA_ROOT = 'X:/vulnforge/data/runtime';
+// Runtime job artifacts (fuzz corpus, pcap captures, gdb session state,
+// ad-hoc PoC runs) land here. Env-configurable so a packaged install
+// outside of the developer's X:/ drive works.
+export const RUNTIME_DATA_ROOT =
+  process.env.VULNFORGE_RUNTIME_DIR || path.join(process.cwd(), 'data/runtime');
 
 // ── Runner ─────────────────────────────────────────────────────────────────
 

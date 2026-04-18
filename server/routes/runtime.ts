@@ -10,6 +10,7 @@ import {
   getFuzzCrashes,
   getFuzzCrashById,
   updateFuzzCrash,
+  getSandboxSnapshots,
   type RuntimeJobFilters,
 } from '../db.js';
 
@@ -198,24 +199,46 @@ router.get('/:id/packets', async (req: Request, res: Response) => {
     try { await fs.access(pcapPath); } catch { res.json({ data: [] }); return; }
 
     const limit = Number(req.query.limit) || 100;
-    const tsharkBin = process.platform === 'win32' ? 'C:\\Program Files\\Wireshark\\tshark.exe' : 'tshark';
-
-    try {
-      const result = await runCmd(tsharkBin, ['-r', pcapPath, '-T', 'fields',
-        '-e', 'frame.number', '-e', 'frame.time_relative', '-e', 'ip.src', '-e', 'ip.dst',
-        '-e', '_ws.col.Protocol', '-e', 'frame.len', '-e', '_ws.col.Info',
-        '-c', String(limit),
-      ], { timeout: 30000, maxBuffer: 8 * 1024 * 1024 });
-
-      const packets = result.stdout.trim().split('\n').filter(Boolean).map(line => {
-        const [num, time, src, dst, proto, len, info] = line.split('\t');
-        return { number: parseInt(num), time: parseFloat(time), src, dst, protocol: proto, length: parseInt(len), info };
-      });
-
-      res.json({ data: packets, total: packets.length });
-    } catch (err: any) {
-      res.json({ data: [], error: `tshark failed: ${err.message}` });
+    // Resolve the tshark binary in a portable order. We walk the
+    // candidate list and try each until one spawns successfully, so a
+    // Windows install with Wireshark in a non-standard path just needs
+    // VULNFORGE_TSHARK set (or tshark on PATH).
+    const tsharkCandidates: string[] = [];
+    if (process.env.VULNFORGE_TSHARK) tsharkCandidates.push(process.env.VULNFORGE_TSHARK);
+    tsharkCandidates.push('tshark');
+    if (process.platform === 'win32') {
+      tsharkCandidates.push(
+        'C:\\Program Files\\Wireshark\\tshark.exe',
+        'C:\\Program Files (x86)\\Wireshark\\tshark.exe',
+      );
     }
+
+    const args = ['-r', pcapPath, '-T', 'fields',
+      '-e', 'frame.number', '-e', 'frame.time_relative', '-e', 'ip.src', '-e', 'ip.dst',
+      '-e', '_ws.col.Protocol', '-e', 'frame.len', '-e', '_ws.col.Info',
+      '-c', String(limit),
+    ];
+    let lastError: any = null;
+    for (const bin of tsharkCandidates) {
+      try {
+        const result = await runCmd(bin, args, { timeout: 30000, maxBuffer: 8 * 1024 * 1024 });
+        const packets = result.stdout.trim().split('\n').filter(Boolean).map(line => {
+          const [num, time, src, dst, proto, len, info] = line.split('\t');
+          return { number: parseInt(num), time: parseFloat(time), src, dst, protocol: proto, length: parseInt(len), info };
+        });
+        res.json({ data: packets, total: packets.length });
+        return;
+      } catch (err: any) {
+        lastError = err;
+        // Only retry on spawn-level ENOENT; if tshark ran but failed,
+        // that's a real error and further candidates won't help.
+        if (err?.code !== 'ENOENT' && !/not found/i.test(String(err?.message))) break;
+      }
+    }
+    res.status(503).json({
+      data: [],
+      error: `tshark unavailable. Install Wireshark or set VULNFORGE_TSHARK. Last error: ${lastError?.message || 'unknown'}`,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -285,7 +308,9 @@ router.post('/:id/snapshot', async (req: Request, res: Response) => {
 // GET /api/runtime/:id/snapshots
 router.get('/:id/snapshots', (req: Request, res: Response) => {
   try {
-    const { getSandboxSnapshots } = require('../db.js');
+    // getSandboxSnapshots is imported at the top of this file — the old
+    // `require(...)` call here threw "require is not defined" in strict
+    // ESM the moment the endpoint was hit.
     const snaps = getSandboxSnapshots(String(req.params.id));
     res.json({ data: snaps, total: snaps.length });
   } catch (err: any) {
