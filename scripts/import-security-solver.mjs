@@ -23,6 +23,11 @@ import process from 'process';
 
 const args = new Set(process.argv.slice(2));
 const DRY_RUN = args.has('--dry-run');
+// --update: when a finding with the same title already exists, PUT
+// the new field values onto it instead of skipping. Useful when the
+// source doc is refined and we want to refresh CVSS / impact / fix
+// etc. without duplicating rows.
+const UPDATE = args.has('--update');
 const API_FLAG = process.argv.indexOf('--api');
 const API = API_FLAG >= 0
   ? process.argv[API_FLAG + 1]
@@ -79,8 +84,42 @@ function parseMasterTable(md) {
 }
 
 /**
+ * Extract a markdown subsection by heading name. The heading can be
+ * at any depth (### or ####); matching is case-insensitive. Returns
+ * the body text up to the next heading of equal or shallower depth,
+ * or null if the section isn't present.
+ */
+function extractSection(block, heading) {
+  const re = new RegExp(
+    `^(#{3,4})\\s+${heading}\\s*$([\\s\\S]*?)(?=^#{1,4}\\s|$)`,
+    'im',
+  );
+  const m = block.match(re);
+  return m ? m[2].trim() : null;
+}
+
+/** First fenced code block inside some text. Language hint ignored. */
+function extractFirstFence(text) {
+  if (!text) return null;
+  const m = text.match(/```[\w-]*\s*\n([\s\S]*?)```/);
+  return m ? m[1].trim() : null;
+}
+
+/** `**Label:**` value on the same line. */
+function extractBoldLabel(block, label) {
+  const re = new RegExp(`\\*\\*${label}:\\*\\*\\s*(.+?)(?:\\n|$)`, 'i');
+  const m = block.match(re);
+  return m ? m[1].trim().replace(/^`|`$/g, '') : null;
+}
+
+/**
  * Parse per-finding sections. Each starts with `## F-NN:` or `### F-NN:`
  * and runs until the next such header or end of file.
+ *
+ * Pulls out as many fields as the source doc exposes so the resulting
+ * vulnerability row carries the same context a human reviewer would
+ * want: Summary, Vulnerable Code snippet, Proposed Fix, Impact, and
+ * Reproduction / Attack Chain for repro_steps.
  */
 function parsePerFindingSections(md) {
   const out = {};
@@ -95,31 +134,76 @@ function parsePerFindingSections(md) {
     const end = i + 1 < matches.length ? matches[i + 1].start : md.length;
     const body = md.slice(start, end);
 
+    // File + line number (first "**File:**" bold label)
     let file = null;
     let lineStart = null;
     let lineEnd = null;
-    const fileMatch = body.match(/\*\*File:\*\*\s*`?([^`\n]+?)`?\s*(?:\n|$)/);
-    if (fileMatch) {
-      const raw = fileMatch[1].trim();
-      const locMatch = raw.match(/^(.+?):(\d+)(?:-(\d+))?$/);
+    const fileRaw = extractBoldLabel(body, 'File');
+    if (fileRaw) {
+      const locMatch = fileRaw.match(/^(.+?):(\d+)(?:-(\d+))?/);
       if (locMatch) {
         file = locMatch[1].trim();
         lineStart = Number(locMatch[2]);
         lineEnd = locMatch[3] ? Number(locMatch[3]) : lineStart;
       } else {
-        file = raw;
+        file = fileRaw;
       }
     }
 
     const cweMatch = body.match(/\bCWE-\d{1,4}\b/);
     const cwe = cweMatch ? cweMatch[0] : null;
 
-    const description = body.replace(headerLine, '').trim();
+    // Meaningful subsections
+    const summary = extractSection(body, 'Summary');
+    const vulnCode = extractSection(body, 'Vulnerable Code');
+    const proposedFix = extractSection(body, 'Proposed Fix')
+      || extractSection(body, 'Fix');
+    const impactSection = extractSection(body, 'Impact');
+    const attackChain = extractSection(body, 'Attack Chain');
+    const reproduction = extractSection(body, 'Reproduction');
+    const exploitation = extractSection(body, 'Exploitation');
 
-    out[id] = { file, lineStart, lineEnd, cwe, description, headerLine };
+    const codeSnippet = extractFirstFence(vulnCode || '') || extractFirstFence(body);
+    const fixSnippet = extractFirstFence(proposedFix || '');
+    const triggerText = extractBoldLabel(body, 'Trigger');
+
+    // Reproduction steps: prefer explicit section, then Attack Chain,
+    // then the Trigger bold label if that's all we have.
+    const reproSteps = reproduction
+      || attackChain
+      || exploitation
+      || (triggerText ? `Trigger: ${triggerText}` : null);
+
+    // Description prefers the Summary section if present, otherwise
+    // the whole block minus the header (old behaviour).
+    const description = summary
+      ? summary
+      : body.replace(headerLine, '').trim();
+
+    out[id] = {
+      file, lineStart, lineEnd, cwe,
+      description,
+      codeSnippet,
+      proposedFix: proposedFix || fixSnippet,
+      impact: impactSection,
+      reproductionSteps: reproSteps,
+      headerLine,
+    };
   }
   return out;
 }
+
+// Approximate CVSS scores per severity bucket. Source audit doesn't
+// give proper CVSS strings, so we plant a representative base-score
+// that lines up roughly with the severity label. Users can tune the
+// exact numbers per finding later in the Finding Detail page; this
+// is just a sensible starting point so the CVSS column isn't empty.
+const CVSS_BY_SEVERITY = {
+  Critical: 9.5,
+  High:     8.1,
+  Medium:   6.1,
+  Low:      3.7,
+};
 
 function toVulnerabilityRow(id, master, detail) {
   if (!master) return null;
@@ -128,18 +212,25 @@ function toVulnerabilityRow(id, master, detail) {
     title: master.name,
     severity: master.severity,
     status: master.status,
+    // CVSS: placeholder derived from severity so the column isn't
+    // blank. Reviewers refine per finding in the UI.
+    cvss: CVSS_BY_SEVERITY[master.severity] ?? null,
+    cvss_vector: null,
     file: detailFile,
-    line_number: detail?.lineStart ?? null,
+    // DB schema uses line_start + line_end; `line_number` was a legacy
+    // alias in the TS type that never existed as a column. Sending it
+    // makes updateVulnerability throw "no such column: line_number".
     line_start: detail?.lineStart ?? null,
     line_end: detail?.lineEnd ?? null,
     cwe: detail?.cwe ?? null,
     description: (detail?.description || '').slice(0, 20_000),
+    // Free-form markdown preserved for each enriched field so the
+    // Finding Detail page renders headings / code blocks / bullets.
+    impact: detail?.impact ?? null,
+    code_snippet: detail?.codeSnippet ?? null,
+    suggested_fix: detail?.proposedFix ?? null,
+    reproduction_steps: detail?.reproductionSteps ?? null,
     method: `Manual triage (RALPH Loop v3) - ${master.type || 'static analysis'}`,
-    notes: [
-      `Imported from ${path.basename(SOURCE)} (${id})`,
-      master.project ? `Project: ${master.project}` : null,
-      master.notes ? `Audit note: ${master.notes}` : null,
-    ].filter(Boolean).join('\n'),
   };
 }
 
@@ -162,6 +253,19 @@ async function apiPost(pathname, body) {
   return r.json();
 }
 
+async function apiPut(pathname, body) {
+  const r = await fetch(API + pathname, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const text = await r.text().catch(() => '');
+    throw new Error(`PUT ${pathname} -> HTTP ${r.status}: ${text.slice(0, 300)}`);
+  }
+  return r.json();
+}
+
 async function main() {
   if (!existsSync(SOURCE)) {
     console.error(`source file not found: ${SOURCE}`);
@@ -175,18 +279,20 @@ async function main() {
   const ids = Object.keys(master).sort();
   console.log(`[import] parsed ${ids.length} master rows, ${Object.keys(detail).length} detail sections`);
 
-  let existingTitles = new Set();
+  // Pre-fetch existing titles → id so we can either skip or update.
+  let existingByTitle = new Map();
   if (!DRY_RUN) {
     try {
       const resp = await apiGet('/vulnerabilities?limit=500');
-      for (const v of resp.data || []) existingTitles.add(v.title);
-      console.log(`[import] ${existingTitles.size} vulnerabilities already in DB`);
+      for (const v of resp.data || []) existingByTitle.set(v.title, v.id);
+      console.log(`[import] ${existingByTitle.size} vulnerabilities already in DB`);
     } catch (err) {
       console.warn(`[import] could not pre-fetch existing vulns (${err.message}); skipping de-dup`);
     }
   }
 
   let created = 0;
+  let updated = 0;
   let skipped = 0;
   let errored = 0;
 
@@ -194,29 +300,45 @@ async function main() {
     const row = toVulnerabilityRow(id, master[id], detail[id]);
     if (!row) { errored++; continue; }
 
-    if (existingTitles.has(row.title)) {
-      console.log(`  SKIP ${id}  "${row.title.slice(0, 60)}" (already exists)`);
+    const existingId = existingByTitle.get(row.title);
+
+    if (DRY_RUN) {
+      const tag = existingId ? (UPDATE ? 'UPD-DRY' : 'SKIP-DRY') : 'NEW-DRY';
+      const extras = [
+        row.cvss != null ? `cvss=${row.cvss}` : null,
+        row.code_snippet ? 'code' : null,
+        row.suggested_fix ? 'fix' : null,
+        row.impact ? 'impact' : null,
+        row.reproduction_steps ? 'repro' : null,
+      ].filter(Boolean).join(',');
+      console.log(`  ${tag} ${id}  [${row.severity}] ${row.title.slice(0, 55)}  (${extras || 'no extras'})`);
+      continue;
+    }
+
+    if (existingId && !UPDATE) {
+      console.log(`  SKIP ${id}  "${row.title.slice(0, 55)}" (exists, use --update to refresh)`);
       skipped++;
       continue;
     }
 
-    if (DRY_RUN) {
-      console.log(`  DRY  ${id}  [${row.severity}] ${row.title} @ ${row.file || '?'}:${row.line_number || '?'}`);
-      continue;
-    }
-
     try {
-      const res = await apiPost('/vulnerabilities', row);
-      const newId = res?.id ?? res?.vuln?.id ?? '?';
-      console.log(`  NEW  ${id}  id=${newId}  [${row.severity}] ${row.title.slice(0, 60)}`);
-      created++;
+      if (existingId) {
+        await apiPut(`/vulnerabilities/${existingId}`, row);
+        console.log(`  UPD  ${id}  id=${existingId}  [${row.severity}] ${row.title.slice(0, 55)}`);
+        updated++;
+      } else {
+        const res = await apiPost('/vulnerabilities', row);
+        const newId = res?.id ?? res?.vuln?.id ?? '?';
+        console.log(`  NEW  ${id}  id=${newId}  [${row.severity}] ${row.title.slice(0, 55)}`);
+        created++;
+      }
     } catch (err) {
       console.warn(`  ERR  ${id}  ${err.message}`);
       errored++;
     }
   }
 
-  console.log(`\n[import] done. created=${created} skipped=${skipped} errored=${errored}`);
+  console.log(`\n[import] done. created=${created} updated=${updated} skipped=${skipped} errored=${errored}`);
 }
 
 main().catch((err) => {

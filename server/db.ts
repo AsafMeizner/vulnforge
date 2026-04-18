@@ -1185,12 +1185,39 @@ export function createVulnerability(v: Vulnerability): number {
   );
 }
 
+// Whitelist of columns that actually exist on the vulnerabilities
+// table. Matches the CREATE TABLE above. Kept here so
+// updateVulnerability silently drops unknown keys (e.g. legacy TS
+// aliases like `line_number`, or type-only fields like `notes` that
+// were never migrated) instead of letting SQLite return a 500 on the
+// unknown-column error. If you add a new column, migrate the table
+// AND extend this list.
+const VULN_COLUMNS = new Set([
+  'project_id', 'title', 'severity', 'status', 'cvss', 'cvss_vector', 'cwe',
+  'file', 'line_start', 'line_end', 'code_snippet',
+  'description', 'impact', 'reproduction_steps',
+  'suggested_fix', 'fix_diff',
+  'method', 'tool_name', 'confidence',
+  'verified', 'false_positive',
+  'advisory', 'advisory_url',
+  'submit_to', 'submit_email', 'email_chain_url', 'issue_url',
+  'response', 'rejection_reason',
+  'sub_findings',
+  'disclosure_content', 'how_to_submit_content',
+  'ai_triage', 'ai_summary',
+  'submitted_at', 'resolved_at',
+]);
+
 export function updateVulnerability(id: number, v: Partial<Vulnerability>): void {
-  const exclude = ['id', 'found_at'];
-  const fields = Object.keys(v).filter(k => !exclude.includes(k));
+  // Drop unknown keys before building the SQL. This avoids 500s when
+  // callers send legacy aliases (e.g. the TS `line_number` field that
+  // was never a real column) and provides a cheap safety net against
+  // SQL injection via column names (only whitelisted identifiers can
+  // reach the SET clause).
+  const fields = Object.keys(v).filter((k) => VULN_COLUMNS.has(k));
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
-  const values = fields.map(f => (v as any)[f]);
+  const setClause = fields.map((f) => `${f} = ?`).join(', ');
+  const values = fields.map((f) => (v as any)[f]);
   db.run(
     `UPDATE vulnerabilities SET ${setClause}, updated_at = datetime('now') WHERE id = ?`,
     [...values, id]
