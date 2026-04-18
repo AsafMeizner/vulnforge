@@ -19,6 +19,10 @@
     "rootDir": "./electron",
     "noEmitOnError": false
   },
+  // preload.ts is compiled by `tsconfig.electron-preload.json` as CJS
+  // (Electron's preload sandbox doesn't accept ESM). Excluding it here
+  // avoids double-compiling it with the wrong module format and
+  // overwriting the correct output.
   "include": ["electron/**/*.ts"],
-  "exclude": ["node_modules", "electron/**/*.test.ts"]
+  "exclude": ["node_modules", "electron/**/*.test.ts", "electron/preload.ts"]
 }

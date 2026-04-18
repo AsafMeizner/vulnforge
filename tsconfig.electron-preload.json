@@ -1,0 +1,26 @@
+{
+  // Preload scripts run in Electron's sandboxed renderer context, which
+  // requires CommonJS output - NOT ESM. Compiling preload.ts with the
+  // main `tsconfig.electron.json` produced ESM `import` statements that
+  // threw "Cannot use import statement outside a module" the moment the
+  // packaged app launched. This config is dedicated to preload.ts and
+  // emits CJS that the sandbox accepts.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": false,
+    "sourceMap": false,
+    "declaration": false,
+    "resolveJsonModule": true,
+    "outDir": "./electron",
+    "rootDir": "./electron",
+    "noEmitOnError": false
+  },
+  // Use `files` (not `include`) so TypeScript's automatic outDir-exclude
+  // doesn't wipe out the one file we want to compile in place.
+  "files": ["electron/preload.ts"]
+}

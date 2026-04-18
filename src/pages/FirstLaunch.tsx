@@ -152,7 +152,7 @@ export default function FirstLaunch({ onFinished }: Props) {
   return (
     <div style={card}>
       <img
-        src="/brand/logo-wide-white.svg"
+        src={`${import.meta.env.BASE_URL}brand/logo-wide-white.svg`}
         alt="VulnForge"
         style={{ display: 'block', width: '100%', maxWidth: 360, height: 'auto', margin: '0 auto 18px' }}
       />

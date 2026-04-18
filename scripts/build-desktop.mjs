@@ -32,8 +32,16 @@ run('npx', ['vite', 'build']);
 console.log('[build] tsc server (dist-server/)…');
 run('npx', ['tsc', '-p', 'tsconfig.server.json']);
 
-console.log('[build] tsc electron main + preload…');
+console.log('[build] tsc electron main (ESM)…');
 run('npx', ['tsc', '-p', 'tsconfig.electron.json']);
+
+// preload.ts MUST compile to CommonJS. Electron's preload sandbox
+// context rejects ESM `import` statements with
+// "Cannot use import statement outside a module", and that breaks
+// every IPC bridge the renderer needs. The dedicated tsconfig emits
+// CJS with `require("electron")`.
+console.log('[build] tsc electron preload (CJS)…');
+run('npx', ['tsc', '-p', 'tsconfig.electron-preload.json']);
 
 // electron-builder flags.
 const args = ['electron-builder'];

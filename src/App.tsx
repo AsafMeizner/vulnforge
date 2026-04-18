@@ -320,7 +320,7 @@ export default function App() {
           {/* Brand */}
           <div style={{ padding: '6px 12px 18px', borderBottom: '1px solid var(--border)', marginBottom: 8 }}>
             <img
-              src="/brand/logo-wide-white.svg"
+              src={`${import.meta.env.BASE_URL}brand/logo-wide-white.svg`}
               alt="VulnForge"
               style={{ display: 'block', width: '100%', height: 'auto', maxHeight: 64 }}
             />

@@ -36,6 +36,19 @@ function resolveApiBase(): string {
   }
   const injected = (window as any).__VULNFORGE_API_BASE__;
   if (typeof injected === 'string' && injected) return injected;
+  // Packaged Electron opens index.html via file://. If neither the
+  // `?api=` search param nor the preload-injected global is available
+  // (e.g. the preload script failed to load), `/api` would resolve
+  // against the file URL and produce `file:///C:/api/...` - guaranteed
+  // ERR_FILE_NOT_FOUND. Fall back to the default server port on
+  // loopback so the user at least sees a working app instead of a
+  // blank page. Dev/web builds (http: or https:) still prefer '/api'
+  // which the vite proxy handles.
+  try {
+    if (window.location.protocol === 'file:') {
+      return 'http://127.0.0.1:3001/api';
+    }
+  } catch { /* ignore */ }
   return '/api';
 }
 
