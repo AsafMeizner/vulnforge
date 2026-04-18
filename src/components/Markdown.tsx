@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
+import { highlightReact } from '@/lib/hljs';
 
 /**
  * Minimal, dependency-free markdown renderer. Built so finding
@@ -149,7 +150,11 @@ function splitBlocks(src: string): Block[] {
 
 function renderBlock(b: Block, key: number): ReactNode {
   switch (b.kind) {
-    case 'code':
+    case 'code': {
+      // Fenced blocks render with syntax colouring via highlight.js.
+      // highlightReact() returns React elements rather than raw HTML,
+      // so we don't need to use any raw-HTML injection attribute.
+      const tokens = highlightReact(b.text, b.lang);
       return (
         <pre
           key={key}
@@ -170,9 +175,12 @@ function renderBlock(b: Block, key: number): ReactNode {
           {b.lang && (
             <div style={{ color: 'var(--muted)', fontSize: 10, marginBottom: 6 }}>{b.lang}</div>
           )}
-          {b.text}
+          <code className={b.lang ? `language-${b.lang} hljs` : 'hljs'}>
+            {tokens}
+          </code>
         </pre>
       );
+    }
     case 'heading': {
       const size = [0, 18, 16, 14, 13][b.level] || 13;
       return (

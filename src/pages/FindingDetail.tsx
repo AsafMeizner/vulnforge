@@ -28,6 +28,7 @@ import { SeverityBadge, StatusBadge, CvssScore } from '@/components/Badge';
 import { useToast } from '@/components/Toast';
 import { NotesPanel } from '@/components/NotesPanel';
 import { Markdown } from '@/components/Markdown';
+import { highlightReact } from '@/lib/hljs';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -191,6 +192,11 @@ function SkeletonBlock() {
 
 function CodeBlock({ code, language = 'c' }: { code: string; language?: string }) {
   const lines = code.split('\n');
+  // Syntax-highlight each line with hljs. Per-line tokenisation is
+  // good enough for the short snippets we show in Affected Code; the
+  // rare multi-line token (block comments, template literals) loses
+  // colour continuity but the code still renders correctly.
+  const highlighted = lines.map((l) => highlightReact(l, language));
   return (
     <div style={{ position: 'relative', background: '#0d1117', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
       <div style={{
@@ -221,8 +227,8 @@ function CodeBlock({ code, language = 'c' }: { code: string; language?: string }
                 }}>
                   {i + 1}
                 </td>
-                <td style={{ padding: '0 16px', color: 'var(--text)', whiteSpace: 'pre', lineHeight: '20px' }}>
-                  {line || ' '}
+                <td className="hljs" style={{ padding: '0 16px', color: 'var(--text)', whiteSpace: 'pre', lineHeight: '20px', background: 'transparent' }}>
+                  {line ? highlighted[i] : ' '}
                 </td>
               </tr>
             ))}

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { detectLanguage, highlightReact } from '@/lib/hljs';
 
 /**
  * Render a file's contents with line numbers and highlight the lines
@@ -54,6 +55,22 @@ export function CodeViewer({
   const lines = content.split(/\r?\n/);
   const start = lineStart ?? 0;
   const end = lineEnd ?? lineStart ?? 0;
+
+  // Detect language from the path's extension once per render. When
+  // detectLanguage returns undefined, highlightReact falls back to
+  // hljs auto-detect on each line — slightly slower but robust.
+  const lang = useMemo(() => detectLanguage(path), [path]);
+
+  // Highlight each line independently. Trade-off: multi-line tokens
+  // (like C block comments or JS template literals spanning lines)
+  // lose continuity because each line is tokenised fresh. For
+  // vulnerability snippets this is fine — they're almost always
+  // statement-level — and the per-line structure we need for the
+  // yellow "vulnerable line" highlight is preserved exactly.
+  const highlightedLines = useMemo(
+    () => lines.map((l) => highlightReact(l, lang)),
+    [lines, lang],
+  );
 
   // If contextLines is set, slice the displayed range so we don't render
   // a 10k-line file blob for a bug on line 42. Otherwise show everything.
@@ -129,14 +146,16 @@ export function CodeViewer({
                     {lineNumber}
                   </td>
                   <td
+                    className="hljs"
                     style={{
                       padding: '0 10px',
                       whiteSpace: 'pre',
                       color: 'var(--text)',
                       verticalAlign: 'top',
+                      background: 'transparent',  // let the row's highlight show
                     }}
                   >
-                    {line || '\u00a0'}
+                    {line ? highlightedLines[visibleFrom - 1 + i] : '\u00a0'}
                   </td>
                 </tr>
               );
