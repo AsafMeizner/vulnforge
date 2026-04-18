@@ -12,7 +12,6 @@
     "dev:server": "tsx watch server/index.ts",
     "dev:server:team": "cross-env VULNFORGE_MODE=server tsx watch server/index.ts",
     "dev:client": "vite",
-    "seed": "tsx seed.ts",
     "build": "vite build",
     "build:server": "tsc -p tsconfig.server.json",
     "build:electron": "tsc -p tsconfig.electron.json && tsc -p tsconfig.electron-preload.json",

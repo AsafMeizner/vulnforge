@@ -42,6 +42,39 @@ let serverProcess: ChildProcess | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
+// ── CR-15: IPC path allowlist ───────────────────────────────────────────
+//
+// The renderer calls ipcRenderer.invoke('open-path', <string>) to hand
+// the OS a path to open. Without validation, a compromised renderer (or
+// XSS in any rendered content) could hand us arbitrary absolute paths
+// and we'd happily shell them - including executables under
+// C:\Windows\System32, SSH keys, etc.
+//
+// The allowlist tracks paths the user explicitly picked via a native
+// file/directory dialog during this session. Anything else must live
+// under the app's userData dir (a per-user sandbox we control). Outside
+// those two buckets: refuse.
+//
+// Blocked extensions are refused unconditionally. Even if the user
+// picked foo.exe via a file dialog, we won't shell-open an executable
+// through this channel - there's no legitimate VulnForge workflow that
+// needs the renderer to launch binaries.
+const allowedOpenPaths = new Set<string>();
+const BLOCKED_EXTS = new Set<string>([
+  '.exe', '.bat', '.cmd', '.ps1', '.psm1', '.sh', '.app', '.msi',
+  '.scr', '.com', '.vbs', '.vbe', '.js', '.jse', '.jar', '.wsf', '.wsh',
+]);
+
+/** Remember that the user explicitly picked this path via a dialog. */
+function rememberPath(p?: string | null): void {
+  if (!p) return;
+  try {
+    allowedOpenPaths.add(path.resolve(p));
+  } catch {
+    /* non-absolute/garbage path - ignore */
+  }
+}
+
 // The port the backend actually bound to. Starts as the preferred 3001
 // but the server will increment on EADDRINUSE and report back the real
 // value. Window + tray display + renderer injection all use this.
@@ -475,15 +508,47 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle('open-path', (_evt, p: string) => {
     if (typeof p !== 'string' || !p) return '';
-    return shell.openPath(p);
+    // Resolve to an absolute normalised path so attackers can't bypass
+    // the allowlist with `./` or `..` tricks.
+    let resolved: string;
+    try {
+      resolved = path.resolve(p);
+    } catch {
+      return 'refused: invalid path';
+    }
+
+    const ext = path.extname(resolved).toLowerCase();
+    if (BLOCKED_EXTS.has(ext)) {
+      return `refused: ${ext} files cannot be opened via this channel`;
+    }
+
+    // Allow anything under the per-user data dir - that's where
+    // VulnForge stores its own reports, dbs, scan outputs, etc.
+    const userData = app.getPath('userData');
+    const inUserData =
+      resolved === userData || resolved.startsWith(userData + path.sep);
+
+    // Otherwise, the path must have been picked by the user via a
+    // dialog earlier in this session.
+    if (!inUserData && !allowedOpenPaths.has(resolved)) {
+      return 'refused: path not previously selected by the user';
+    }
+
+    return shell.openPath(resolved);
   });
   ipcMain.handle('open-file-dialog', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openFile'] });
-    return r.canceled ? null : r.filePaths[0];
+    if (r.canceled) return null;
+    const picked = r.filePaths[0];
+    rememberPath(picked);
+    return picked;
   });
   ipcMain.handle('open-directory-dialog', async () => {
     const r = await dialog.showOpenDialog({ properties: ['openDirectory'] });
-    return r.canceled ? null : r.filePaths[0];
+    if (r.canceled) return null;
+    const picked = r.filePaths[0];
+    rememberPath(picked);
+    return picked;
   });
 }
 
