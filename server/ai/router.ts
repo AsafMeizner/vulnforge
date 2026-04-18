@@ -30,6 +30,37 @@ export interface AIResponse {
 
 // ── Internal: dispatch to a named provider ─────────────────────────────────
 
+/**
+ * Resolve a free-form provider name to a canonical backend key.
+ *
+ * The switch below dispatches on exact strings ("ollama", "claude", ...).
+ * Historically this meant users had to name their provider rows with
+ * exactly those keywords; "Ollama (local)" would fall through to
+ * `default: throw "Unknown AI provider"`. Now we check a sequence of
+ * cues from the provider record itself before giving up:
+ *   1. Exact match on the canonical keywords
+ *   2. Lowercased name starts with a known keyword
+ *   3. base_url port (11434=ollama, `claude-cli`=cli)
+ * Anything we still can't identify falls through to the switch default.
+ */
+function canonicalProviderKey(
+  nameOrId: string,
+  record: { base_url?: string | null; name?: string | null } | undefined,
+): string {
+  const known = ['ollama', 'claude_cli', 'claude', 'openai', 'gemini'];
+  const n = (nameOrId || '').toLowerCase();
+  for (const k of known) if (n === k) return k;
+  for (const k of known) if (n.startsWith(k)) return k;
+  const recName = (record?.name || '').toLowerCase();
+  for (const k of known) if (recName.startsWith(k)) return k;
+  const url = (record?.base_url || '').toLowerCase();
+  if (url.includes(':11434') || url.includes('ollama')) return 'ollama';
+  if (url.includes('anthropic') || url.includes('claude.ai')) return 'claude';
+  if (url.includes('openai') || url.includes('/v1/chat/completions')) return 'openai';
+  if (url.includes('generativelanguage.googleapis.com')) return 'gemini';
+  return n; // fall through to the switch default (caller will throw)
+}
+
 async function dispatchToProvider(
   providerName: string,
   model: string | undefined,
@@ -41,9 +72,13 @@ async function dispatchToProvider(
   const allProviders = getAllAIProviders();
   const providerRecord = allProviders.find(
     p => p.name.toLowerCase() === providerName.toLowerCase()
+  ) || allProviders.find(
+    p => canonicalProviderKey(p.name, p) === canonicalProviderKey(providerName, undefined),
   );
 
-  switch (providerName.toLowerCase()) {
+  const canonical = canonicalProviderKey(providerName, providerRecord);
+
+  switch (canonical) {
     case 'ollama': {
       const ollamaMessages: OllamaMessage[] = [];
       if (systemPrompt) ollamaMessages.push({ role: 'system', content: systemPrompt });
@@ -140,7 +175,11 @@ async function dispatchToProvider(
     }
 
     default:
-      throw new Error(`Unknown AI provider: ${providerName}`);
+      throw new Error(
+        `Unknown AI provider: "${providerName}" (resolved to "${canonical}"). ` +
+        `Supported backends: ollama, claude, claude_cli, openai, gemini. ` +
+        `Either rename the provider row or set its base_url so the resolver can infer the backend.`,
+      );
   }
 }
 

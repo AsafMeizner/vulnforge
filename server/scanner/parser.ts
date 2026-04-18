@@ -79,14 +79,24 @@ function splitIntoFindings(markdown: string): RawFinding[] {
   const splitRegex = /(?=^#{1,4}\s*(?:\[)?(CRITICAL|HIGH|MEDIUM|MED|LOW|INFO(?:RMATIONAL)?)\]?\s)/im;
   const blocks = markdown.split(splitRegex);
 
-  // blocks will have the captured severity groups interspersed - reassemble
+  // String.prototype.split with a capture group interleaves the
+  // captured text into the result array. Since the split uses a
+  // lookahead `(?=^#{1,4}\s*...(SEV)...)`, no text is consumed — the
+  // "SEV" capture is duplicative of what already starts the next block
+  // (`### HIGH ...`). The old code prepended the captured severity to
+  // the next block, producing titles like `HIGH### [HIGH] obfuscation`
+  // because the FINDING_PATTERNS then failed to match and the fallback
+  // only stripped leading `#` characters.
+  //
+  // Fix: drop the capture-group blocks entirely. The "body" block that
+  // follows is already a well-formed `### SEV ...` heading.
   const assembled: string[] = [];
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
     if (/^(CRITICAL|HIGH|MEDIUM|MED|LOW|INFO(?:RMATIONAL)?)$/i.test(block.trim())) {
-      // This is a captured group - prepend to next block
+      // Captured severity group — the real block is the next one.
       if (i + 1 < blocks.length) {
-        assembled.push(block + blocks[i + 1]);
+        assembled.push(blocks[i + 1]);
         i++;
       }
     } else if (block.trim()) {

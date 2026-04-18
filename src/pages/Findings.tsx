@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getVulnerabilities } from '@/lib/api';
+import { getVulnerabilities, apiFetch } from '@/lib/api';
 import type { Vulnerability, Severity, VulnStatus } from '@/lib/types';
 import { SeverityBadge, StatusBadge, CvssScore } from '@/components/Badge';
 import { FindingDetailModal } from './FindingDetail';
@@ -41,6 +41,11 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
   const [sortKey, setSortKey] = useState<SortKey>('found_at');
   const [sortAsc, setSortAsc] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(initialVulnId ?? null);
+  // Count of raw scanner output waiting in the scan-findings queue.
+  // When the main vulnerabilities table is empty but this is > 0, the
+  // empty state nudges the user to Review instead of "run a scan"
+  // (which would be misleading — they already did).
+  const [pendingReview, setPendingReview] = useState(0);
   // Keyboard-focused row index (j/k navigation)
   const [focusedIdx, setFocusedIdx] = useState<number>(0);
   const tableRef = useRef<HTMLTableSectionElement>(null);
@@ -77,6 +82,22 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
   }, [severity, status, effectiveSearch, sortKey, sortAsc, page, toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Poll the scan-findings queue count alongside the main findings load,
+  // so the empty state knows whether to say "run a scan" or "review the
+  // N pending findings from your last run".
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch('/api/scan-findings?limit=1&status=pending');
+        if (!res.ok) return;
+        const body = await res.json();
+        if (!cancelled) setPendingReview(Number(body?.total) || 0);
+      } catch { /* non-fatal */ }
+    })();
+    return () => { cancelled = true; };
+  }, [total]);
 
   // Reset to page 1 when filters change
   useEffect(() => { setPage(1); }, [severity, status, effectiveSearch, sortKey, sortAsc]);
@@ -210,6 +231,37 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
           hasFilters ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
               No findings match current filters.
+            </div>
+          ) : pendingReview > 0 ? (
+            // A scan already ran but nothing's been promoted to the
+            // vulnerabilities table yet. Nudge the user into the Review
+            // queue instead of pretending no scan happened.
+            <div style={{ padding: 48, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+              <div style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>
+                {pendingReview.toLocaleString()} finding{pendingReview === 1 ? '' : 's'} waiting for review
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 420 }}>
+                Your scan produced raw findings that haven't been accepted into the main list yet.
+                Triage them in Review — accept, reject, or let AI batch-filter.
+              </div>
+              {onNavigate && (
+                <button
+                  onClick={() => onNavigate('review')}
+                  style={{
+                    background: 'var(--blue)',
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: '8px 18px',
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    marginTop: 4,
+                  }}
+                >
+                  Go to Review ({pendingReview.toLocaleString()})
+                </button>
+              )}
             </div>
           ) : (
             <div style={{ padding: 48, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
