@@ -126,7 +126,21 @@ function splitIntoFindings(markdown: string): RawFinding[] {
       title = headerLine.replace(/^#+\s*/, '').replace(/\*\*/g, '').trim();
     }
 
-    if (title) {
+    // Filter non-findings that creep in because they happen to look
+    // like an H2/H3 heading: report banners ("API Misuse Audit Results"),
+    // group-count headers ("(18 findings)", "2 findings"), and empty
+    // titles. These pollute the review queue with rows that carry no
+    // actionable content.
+    const looksLikeNoise =
+      !title ||
+      /^\(\s*\d+\s+findings?\s*\)\s*$/i.test(title) ||
+      /^\d+\s+findings?\s*$/i.test(title) ||
+      /\baudit\s+results\b/i.test(title) ||
+      /\btarget\s*:/i.test(title) ||
+      /^summary$/i.test(title) ||
+      /^findings?$/i.test(title);
+
+    if (title && !looksLikeNoise) {
       findings.push({
         severity,
         rawTitle: title,
