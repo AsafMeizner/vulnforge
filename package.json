@@ -70,7 +70,7 @@
     "appId": "com.vulnforge.app",
     "productName": "VulnForge",
     "directories": {
-      "output": "release9",
+      "output": "release",
       "buildResources": "public/brand"
     },
     "files": [
