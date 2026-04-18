@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { SeverityBadge, CvssScore } from '@/components/Badge';
 import { useToast } from '@/components/Toast';
 import {
@@ -7,9 +7,14 @@ import {
   acceptScanFinding,
   rejectScanFinding,
   bulkAcceptScanFindings,
+  getToolDescriptions,
+  getProjectFile,
+  deepTriageBatch,
+  resolveWsBase,
   type ScanFinding,
   type PipelineRun,
 } from '@/lib/api';
+import { CodeViewer } from '@/components/CodeViewer';
 
 interface ReviewQueueProps {
   pipelineId?: string;
@@ -25,6 +30,18 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [reviewed, setReviewed] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<'summary' | 'code' | 'fix' | 'raw'>('summary');
+  // Deep-triage UI state: description map, batch progress, verified-only
+  // filter, and the file-viewer modal's open state.
+  const [toolDescriptions, setToolDescriptions] = useState<Record<string, string>>({});
+  const [triageProgress, setTriageProgress] = useState<null | {
+    batchId: string; done: number; total: number;
+    verified: number; rejected: number; errored: number; completed: boolean;
+  }>(null);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [fileViewer, setFileViewer] = useState<null | {
+    projectId: number; path: string;
+    lineStart: number | null; lineEnd: number | null;
+  }>(null);
 
   // Load findings
   const loadFindings = useCallback(async () => {
@@ -53,6 +70,47 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
 
   useEffect(() => { loadFindings(); }, [loadFindings]);
 
+  // Fetch the tool_name -> description map once on mount.
+  useEffect(() => {
+    getToolDescriptions().then(setToolDescriptions).catch(() => { /* non-fatal */ });
+  }, []);
+
+  // Subscribe to deep-triage progress broadcasts over the WebSocket.
+  // Parses the JSON-encoded `detail` field the batch worker emits.
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    try { ws = new WebSocket(resolveWsBase()); } catch { return; }
+    ws.onmessage = (ev) => {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.type !== 'progress' || msg.category !== 'deep-triage' || !msg.id) return;
+        const detail = typeof msg.data?.detail === 'string' ? JSON.parse(msg.data.detail) : msg.data?.detail;
+        if (!detail) return;
+        setTriageProgress({
+          batchId: msg.id,
+          done: detail.done || 0, total: detail.total || 0,
+          verified: detail.verified || 0, rejected: detail.rejected || 0,
+          errored: detail.errored || 0, completed: !!detail.completed,
+        });
+        if (detail.completed) loadFindings();
+      } catch { /* malformed - ignore */ }
+    };
+    return () => { try { ws?.close(); } catch { /* */ } };
+  }, [loadFindings]);
+
+  // Verified-only filter: hide findings without a verified/likely verdict.
+  // Untriaged findings stay visible so the user can still review them.
+  const displayFindings = useMemo(() => {
+    if (!verifiedOnly) return findings;
+    return findings.filter((f) => {
+      if (!f.ai_verification) return false;
+      try {
+        const r = JSON.parse(f.ai_verification);
+        return r?.verdict === 'verified' || r?.verdict === 'likely';
+      } catch { return false; }
+    });
+  }, [findings, verifiedOnly]);
+
   // Keyboard navigation
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -74,7 +132,45 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
     return () => window.removeEventListener('keydown', onKey);
   }, [findings, currentIndex, viewMode]);
 
-  const current = findings[currentIndex];
+  const current = displayFindings[currentIndex] || findings[currentIndex];
+
+  const handleDeepTriageAll = async () => {
+    const pending = findings.filter((f) => f.status === 'pending');
+    if (pending.length === 0) { toast('info', 'No pending findings to triage'); return; }
+    const ok = window.confirm(
+      `Run AI Deep Triage on ${pending.length} pending findings?\n\n` +
+      'Each goes through 4 stages (verify -> test -> write -> verdict). ' +
+      'Ollama-backed triage takes 10-30s per finding; you can keep reviewing while it runs.',
+    );
+    if (!ok) return;
+    try {
+      const resp = await deepTriageBatch({
+        ids: pending.map((f) => f.id),
+        concurrency: 3,
+      });
+      toast('success', `Deep-triage started (${resp.total} findings)`);
+      setTriageProgress({
+        batchId: resp.batchId,
+        done: 0, total: resp.total,
+        verified: 0, rejected: 0, errored: 0, completed: false,
+      });
+    } catch (err: any) {
+      toast('error', `Deep-triage failed: ${err.message}`);
+    }
+  };
+
+  const handleViewInFile = (f: ScanFinding) => {
+    if (!f.file || !f.project_id) {
+      toast('error', 'Finding has no file/project - cannot open');
+      return;
+    }
+    setFileViewer({
+      projectId: f.project_id,
+      path: f.file,
+      lineStart: f.line_start ?? null,
+      lineEnd: f.line_end ?? null,
+    });
+  };
 
   const handleAccept = async () => {
     if (!current) return;
@@ -162,13 +258,25 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <span style={{ color: 'var(--text)', fontSize: 13, fontWeight: 500 }}>
-            {currentIndex + 1} of {findings.length} remaining
+            {currentIndex + 1} of {displayFindings.length} remaining
           </span>
           <span style={{ color: 'var(--muted)', fontSize: 12 }}>
             ({reviewed.size} reviewed)
           </span>
+
+          {/* Verified-only filter - only show rows whose AI verdict was verified/likely */}
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+            fontSize: 12, color: verifiedOnly ? 'var(--blue)' : 'var(--muted)',
+            padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6,
+          }}>
+            <input type="checkbox" checked={verifiedOnly}
+              onChange={(e) => { setVerifiedOnly(e.target.checked); setCurrentIndex(0); }}
+              style={{ margin: 0 }} />
+            Verified only
+          </label>
 
           {/* View mode toggle */}
           <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
@@ -182,11 +290,59 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
             </button>
           </div>
 
+          <button
+            onClick={handleDeepTriageAll}
+            disabled={!!triageProgress && !triageProgress.completed}
+            title="Run AI 4-stage triage (verify -> test -> write -> verdict) on every pending finding"
+            style={{
+              ...btnStyle('var(--blue)', true),
+              opacity: (!!triageProgress && !triageProgress.completed) ? 0.7 : 1,
+              cursor: (!!triageProgress && !triageProgress.completed) ? 'wait' : 'pointer',
+            }}
+          >
+            {triageProgress && !triageProgress.completed
+              ? `AI Triage ${triageProgress.done}/${triageProgress.total}`
+              : 'AI Deep Triage'}
+          </button>
+
           <button onClick={handleAcceptAll} style={btnStyle('var(--green)', true)}>
             Accept All ({findings.length})
           </button>
         </div>
       </div>
+
+      {/* Deep-triage progress strip - only while a batch is in flight */}
+      {triageProgress && !triageProgress.completed && (
+        <div style={{
+          padding: '6px 20px', borderBottom: '1px solid var(--border)',
+          background: 'color-mix(in srgb, var(--blue) 10%, transparent)',
+          display: 'flex', alignItems: 'center', gap: 14, fontSize: 12, color: 'var(--text)',
+        }}>
+          <strong>Deep triage</strong>
+          <span style={{ color: 'var(--muted)' }}>{triageProgress.done}/{triageProgress.total}</span>
+          <span style={{ width: 200, height: 6, background: 'var(--surface-2)', borderRadius: 3, overflow: 'hidden' }}>
+            <span style={{
+              display: 'block',
+              width: `${triageProgress.total === 0 ? 0 : Math.round((triageProgress.done / triageProgress.total) * 100)}%`,
+              height: '100%', background: 'var(--blue)', transition: 'width 0.3s ease',
+            }} />
+          </span>
+          <span style={{ color: 'var(--green)' }}>{triageProgress.verified} verified</span>
+          <span style={{ color: 'var(--muted)' }}>{triageProgress.rejected} rejected</span>
+          {triageProgress.errored > 0 && <span style={{ color: 'var(--red)' }}>{triageProgress.errored} errored</span>}
+        </div>
+      )}
+
+      {/* File-viewer modal - triggered by "View in file" on a finding */}
+      {fileViewer && (
+        <FileViewerModal
+          projectId={fileViewer.projectId}
+          path={fileViewer.path}
+          lineStart={fileViewer.lineStart}
+          lineEnd={fileViewer.lineEnd}
+          onClose={() => setFileViewer(null)}
+        />
+      )}
 
       {/* ── Main Content ─────────────────────────────────────────── */}
       {viewMode === 'card' ? (
@@ -225,6 +381,8 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
               finding={current}
               activeTab={activeTab}
               onTabChange={setActiveTab}
+              toolDescription={toolDescriptions[current.tool_name || ''] || null}
+              onViewInFile={() => handleViewInFile(current)}
             />}
 
             {/* Action buttons */}
@@ -323,11 +481,15 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
 // ── Finding Card Component ─────────────────────────────────────────────────
 
 function FindingCard({
-  finding, activeTab, onTabChange,
+  finding, activeTab, onTabChange, toolDescription, onViewInFile,
 }: {
   finding: ScanFinding;
   activeTab: string;
   onTabChange: (tab: 'summary' | 'code' | 'fix' | 'raw') => void;
+  /** Optional one-sentence description of what the scanner looks for. */
+  toolDescription?: string | null;
+  /** Invoked when the user clicks "View in file" on the code tab. */
+  onViewInFile?: () => void;
 }) {
   const verification = finding.ai_verification ? tryParse(finding.ai_verification) : null;
 
@@ -382,6 +544,53 @@ function FindingCard({
       <div style={{ padding: 20, minHeight: 200, maxHeight: 400, overflow: 'auto' }}>
         {activeTab === 'summary' && (
           <div>
+            {toolDescription && (
+              <div style={{
+                marginBottom: 16, padding: '10px 12px', borderRadius: 6,
+                background: 'color-mix(in srgb, var(--blue) 8%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--blue) 30%, var(--border))',
+              }}>
+                <div style={{ ...labelStyle, color: 'var(--blue)', marginBottom: 4 }}>
+                  What {finding.tool_name || 'this scanner'} checks for
+                </div>
+                <p style={{ color: 'var(--text)', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
+                  {toolDescription}
+                </p>
+              </div>
+            )}
+            {(() => {
+              // Deep-triage verdict block. Only render when we actually
+              // have a schema-v1 result — ignores the older ai_review
+              // JSON shape stored by the legacy /ai-review endpoint.
+              if (!verification || verification.v !== 1) return null;
+              const verdictColor = verification.verdict === 'verified' ? 'var(--green)'
+                : verification.verdict === 'likely' ? 'var(--blue)'
+                : verification.verdict === 'rejected' ? 'var(--muted)'
+                : verification.verdict === 'needs-runtime' ? 'var(--orange)'
+                : 'var(--muted)';
+              return (
+                <div style={{
+                  marginBottom: 16, padding: 12, borderRadius: 6,
+                  background: 'var(--bg)', border: `1px solid ${verdictColor}44`,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <div style={{ ...labelStyle, color: verdictColor, margin: 0 }}>
+                      AI Deep Triage
+                    </div>
+                    <span style={{
+                      padding: '2px 8px', borderRadius: 3, fontSize: 11, fontWeight: 700,
+                      background: `${verdictColor}22`, color: verdictColor, textTransform: 'uppercase',
+                    }}>{verification.verdict}</span>
+                    <span style={{ color: 'var(--muted)', fontSize: 11 }}>
+                      {verification.confidence}% confidence
+                    </span>
+                  </div>
+                  <p style={{ color: 'var(--text)', fontSize: 13, margin: 0, whiteSpace: 'pre-line' }}>
+                    {verification.rationale}
+                  </p>
+                </div>
+              );
+            })()}
             {finding.description && (
               <div style={{ marginBottom: 16 }}>
                 <div style={labelStyle}>Description</div>
@@ -423,14 +632,30 @@ function FindingCard({
         )}
 
         {activeTab === 'code' && (
-          <pre style={{
-            margin: 0, padding: 12, borderRadius: 6,
-            background: 'var(--bg)', border: '1px solid var(--border)',
-            overflow: 'auto', fontSize: 12, lineHeight: 1.5,
-            color: 'var(--text)', fontFamily: 'monospace',
-          }}>
-            {finding.code_snippet || 'No code snippet available.'}
-          </pre>
+          <div>
+            <pre style={{
+              margin: 0, padding: 12, borderRadius: 6,
+              background: 'var(--bg)', border: '1px solid var(--border)',
+              overflow: 'auto', fontSize: 12, lineHeight: 1.5,
+              color: 'var(--text)', fontFamily: 'monospace',
+            }}>
+              {finding.code_snippet || 'No code snippet available.'}
+            </pre>
+            {finding.file && onViewInFile && (
+              <button
+                onClick={onViewInFile}
+                style={{
+                  marginTop: 10, padding: '6px 14px', fontSize: 12,
+                  background: 'var(--surface-2)', color: 'var(--text)',
+                  border: '1px solid var(--border)', borderRadius: 5, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <span>&#128193;</span>
+                View {finding.file.split(/[/\\]/).pop()}{finding.line_start ? ` : ${finding.line_start}` : ''} in full
+              </button>
+            )}
+          </div>
         )}
 
         {activeTab === 'fix' && (
@@ -480,6 +705,92 @@ function FindingCard({
             </pre>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── File Viewer Modal ─────────────────────────────────────────────────────
+// Fetches the file from the server's /projects/:id/file endpoint and
+// renders it in a CodeViewer with the flagged line(s) highlighted.
+// Escape or backdrop click closes.
+
+function FileViewerModal({
+  projectId, path, lineStart, lineEnd, onClose,
+}: {
+  projectId: number;
+  path: string;
+  lineStart: number | null;
+  lineEnd: number | null;
+  onClose: () => void;
+}) {
+  const [content, setContent] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProjectFile(projectId, path)
+      .then((r) => { if (!cancelled) setContent(r.content); })
+      .catch((e) => { if (!cancelled) setError(e.message || String(e)); });
+    return () => { cancelled = true; };
+  }, [projectId, path]);
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, width: 'min(1100px, 95vw)', maxHeight: '88vh',
+          overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        }}
+      >
+        <div style={{
+          padding: '12px 16px', borderBottom: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div>
+            <strong style={{ color: 'var(--text)' }}>{path}</strong>
+            {lineStart && (
+              <span style={{ color: 'var(--muted)', marginLeft: 8, fontSize: 12 }}>
+                :{lineStart}{lineEnd && lineEnd !== lineStart ? `-${lineEnd}` : ''}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent', border: 'none', color: 'var(--muted)',
+              fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: 0,
+            }}
+            aria-label="Close"
+          >&times;</button>
+        </div>
+        <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+          {error ? (
+            <div style={{ color: 'var(--red)', fontSize: 13 }}>{error}</div>
+          ) : (
+            <CodeViewer
+              content={content}
+              path={path}
+              lineStart={lineStart}
+              lineEnd={lineEnd}
+              contextLines={60}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

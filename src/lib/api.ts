@@ -272,6 +272,49 @@ export const getTools = () => request<{ data: Tool[]; total: number }>('/tools')
 
 export const getTool = (id: string) => request<Tool>(`/tools/${id}`);
 
+// Map of scanner tool_name -> one-sentence "what this tool looks for".
+// Backed by server/data/tool-descriptions.json. Cached so repeated
+// Review-card renders don't re-fetch.
+let _toolDescriptionsCache: Record<string, string> | null = null;
+export async function getToolDescriptions(): Promise<Record<string, string>> {
+  if (_toolDescriptionsCache) return _toolDescriptionsCache;
+  const res = await request<{ data: Record<string, string> }>('/tools/descriptions');
+  _toolDescriptionsCache = res.data || {};
+  return _toolDescriptionsCache;
+}
+
+// Read a file from inside a project's local checkout. Server-side
+// validates the path doesn't escape the project root.
+export interface ProjectFileResponse {
+  path: string;
+  absolute: string;
+  size: number;
+  modified: string;
+  content: string;
+}
+export const getProjectFile = (projectId: number, path: string) =>
+  request<ProjectFileResponse>(`/projects/${projectId}/file?path=${encodeURIComponent(path)}`);
+
+// Kick off the 4-stage AI triage chain on one finding. Slow
+// (one LLM call per stage) - prefer the batch endpoint for many.
+export const deepTriageFinding = (id: number) =>
+  request<{ id: number; result: any }>(`/scan-findings/${id}/deep-triage`, { method: 'POST' });
+
+// Batch deep-triage. Returns a batchId immediately (202); listen on
+// the WebSocket ('deep-triage' category) for progress events.
+export const deepTriageBatch = (opts: {
+  ids?: number[];
+  pipeline_id?: string;
+  project_id?: number;
+  status?: string;
+  limit?: number;
+  concurrency?: number;
+}) =>
+  request<{ batchId: string; total: number }>(`/scan-findings/deep-triage-batch`, {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+
 // Plugins
 export interface InstalledPlugin {
   id: number;

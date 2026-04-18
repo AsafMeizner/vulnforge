@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { readdirSync, statSync, existsSync } from 'fs';
+import { readdirSync, statSync, existsSync, readFileSync } from 'fs';
 import path from 'path';
 import {
   getAllProjects,
@@ -83,6 +83,71 @@ router.get('/', (_req: Request, res: Response) => {
     res.json({ data: projects, total: projects.length });
   } catch (err: any) {
     console.error('GET /projects error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/projects/:id/file?path=<relative> - read a single file from
+// the project's local checkout and return its contents. Used by the
+// Review / Finding detail UI to display the vulnerable file with the
+// flagged line highlighted. Paths are validated against the project's
+// root to block `../` escapes.
+router.get('/:id/file', (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+    const project = getProjectById(id);
+    if (!project) { res.status(404).json({ error: 'Project not found' }); return; }
+    const projectRoot = project.path;
+    if (!projectRoot) { res.status(400).json({ error: 'Project has no local path' }); return; }
+
+    const reqPath = String(req.query.path || '').trim();
+    if (!reqPath) { res.status(400).json({ error: 'path query param required' }); return; }
+
+    // Resolve the requested path relative to the project root and make
+    // sure the result is still underneath it. Blocks `../../etc/passwd`
+    // and friends even if the project root itself is a symlink.
+    const fsRoot = path.resolve(projectRoot);
+    const abs = path.resolve(fsRoot, reqPath);
+    if (!abs.startsWith(fsRoot + path.sep) && abs !== fsRoot) {
+      res.status(400).json({ error: 'path escapes project root' });
+      return;
+    }
+    if (!existsSync(abs)) { res.status(404).json({ error: 'file not found' }); return; }
+
+    let stats;
+    try { stats = statSync(abs); } catch (err: any) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+    if (!stats.isFile()) { res.status(400).json({ error: 'not a regular file' }); return; }
+
+    // Cap reads at 2 MB so a user accidentally clicking on a binary
+    // doesn't OOM the server. Larger files can still be opened via
+    // VS Code externally.
+    const MAX_BYTES = 2 * 1024 * 1024;
+    if (stats.size > MAX_BYTES) {
+      res.status(413).json({
+        error: 'file too large to preview',
+        size: stats.size,
+        maxBytes: MAX_BYTES,
+      });
+      return;
+    }
+
+    // Best-effort text read. If the file is binary, the response will
+    // contain garbage — the UI should detect that (null bytes, non-
+    // printable ratio) and show a "binary file" placeholder instead.
+    const content = readFileSync(abs, 'utf-8');
+    res.json({
+      path: reqPath,
+      absolute: abs,
+      size: stats.size,
+      modified: stats.mtime.toISOString(),
+      content,
+    });
+  } catch (err: any) {
+    console.error('GET /projects/:id/file error:', err);
     res.status(500).json({ error: err.message });
   }
 });

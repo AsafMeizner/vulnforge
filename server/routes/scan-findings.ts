@@ -6,6 +6,7 @@ import {
   countScanFindings,
   createVulnerability,
   getVulnerabilityById,
+  type ScanFinding,
 } from '../db.js';
 import { recordTriageDecision } from '../ai/triage-memory.js';
 
@@ -299,6 +300,131 @@ No markdown fences. Just the JSON array.`;
     res.json({ accepted, rejected, reviews });
   } catch (err: any) {
     console.error('POST /scan-findings/ai-review error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/scan-findings/:id/deep-triage ───────────────────────────────
+// Run the 4-stage AI chain on a single finding. Returns the result
+// (which also gets persisted on scan_findings.ai_verification).
+// Slow - each call makes 4 LLM round-trips.
+router.post('/:id/deep-triage', async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+    const f = getScanFindingById(id);
+    if (!f) { res.status(404).json({ error: 'not found' }); return; }
+
+    const { deepTriageFinding } = await import('../ai/deep-triage.js');
+    const result = await deepTriageFinding(f);
+    updateScanFinding(id, { ai_verification: JSON.stringify(result) });
+    res.json({ id, result });
+  } catch (err: any) {
+    console.error('POST /scan-findings/:id/deep-triage error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── POST /api/scan-findings/deep-triage-batch ─────────────────────────────
+// Body: { ids?: number[], pipeline_id?: string, project_id?: number,
+//         status?: string, limit?: number, concurrency?: number }
+// Runs the 4-stage chain on a set of findings. Always returns 202 and
+// broadcasts progress over the WebSocket (category='deep-triage'). If
+// none of ids/pipeline_id/project_id is supplied, batches all
+// status='pending' findings.
+router.post('/deep-triage-batch', (req: Request, res: Response) => {
+  try {
+    const body = req.body as {
+      ids?: number[];
+      pipeline_id?: string;
+      project_id?: number;
+      status?: string;
+      limit?: number;
+      concurrency?: number;
+    };
+
+    // Select the batch up front so the response knows how many to expect.
+    let findings: ScanFinding[] = [];
+    if (Array.isArray(body.ids) && body.ids.length) {
+      findings = body.ids
+        .map((id) => getScanFindingById(Number(id)))
+        .filter((f): f is ScanFinding => !!f);
+    } else {
+      findings = getScanFindings({
+        pipeline_id: body.pipeline_id,
+        project_id: body.project_id,
+        status: body.status || 'pending',
+      });
+    }
+    if (body.limit && body.limit > 0) findings = findings.slice(0, body.limit);
+
+    const batchId = 'dtb-' + Math.random().toString(36).slice(2, 10);
+    res.status(202).json({ batchId, total: findings.length });
+
+    // Detached worker. Bounded concurrency so we don't stack 100 LLM
+    // requests against a single Ollama instance.
+    const concurrency = Math.min(
+      Math.max(1, Number(body.concurrency) || 2),
+      8,
+    );
+
+    (async () => {
+      let done = 0;
+      let verified = 0;
+      let rejected = 0;
+      let errored = 0;
+
+      const { deepTriageFinding } = await import('../ai/deep-triage.js');
+      const { broadcastProgress } = await import('../ws.js');
+
+      // `broadcastProgress` expects a constrained shape
+      // ({ step, detail?, progress?, status? }) so we serialise the
+      // batch stats into `detail` as JSON. Frontend parses it.
+      function emit(opts: { completed?: boolean; last_id?: number } = {}): void {
+        broadcastProgress('deep-triage', batchId, {
+          step: opts.completed ? 'deep-triage complete' : 'deep-triage',
+          progress: findings.length === 0 ? 100 : Math.round((done / findings.length) * 100),
+          status: opts.completed ? 'complete' : 'running',
+          detail: JSON.stringify({
+            done,
+            total: findings.length,
+            verified,
+            rejected,
+            errored,
+            last_id: opts.last_id,
+            completed: opts.completed === true,
+          }),
+        });
+      }
+
+      emit();
+
+      let idx = 0;
+      async function worker(): Promise<void> {
+        while (idx < findings.length) {
+          const i = idx++;
+          const f = findings[i];
+          try {
+            const result = await deepTriageFinding(f);
+            updateScanFinding(f.id, { ai_verification: JSON.stringify(result) });
+            if (result.verdict === 'verified' || result.verdict === 'likely') verified++;
+            else if (result.verdict === 'rejected') rejected++;
+          } catch (err: any) {
+            errored++;
+            console.warn(`[deep-triage] finding ${f.id} failed:`, err?.message);
+          }
+          done++;
+          emit({ last_id: f.id });
+        }
+      }
+      const workers: Promise<void>[] = [];
+      for (let w = 0; w < Math.min(concurrency, findings.length); w++) workers.push(worker());
+      await Promise.all(workers);
+      emit({ completed: true });
+      console.log(`[deep-triage] batch ${batchId} done - verified=${verified} rejected=${rejected} errored=${errored}`);
+    })().catch((err) => console.error('[deep-triage] batch worker crashed:', err));
+  } catch (err: any) {
+    console.error('POST /scan-findings/deep-triage-batch error:', err);
     res.status(500).json({ error: err.message });
   }
 });
