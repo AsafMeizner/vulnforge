@@ -27,6 +27,7 @@ import type { Vulnerability, Severity, VulnStatus } from '@/lib/types';
 import { SeverityBadge, StatusBadge, CvssScore } from '@/components/Badge';
 import { useToast } from '@/components/Toast';
 import { NotesPanel } from '@/components/NotesPanel';
+import { Markdown } from '@/components/Markdown';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -790,10 +791,13 @@ Question: `;
                         onChange={e => setEditData(p => ({ ...p, description: e.target.value }))}
                         style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }}
                       />
+                    ) : vuln.description ? (
+                      // Render as markdown so imported audit docs
+                      // (headings, fenced code, bullets, bold) remain
+                      // readable instead of collapsing into one line.
+                      <Markdown>{vuln.description}</Markdown>
                     ) : (
-                      <p style={{ margin: 0, color: 'var(--text)', fontSize: 13, lineHeight: 1.7 }}>
-                        {vuln.description ?? <span style={{ color: 'var(--muted)' }}>No description.</span>}
-                      </p>
+                      <span style={{ color: 'var(--muted)', fontSize: 13 }}>No description.</span>
                     )}
                   </Field>
 

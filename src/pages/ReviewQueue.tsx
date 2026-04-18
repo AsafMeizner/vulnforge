@@ -15,6 +15,7 @@ import {
   type PipelineRun,
 } from '@/lib/api';
 import { CodeViewer } from '@/components/CodeViewer';
+import { Markdown } from '@/components/Markdown';
 
 interface ReviewQueueProps {
   pipelineId?: string;
@@ -594,17 +595,15 @@ function FindingCard({
             {finding.description && (
               <div style={{ marginBottom: 16 }}>
                 <div style={labelStyle}>Description</div>
-                <p style={{ color: 'var(--text)', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-                  {finding.description}
-                </p>
+                {/* Markdown so headings/code/bullets/bold render
+                    instead of collapsing into an unreadable wall. */}
+                <Markdown fontSize={13}>{finding.description}</Markdown>
               </div>
             )}
             {finding.impact && (
               <div style={{ marginBottom: 16 }}>
                 <div style={labelStyle}>Impact</div>
-                <p style={{ color: 'var(--text)', fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-                  {finding.impact}
-                </p>
+                <Markdown fontSize={13}>{finding.impact}</Markdown>
               </div>
             )}
             {verification && (
