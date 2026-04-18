@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { resolveWsBase, apiFetch } from '@/lib/api';
+import { resolveWsBase, apiFetch, updatePluginRow } from '@/lib/api';
 
 // -- Types --------------------------------------------------------------------
 
@@ -620,6 +620,19 @@ export default function Plugins() {
     }
   };
 
+  // Flip the enabled flag on a plugin row. Kept in the catalog/installed
+  // lists either way; Run just becomes unavailable when disabled.
+  const handleToggleEnabled = async (plugin: InstalledPlugin) => {
+    const next = !plugin.enabled;
+    try {
+      await updatePluginRow(plugin.id, { enabled: next });
+      setInstallError(null);
+      await load();
+    } catch (err: any) {
+      setInstallError(`Failed to ${next ? 'enable' : 'disable'} ${plugin.name}: ${err.message}`);
+    }
+  };
+
   const handleOpenRun = async (plugin: InstalledPlugin) => {
     const res = await apiFetch(`/api/plugins/${plugin.id}/modules`);
     const modules: string[] = res.ok
@@ -1120,6 +1133,23 @@ export default function Plugins() {
                       }}
                     >
                       Run
+                    </button>
+                    {/* Enable/Disable toggle. Mirrors the server's PUT
+                        route; plugin stays installed either way. */}
+                    <button
+                      onClick={() => handleToggleEnabled(plugin)}
+                      title={plugin.enabled ? 'Disable this plugin (keep installed)' : 'Enable this plugin'}
+                      style={{
+                        background: 'none',
+                        border: `1px solid ${plugin.enabled ? 'var(--yellow)44' : 'var(--green)44'}`,
+                        borderRadius: 5,
+                        padding: '5px 12px',
+                        color: plugin.enabled ? 'var(--yellow)' : 'var(--green)',
+                        fontSize: 11, fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {plugin.enabled ? 'Disable' : 'Enable'}
                     </button>
                     <button
                       onClick={() => handleUninstall(plugin.id, plugin.name)}

@@ -224,6 +224,42 @@ router.post('/install-dep', async (req: Request, res: Response) => {
   }
 });
 
+// -- PUT /api/plugins/:id -----------------------------------------------------
+// Patch a plugin row. Primarily used by the Enable/Disable toggle.
+// Accepts any subset of { enabled, name, manifest }.
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
+    const existing = pluginManager.getPlugin(id);
+    if (!existing) { res.status(404).json({ error: `Plugin ${id} not found` }); return; }
+
+    const body = (req.body || {}) as Partial<{
+      enabled: boolean | number;
+      name: string;
+      manifest: string | Record<string, unknown>;
+    }>;
+    const updates: Record<string, unknown> = {};
+    if ('enabled' in body) {
+      // Store as 0/1 since SQLite INTEGER columns prefer numbers to booleans.
+      updates.enabled = body.enabled ? 1 : 0;
+    }
+    if (typeof body.name === 'string' && body.name.trim()) updates.name = body.name.trim();
+    if (body.manifest !== undefined) {
+      updates.manifest = typeof body.manifest === 'string' ? body.manifest : JSON.stringify(body.manifest);
+    }
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ error: 'No updatable fields provided' }); return;
+    }
+    const { updatePlugin } = await import('../db.js');
+    updatePlugin(id, updates as any);
+    res.json(pluginManager.getPlugin(id));
+  } catch (err: any) {
+    console.error('PUT /plugins/:id error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // -- DELETE /api/plugins/:id --------------------------------------------------
 
 router.delete('/:id', async (req: Request, res: Response) => {

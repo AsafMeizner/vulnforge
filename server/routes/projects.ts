@@ -366,6 +366,37 @@ router.post('/import-url', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/projects/:id - edit a project's metadata.
+// Accepts any subset of { name, path, repo_url, branch, language }.
+// Empty strings are normalised to null so the user can intentionally
+// clear a field.
+router.put('/:id', (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+    const existing = getProjectById(id);
+    if (!existing) { res.status(404).json({ error: 'Project not found' }); return; }
+
+    const body = (req.body || {}) as Partial<{
+      name: string; path: string | null; repo_url: string | null;
+      branch: string | null; language: string | null;
+    }>;
+    const updates: Record<string, unknown> = {};
+    const norm = (v: unknown) => (typeof v === 'string' && !v.trim()) ? null : v;
+    for (const key of ['name', 'path', 'repo_url', 'branch', 'language'] as const) {
+      if (key in body) updates[key] = norm(body[key]);
+    }
+    if (typeof updates.name === 'string' && !updates.name.trim()) {
+      res.status(400).json({ error: 'name cannot be empty' }); return;
+    }
+    updateProject(id, updates as any);
+    res.json(getProjectById(id));
+  } catch (err: any) {
+    console.error('PUT /projects/:id error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // DELETE /api/projects/:id
 router.delete('/:id', (req: Request, res: Response) => {
   try {

@@ -1159,7 +1159,15 @@ Question: `;
                       </div>
 
                       {reportContent.advisory ? (
-                        <pre style={reportPreStyle}>{reportContent.advisory}</pre>
+                        // GitHub advisories are markdown; render them as
+                        // such so headings / code blocks / lists show up
+                        // properly instead of as a wall of text.
+                        <div style={{
+                          padding: '16px 20px', background: 'var(--bg)',
+                          border: '1px solid var(--border)', borderRadius: 6,
+                        }}>
+                          <Markdown>{reportContent.advisory}</Markdown>
+                        </div>
                       ) : reportLoading === 'advisory' ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 20, color: 'var(--muted)', fontSize: 13 }}>
                           <Spinner /> Generating advisory...
@@ -1185,8 +1193,14 @@ Question: `;
                       </div>
 
                       {reportContent.summary ? (
-                        <div style={{ ...reportPreStyle as any, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'inherit', fontSize: 13 }}>
-                          {reportContent.summary}
+                        // Executive summaries are markdown-rich; render
+                        // headings, bullets, bold, code spans properly
+                        // rather than as one run-on paragraph.
+                        <div style={{
+                          padding: '16px 20px', background: 'var(--bg)',
+                          border: '1px solid var(--border)', borderRadius: 6,
+                        }}>
+                          <Markdown>{reportContent.summary}</Markdown>
                         </div>
                       ) : reportLoading === 'summary' ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 20, color: 'var(--muted)', fontSize: 13 }}>
@@ -1283,6 +1297,19 @@ Question: `;
                         </button>
                       </div>
                       <InfoBox color="var(--purple)">{vuln.ai_triage}</InfoBox>
+                    </div>
+                  ) : vuln.manual_triage?.trim() ? (
+                    // User has already written a manual triage. Offer only
+                    // the "Run AI Triage" option as a secondary action;
+                    // the ManualTriageField below renders their content.
+                    <div style={{ display: 'flex', gap: 10, padding: '12px 0', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={runTriage}
+                        disabled={triaging}
+                        style={{ ...actionBtn('var(--surface-2)'), display: 'flex', alignItems: 'center', gap: 6, opacity: triaging ? 0.6 : 1 }}
+                      >
+                        {triaging ? <><Spinner size={12} /> Triaging...</> : '+ Add AI Triage'}
+                      </button>
                     </div>
                   ) : (
                     // Two buttons side-by-side, no paragraph. The user

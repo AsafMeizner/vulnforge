@@ -206,6 +206,14 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
 
   const handleAcceptAll = async () => {
     const ids = findings.map(f => f.id);
+    // Guard a dangerous one-click action: Accept All promotes every
+    // pending finding to an accepted vulnerability in bulk and has no
+    // single-click undo. Always require a confirm.
+    if (!window.confirm(
+      `Accept all ${ids.length} pending finding${ids.length === 1 ? '' : 's'}?\n\n` +
+      'Each one becomes a vulnerability row in the Findings list. ' +
+      'There is no bulk-undo — you would have to reject them one by one.',
+    )) return;
     try {
       await bulkAcceptScanFindings(ids);
       toast('success', `Accepted ${ids.length} findings`);

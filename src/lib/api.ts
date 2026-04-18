@@ -252,6 +252,25 @@ export const deleteVulnerability = (id: number) =>
 // Projects
 export const getProjects = () => request<{ data: Project[]; total: number }>('/projects').then(r => r.data);
 
+// Edit project metadata (name/path/repo_url/branch/language).
+// Server-side PUT with empty-string -> null normalisation.
+export const updateProject = (id: number, body: Partial<Project>) =>
+  request<Project>(`/projects/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
+// Delete a project + all of its findings.
+export const deleteProject = (id: number) =>
+  request<void>(`/projects/${id}`, { method: 'DELETE' });
+
+// Enable/disable an installed plugin. Also accepts name/manifest patches.
+export const updatePluginRow = (id: number, body: { enabled?: boolean; name?: string; manifest?: any }) =>
+  request<InstalledPlugin>(`/plugins/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
 export const importProject = (path: string) =>
   request<Project>('/projects', {
     method: 'POST',

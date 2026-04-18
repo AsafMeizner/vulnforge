@@ -408,7 +408,19 @@ router.post('/', async (req: Request, res: Response) => {
       updatedAt: now,
     };
 
-    const result = await providerInstance.createNote(meta, String(content));
+    // Some plugin-supplied note providers (read-only backends, search
+    // adapters, etc.) don't implement every method in the interface.
+    // Surface a clear error instead of letting
+    // "providerInstance.createNote is not a function" bubble up as a
+    // cryptic 500. Same pattern as the testConnection fallback.
+    if (typeof (providerInstance as any).createNote !== 'function') {
+      res.status(400).json({
+        error: `Provider '${providerRow.name}' does not support creating notes. ` +
+               `Pick a different provider row in Settings -> Notes, or switch to the built-in 'local' provider.`,
+      });
+      return;
+    }
+    const result = await (providerInstance as any).createNote(meta, String(content));
 
     const id = createNote({
       provider: providerRow.name,

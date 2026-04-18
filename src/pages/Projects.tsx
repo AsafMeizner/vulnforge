@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getProjects, importProject, importProjectFromUrl, getVulnerabilities, apiFetch } from '@/lib/api';
+import { getProjects, importProject, importProjectFromUrl, getVulnerabilities, apiFetch, updateProject, deleteProject } from '@/lib/api';
 import type { Project, Vulnerability } from '@/lib/types';
 import { SeverityBadge, StatusBadge } from '@/components/Badge';
 import { Modal } from '@/components/Modal';
@@ -46,6 +46,10 @@ export default function Projects() {
   const [importPath, setImportPath] = useState('');
   const [importing, setImporting] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  // Edit modal: null = closed. When set, renders the edit form over
+  // the page. Separate state from selectedProject so you can close the
+  // modal without losing the detail panel selection.
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectVulns, setProjectVulns] = useState<Vulnerability[]>([]);
   const [vulnsLoading, setVulnsLoading] = useState(false);
   const [selectedVulnId, setSelectedVulnId] = useState<number | null>(null);
@@ -191,17 +195,51 @@ export default function Projects() {
       {/* Project detail panel */}
       {selectedProject && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8 }}>
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
               <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>{selectedProject.name}</span>
               <span style={{ fontSize: 12, color: 'var(--muted)', marginLeft: 10 }}>{selectedProject.path}</span>
             </div>
-            <button
-              onClick={() => setSelectedProject(null)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 16 }}
-            >
-              x
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <button
+                onClick={() => setEditingProject(selectedProject)}
+                title="Edit project metadata (name, path, branch, language)"
+                style={{
+                  padding: '4px 12px', fontSize: 12, fontWeight: 600,
+                  background: 'var(--surface-2)', color: 'var(--text)',
+                  border: '1px solid var(--border)', borderRadius: 5, cursor: 'pointer',
+                }}
+              >
+                Edit
+              </button>
+              <button
+                onClick={async () => {
+                  if (!window.confirm(`Delete project "${selectedProject.name}"?\n\nAll findings linked to it remain in the DB unless also deleted.`)) return;
+                  try {
+                    await deleteProject(selectedProject.id);
+                    toast('Project deleted', 'success');
+                    setSelectedProject(null);
+                    await load();
+                  } catch (err: any) {
+                    toast(`Failed to delete: ${err.message}`, 'error');
+                  }
+                }}
+                title="Delete this project"
+                style={{
+                  padding: '4px 12px', fontSize: 12, fontWeight: 600,
+                  background: 'transparent', color: 'var(--red)',
+                  border: '1px solid var(--red)44', borderRadius: 5, cursor: 'pointer',
+                }}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setSelectedProject(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 16 }}
+              >
+                x
+              </button>
+            </div>
           </div>
 
           {vulnsLoading ? (
@@ -250,6 +288,25 @@ export default function Projects() {
           onImported={() => { setImportOpen(false); load(); }}
           onCancel={() => setImportOpen(false)}
         />
+      </Modal>
+
+      {/* Edit project modal - lets the user change name/path/repo_url/
+          branch/language after initial import. Before this existed,
+          a typo in the name was permanent. */}
+      <Modal open={!!editingProject} onClose={() => setEditingProject(null)} title="Edit Project" width={520}>
+        {editingProject && (
+          <EditProjectForm
+            project={editingProject}
+            onSaved={async (next) => {
+              setEditingProject(null);
+              // Refresh both the list and the detail panel so the
+              // visible state matches what just got saved.
+              await load();
+              if (selectedProject?.id === next.id) setSelectedProject(next);
+            }}
+            onCancel={() => setEditingProject(null)}
+          />
+        )}
       </Modal>
 
       {/* Finding detail modal */}
@@ -426,6 +483,105 @@ const labelStyle: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
+  width: '100%',
+  background: 'var(--bg)',
+  border: '1px solid var(--border)',
+  borderRadius: 5,
+  padding: '8px 10px',
+  color: 'var(--text)',
+  fontSize: 13,
+  outline: 'none',
+  fontFamily: 'inherit',
+  boxSizing: 'border-box',
+};
+
+/**
+ * Edit-a-project form. Shows every user-writable metadata field so
+ * post-import typos are fixable without deleting + re-importing. Path
+ * lives here too because a project's source directory can move on disk
+ * and the user needs to be able to point VulnForge at the new location
+ * without losing any findings linked to the old row.
+ */
+function EditProjectForm({ project, onSaved, onCancel }: {
+  project: Project;
+  onSaved: (next: Project) => void | Promise<void>;
+  onCancel: () => void;
+}) {
+  const { toast } = useToast();
+  const [name, setName] = useState(project.name || '');
+  const [path, setPath] = useState(project.path || '');
+  const [repoUrl, setRepoUrl] = useState((project as any).repo_url || '');
+  const [branch, setBranch] = useState((project as any).branch || '');
+  const [language, setLanguage] = useState(project.language || '');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!name.trim()) { toast('Name is required', 'error'); return; }
+    setSaving(true);
+    try {
+      const next = await updateProject(project.id, {
+        name: name.trim(),
+        path: path || null,
+        repo_url: repoUrl || null,
+        branch: branch || null,
+        language: language || null,
+      } as any);
+      toast('Project updated', 'success');
+      await onSaved(next);
+    } catch (err: any) {
+      toast(`Failed to save: ${err.message}`, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div>
+        <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Name</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} autoFocus style={projectInputStyle} />
+      </div>
+      <div>
+        <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Local path</label>
+        <input value={path} onChange={(e) => setPath(e.target.value)} placeholder="/absolute/path/to/repo" style={projectInputStyle} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div>
+          <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Repository URL</label>
+          <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://github.com/org/repo" style={projectInputStyle} />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Branch</label>
+          <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="main" style={projectInputStyle} />
+        </div>
+      </div>
+      <div>
+        <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Primary language</label>
+        <input value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="auto-detected on import if blank" style={projectInputStyle} />
+      </div>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+        <button onClick={onCancel} disabled={saving} style={{
+          padding: '8px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)',
+          borderRadius: 5, color: 'var(--text)', fontSize: 13, cursor: 'pointer',
+        }}>Cancel</button>
+        <button
+          onClick={handleSave}
+          disabled={saving || !name.trim()}
+          style={{
+            padding: '8px 18px', background: 'var(--green)', color: '#000',
+            border: 'none', borderRadius: 5, fontSize: 13, fontWeight: 700,
+            cursor: (saving || !name.trim()) ? 'not-allowed' : 'pointer',
+            opacity: (saving || !name.trim()) ? 0.6 : 1,
+          }}
+        >{saving ? 'Saving...' : 'Save'}</button>
+      </div>
+    </div>
+  );
+}
+
+// Reusable input style for the forms on this page. Named to avoid
+// collision with the `inputStyle` used in other pages.
+const projectInputStyle: React.CSSProperties = {
   width: '100%',
   background: 'var(--bg)',
   border: '1px solid var(--border)',

@@ -11,6 +11,8 @@ import {
   type Vendor,
 } from '@/lib/api';
 import { useToast } from '@/components/Toast';
+import { Markdown } from '@/components/Markdown';
+import { FindingCombo } from '@/components/FindingCombo';
 
 type Tab = 'pipeline' | 'vendors' | 'analytics';
 
@@ -283,7 +285,7 @@ function NewDisclosureModal({ vendors, onClose, onCreated }: {
   const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [title, setTitle] = useState('');
   const [vendorId, setVendorId] = useState<number | ''>('');
-  const [findingId, setFindingId] = useState('');
+  const [findingId, setFindingId] = useState<number | null>(null);
   const [slaDays, setSlaDays] = useState(90);
 
   const handleCreate = async () => {
@@ -292,7 +294,7 @@ function NewDisclosureModal({ vendors, onClose, onCreated }: {
       await createDisclosure({
         title: title.trim(),
         vendor_id: vendorId ? Number(vendorId) : undefined,
-        finding_id: findingId ? Number(findingId) : undefined,
+        finding_id: findingId ?? undefined,
         sla_days: slaDays,
         status: 'draft',
       });
@@ -309,7 +311,12 @@ function NewDisclosureModal({ vendors, onClose, onCreated }: {
           {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
         </select>
       </Field>
-      <Field label="Linked finding ID"><input value={findingId} onChange={e => setFindingId(e.target.value)} style={inputStyle} /></Field>
+      <Field label="Linked finding">
+        {/* Searchable combo instead of raw-id input - matches the
+            Investigate/Exploits pattern so users never have to type
+            numeric finding ids. */}
+        <FindingCombo value={findingId} onChange={setFindingId} placeholder="Search findings..." />
+      </Field>
       <Field label="SLA (days)"><input type="number" value={slaDays} onChange={e => setSlaDays(Number(e.target.value))} style={inputStyle} /></Field>
       <ModalActions onCancel={onClose} onConfirm={handleCreate} confirmLabel="Create" />
     </ModalShell>
@@ -386,11 +393,27 @@ function DisclosureDetailModal({ disclosure, vendor, vendors, onClose, onUpdated
       // yyyy-mm-dd; the backend expects an ISO string or null. Empty
       // strings become undefined so they don't clobber nulls.
       const toIsoOrUndef = (v?: string | null) => v && v.trim() ? v : undefined;
+
+      // Auto-promote status when a date stamp pushes the workflow
+      // forward. Keeps the Status column honest: if you just filled in
+      // submission_date on a draft, the record is no longer a draft.
+      // Manual status picks (user explicitly changed it to something
+      // earlier) are respected by only promoting forward.
+      let autoStatus = draft.status;
+      const order = ['draft', 'submitted', 'acknowledged', 'fixed', 'disclosed'];
+      const bump = (target: string) => {
+        if (order.indexOf(autoStatus) < order.indexOf(target)) autoStatus = target;
+      };
+      if (draft.submission_date) bump('submitted');
+      if (draft.response_date) bump('acknowledged');
+      if (draft.patch_date) bump('fixed');
+      if (draft.public_date) bump('disclosed');
+
       const payload: Partial<Disclosure> & { status_note?: string } = {
         title: draft.title.trim(),
         vendor_id: draft.vendor_id || undefined,
         finding_id: draft.finding_id || undefined,
-        status: draft.status,
+        status: autoStatus,
         cve_id: toIsoOrUndef(draft.cve_id),
         tracking_id: toIsoOrUndef(draft.tracking_id),
         sla_days: draft.sla_days || undefined,
@@ -435,7 +458,10 @@ function DisclosureDetailModal({ disclosure, vendor, vendors, onClose, onUpdated
         {disclosure.notes && (
           <div>
             <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>Notes</div>
-            <div style={{ color: 'var(--text)', fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{disclosure.notes}</div>
+            {/* The edit form labels this textarea "markdown is fine";
+                the view mode now renders it as such instead of a flat
+                pre-wrap wall. */}
+            <Markdown>{disclosure.notes}</Markdown>
           </div>
         )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
@@ -484,8 +510,12 @@ function DisclosureDetailModal({ disclosure, vendor, vendors, onClose, onUpdated
         <Field label="SLA (days)">
           <input type="number" value={draft.sla_days || ''} onChange={(e) => setField('sla_days', e.target.value ? Number(e.target.value) : undefined)} style={inputStyle} />
         </Field>
-        <Field label="Linked finding ID">
-          <input type="number" value={draft.finding_id || ''} onChange={(e) => setField('finding_id', e.target.value ? Number(e.target.value) : undefined)} style={inputStyle} />
+        <Field label="Linked finding">
+          <FindingCombo
+            value={draft.finding_id ?? null}
+            onChange={(id) => setField('finding_id', id ?? undefined)}
+            placeholder="Search findings..."
+          />
         </Field>
         <Field label="Submitted">
           <input type="date" value={dateVal(draft.submission_date)} onChange={(e) => setField('submission_date', e.target.value || undefined)} style={inputStyle} />
