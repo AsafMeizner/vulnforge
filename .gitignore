@@ -94,3 +94,32 @@ docs/superpowers/
 
 # Project-level Claude Code config (local only)
 .claude/
+
+# Crash dumps from shells / tooling
+*.stackdump
+
+# Local screenshot / showcase scratch at repo root - authored copies
+# live under docs/assets; anything at root is session-scoped.
+/showcase-*.png
+/showcase-*.jpeg
+/bento-*.jpeg
+/hero-*.jpeg
+/prod-bento*.jpeg
+/final-bento.jpeg
+/stats-*.jpeg
+/vf-dashboard-raw.png
+/dashboard-initial.png
+/scanner*.png
+
+# Top-level tarballs from the server-packaging workflow
+/vulnforge-server-*.tar.gz
+/vulnforge-server-*.docker
+
+# Local dev seeder + its data sources (stays out of distribution)
+/seed.ts
+/seed-data/
+/disclosures/
+/findings/
+/targets/
+
+/scripts/legacy/
