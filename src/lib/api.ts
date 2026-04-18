@@ -288,6 +288,18 @@ export const updateReport = (id: number, body: { content?: string; type?: string
 export const deleteReport = (id: number) =>
   request<void>(`/reports/${id}`, { method: 'DELETE' });
 
+// Manual report create - no AI call. Used by the "Write Manually"
+// path so the UI can have the user author from scratch.
+export const createManualReport = (body: { vuln_id: number; type: string; content?: string; format?: string }) =>
+  request<Report>(`/reports`, { method: 'POST', body: JSON.stringify(body) });
+
+// Fetch all reports for a vuln - the UI uses this to recover the
+// report id for an already-persisted report so Edit/Delete work.
+export const getReportsForVuln = (vuln_id: number) =>
+  request<{ data: Report[]; total: number }>(`/reports`).then((r) =>
+    r.data.filter((rpt) => (rpt as any).vuln_id === vuln_id),
+  );
+
 // Checklist CRUD
 export const createChecklist = (body: { name: string; source_url?: string; category?: string }) =>
   request<{ id: number; name: string }>(`/checklists`, { method: 'POST', body: JSON.stringify(body) });

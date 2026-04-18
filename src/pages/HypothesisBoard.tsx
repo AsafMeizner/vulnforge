@@ -84,6 +84,16 @@ export default function HypothesisBoard() {
   const [dragOverCol, setDragOverCol] = useState<HStatus | null>(null);
   const [viewerId, setViewerId] = useState<number | null>(null);
   const [viewerNote, setViewerNote] = useState<Note | null>(null);
+  // Viewer edit mode. Pattern ported from Disclosure.tsx's dual-mode
+  // modal: default is read-only; Edit button unlocks the fields. Save
+  // commits via updateNote(); Cancel discards the draft. The card
+  // viewer was fully read-only before - users couldn't fix a typo in
+  // a hypothesis title or refine confidence without dragging over to
+  // quick-capture and starting over.
+  const [viewerEditing, setViewerEditing] = useState(false);
+  const [viewerDraft, setViewerDraft] = useState<{ title: string; content: string; confidence: number; tags: string }>({
+    title: '', content: '', confidence: 50, tags: '',
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,13 +122,46 @@ export default function HypothesisBoard() {
     (async () => {
       try {
         const full = await getNote(viewerId);
-        if (!cancelled) setViewerNote(full);
+        if (!cancelled) {
+          setViewerNote(full);
+          // Reset draft to the fresh server state every time we open
+          // a new note. Also leaves Edit mode if it was somehow on.
+          setViewerDraft({
+            title: full.title || '',
+            content: full.content || '',
+            confidence: confidencePercent(full.confidence),
+            tags: normalizeTags(full.tags).join(', '),
+          });
+          setViewerEditing(false);
+        }
       } catch (err: any) {
         if (!cancelled) toast(`Failed to load note: ${err?.message || err}`, 'error');
       }
     })();
     return () => { cancelled = true; };
   }, [viewerId, toast]);
+
+  // Save the current draft back to the server. Called by the Save
+  // button in viewer edit mode.
+  const saveViewerDraft = async () => {
+    if (!viewerNote) return;
+    if (!viewerDraft.title.trim()) { toast('Title required', 'error'); return; }
+    try {
+      const tagsArr = viewerDraft.tags.split(',').map(t => t.trim()).filter(Boolean);
+      const updated = await updateNote(viewerNote.id, {
+        title: viewerDraft.title.trim(),
+        content: viewerDraft.content,
+        confidence: viewerDraft.confidence / 100,
+        tags: tagsArr,
+      } as any);
+      setViewerNote(updated);
+      setViewerEditing(false);
+      toast('Saved', 'success');
+      await load();
+    } catch (err: any) {
+      toast(`Save failed: ${err?.message || err}`, 'error');
+    }
+  };
 
   // Group notes by column.
   const grouped = useMemo(() => {
@@ -329,7 +372,88 @@ export default function HypothesisBoard() {
         {!viewerNote && (
           <div style={{ padding: 20, color: 'var(--muted)', fontSize: 13 }}>Loading...</div>
         )}
-        {viewerNote && (
+        {viewerNote && viewerEditing && (
+          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <div style={viewerLabelStyle}>Title</div>
+              <input
+                value={viewerDraft.title}
+                onChange={(e) => setViewerDraft(d => ({ ...d, title: e.target.value }))}
+                style={{
+                  width: '100%', padding: '8px 10px', background: 'var(--bg)',
+                  border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text)',
+                  fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div>
+              <div style={viewerLabelStyle}>
+                Confidence: {viewerDraft.confidence}%
+              </div>
+              <input
+                type="range" min={0} max={100}
+                value={viewerDraft.confidence}
+                onChange={(e) => setViewerDraft(d => ({ ...d, confidence: Number(e.target.value) }))}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <div>
+              <div style={viewerLabelStyle}>Content</div>
+              <textarea
+                value={viewerDraft.content}
+                onChange={(e) => setViewerDraft(d => ({ ...d, content: e.target.value }))}
+                rows={10}
+                style={{
+                  width: '100%', padding: 10, background: 'var(--bg)',
+                  border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text)',
+                  fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                  lineHeight: 1.5, fontFamily: 'inherit', resize: 'vertical',
+                }}
+              />
+            </div>
+            <div>
+              <div style={viewerLabelStyle}>Tags (comma-separated)</div>
+              <input
+                value={viewerDraft.tags}
+                onChange={(e) => setViewerDraft(d => ({ ...d, tags: e.target.value }))}
+                placeholder="e.g. buffer-overflow, kernel, probable"
+                style={{
+                  width: '100%', padding: '8px 10px', background: 'var(--bg)',
+                  border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text)',
+                  fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  // Reset draft + exit edit mode.
+                  setViewerDraft({
+                    title: viewerNote.title || '',
+                    content: viewerNote.content || '',
+                    confidence: confidencePercent(viewerNote.confidence),
+                    tags: normalizeTags(viewerNote.tags).join(', '),
+                  });
+                  setViewerEditing(false);
+                }}
+                style={{
+                  padding: '7px 16px', fontSize: 12,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  borderRadius: 5, color: 'var(--text)', cursor: 'pointer',
+                }}
+              >Cancel</button>
+              <button
+                onClick={saveViewerDraft}
+                style={{
+                  padding: '7px 18px', fontSize: 12, fontWeight: 700,
+                  background: 'var(--green)', color: '#000',
+                  border: 'none', borderRadius: 5, cursor: 'pointer',
+                }}
+              >Save</button>
+            </div>
+          </div>
+        )}
+        {viewerNote && !viewerEditing && (
           <div style={{ padding: 20 }}>
             <div style={{
               display: 'flex',
@@ -400,6 +524,17 @@ export default function HypothesisBoard() {
                 ))}
               </div>
             )}
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
+              <button
+                onClick={() => setViewerEditing(true)}
+                style={{
+                  padding: '7px 16px', fontSize: 12, fontWeight: 600,
+                  background: 'var(--surface-2)', border: '1px solid var(--border)',
+                  borderRadius: 5, color: 'var(--text)', cursor: 'pointer',
+                }}
+              >Edit</button>
+            </div>
           </div>
         )}
       </Modal>

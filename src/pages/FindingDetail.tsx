@@ -5,6 +5,9 @@ import {
   deleteVulnerability,
   triggerAITriage,
   generateReport,
+  createManualReport,
+  updateReport,
+  deleteReport,
   sendAIChat,
   suggestFix,
   deepAnalyze,
@@ -276,6 +279,65 @@ function ManualTriageField({
   );
 }
 
+/**
+ * Inline textarea + Save/Cancel used by each Report sub-tab's edit
+ * mode. Shared so email / advisory / summary all behave the same.
+ * Markdown-friendly hint + monospace font so users paste code fences
+ * without surprises.
+ */
+function ReportEditor({
+  draft, onChange, onSave, onCancel,
+}: {
+  draft: string;
+  onChange: (next: string) => void;
+  onSave: () => Promise<void> | void;
+  onCancel: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <textarea
+        value={draft}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Type your report. Markdown works: # headings, **bold**, `code`, ```fenced blocks```, bullet lists, [links](https://...)."
+        autoFocus
+        style={{
+          width: '100%', minHeight: 320, resize: 'vertical',
+          background: 'var(--bg)', color: 'var(--text)',
+          border: '1px solid var(--border)', borderRadius: 6,
+          padding: '12px 14px', fontSize: 13, lineHeight: 1.55,
+          fontFamily: 'ui-monospace, SF Mono, Menlo, Consolas, monospace',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button
+          onClick={onCancel}
+          disabled={saving}
+          style={{
+            padding: '6px 14px', fontSize: 12,
+            border: '1px solid var(--border)', borderRadius: 5,
+            background: 'transparent', color: 'var(--muted)', cursor: 'pointer',
+          }}
+        >Cancel</button>
+        <button
+          onClick={async () => {
+            setSaving(true);
+            try { await onSave(); } finally { setSaving(false); }
+          }}
+          disabled={saving}
+          style={{
+            padding: '6px 16px', fontSize: 12, fontWeight: 600,
+            border: '1px solid var(--green)', borderRadius: 5,
+            background: 'var(--green)', color: '#000',
+            cursor: saving ? 'wait' : 'pointer',
+            opacity: saving ? 0.7 : 1,
+          }}
+        >{saving ? 'Saving...' : 'Save'}</button>
+      </div>
+    </div>
+  );
+}
+
 function Skeleton({ height = 16, width = '100%' }: { height?: number; width?: string }) {
   return (
     <div style={{
@@ -437,6 +499,15 @@ export default function FindingDetail({ vulnId, onClose }: FindingDetailProps) {
 
   // Report tab
   const [reportContent, setReportContent] = useState<Partial<Record<ReportSubTab, string>>>({});
+  // Track the report row id per sub-tab so Edit/Delete know what to
+  // PUT/DELETE against. Generated reports + manual reports both
+  // persist; the UI just needs to remember which id is which.
+  const [reportIds, setReportIds] = useState<Partial<Record<ReportSubTab, number>>>({});
+  // Sub-tab currently in edit mode. null = no tab in edit; the value
+  // is the ReportSubTab being edited. The draft textarea value lives
+  // alongside so Save/Cancel can commit or discard cleanly.
+  const [reportEditing, setReportEditing] = useState<ReportSubTab | null>(null);
+  const [reportDraft, setReportDraft] = useState<string>('');
   const [reportLoading, setReportLoading] = useState<ReportSubTab | null>(null);
 
   // AI tab
@@ -630,12 +701,65 @@ export default function FindingDetail({ vulnId, onClose }: FindingDetailProps) {
         summary: 'summary',
       };
       const report = await generateReport(vuln.id, typeMap[subTab]);
-      setReportContent(prev => ({ ...prev, [subTab]: report.content }));
+      setReportContent(prev => ({ ...prev, [subTab]: report.content || '' }));
+      // Store the id so Edit/Delete can address this row.
+      if ((report as any).id) setReportIds(prev => ({ ...prev, [subTab]: (report as any).id as number }));
       toast('Report generated', 'success');
     } catch (err) {
       toast(`Report generation failed: ${err instanceof Error ? err.message : err}`, 'error');
     } finally {
       setReportLoading(null);
+    }
+  };
+
+  /**
+   * Kick off manual editing. If there's already a report row for this
+   * sub-tab, the textarea pre-fills with its content. If not, a
+   * blank row gets created server-side so future Save becomes a
+   * straight PUT and the Delete button has something to target.
+   */
+  const handleEditReport = async (subTab: ReportSubTab) => {
+    if (!vuln) return;
+    setReportEditing(subTab);
+    setReportDraft(reportContent[subTab] || '');
+    // Lazy-create a DB row if we're "writing manually" for the first
+    // time. Saves happen against the id this returns.
+    if (!reportIds[subTab]) {
+      try {
+        const row = await createManualReport({ vuln_id: vuln.id, type: subTab, content: '' });
+        if ((row as any).id) setReportIds(prev => ({ ...prev, [subTab]: (row as any).id as number }));
+      } catch (err: any) {
+        toast(`Failed to start manual report: ${err.message || err}`, 'error');
+        setReportEditing(null);
+      }
+    }
+  };
+
+  const handleSaveReport = async (subTab: ReportSubTab) => {
+    const id = reportIds[subTab];
+    if (!id) { toast('No report id - try generating or writing again', 'error'); return; }
+    try {
+      await updateReport(id, { content: reportDraft });
+      setReportContent(prev => ({ ...prev, [subTab]: reportDraft }));
+      setReportEditing(null);
+      toast('Saved', 'success');
+    } catch (err: any) {
+      toast(`Save failed: ${err.message || err}`, 'error');
+    }
+  };
+
+  const handleDeleteReport = async (subTab: ReportSubTab) => {
+    const id = reportIds[subTab];
+    if (!id) { return; }
+    if (!window.confirm('Delete this report? This cannot be undone.')) return;
+    try {
+      await deleteReport(id);
+      setReportContent(prev => ({ ...prev, [subTab]: '' }));
+      setReportIds(prev => { const next = { ...prev }; delete next[subTab]; return next; });
+      if (reportEditing === subTab) setReportEditing(null);
+      toast('Report deleted', 'success');
+    } catch (err: any) {
+      toast(`Delete failed: ${err.message || err}`, 'error');
     }
   };
 
@@ -1114,22 +1238,46 @@ Question: `;
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button
                           onClick={() => handleGenerateReport('email')}
-                          disabled={reportLoading === 'email'}
+                          disabled={reportLoading === 'email' || reportEditing === 'email'}
                           style={{ ...actionBtn('var(--blue)'), display: 'flex', alignItems: 'center', gap: 6, color: '#fff', opacity: reportLoading === 'email' ? 0.7 : 1 }}
                         >
-                          {reportLoading === 'email' ? <><Spinner size={12} /> Generating...</> : 'Generate with AI'}
+                          {reportLoading === 'email' ? <><Spinner size={12} /> Generating...</> : (reportContent.email ? 'Re-generate' : 'Generate with AI')}
                         </button>
+                        {/* Edit / Delete / Write Manually controls -
+                            same pattern for all three sub-tabs. */}
+                        <button
+                          onClick={() => handleEditReport('email')}
+                          disabled={reportEditing === 'email' || reportLoading === 'email'}
+                          style={{ ...actionBtn('var(--surface-2)') }}
+                        >
+                          {reportContent.email ? 'Edit' : 'Write Manually'}
+                        </button>
+                        {reportIds.email && (
+                          <button
+                            onClick={() => handleDeleteReport('email')}
+                            style={{ ...actionBtn('var(--surface-2)'), color: 'var(--red)' }}
+                          >
+                            Delete
+                          </button>
+                        )}
                         {reportContent.email && <CopyButton text={reportContent.email} label="Copy All" />}
                       </div>
 
-                      {reportContent.email ? (
+                      {reportEditing === 'email' ? (
+                        <ReportEditor
+                          draft={reportDraft}
+                          onChange={setReportDraft}
+                          onSave={() => handleSaveReport('email')}
+                          onCancel={() => setReportEditing(null)}
+                        />
+                      ) : reportContent.email ? (
                         <pre style={reportPreStyle}>{reportContent.email}</pre>
                       ) : reportLoading === 'email' ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 20, color: 'var(--muted)', fontSize: 13 }}>
                           <Spinner /> Generating email disclosure...
                         </div>
                       ) : (
-                        <EmptyState>Click "Generate with AI" to create the disclosure email.</EmptyState>
+                        <EmptyState>Generate with AI or click <strong>Write Manually</strong> to author the email by hand.</EmptyState>
                       )}
                     </div>
                   )}
@@ -1140,11 +1288,26 @@ Question: `;
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button
                           onClick={() => handleGenerateReport('advisory')}
-                          disabled={reportLoading === 'advisory'}
+                          disabled={reportLoading === 'advisory' || reportEditing === 'advisory'}
                           style={{ ...actionBtn('var(--blue)'), display: 'flex', alignItems: 'center', gap: 6, color: '#fff', opacity: reportLoading === 'advisory' ? 0.7 : 1 }}
                         >
-                          {reportLoading === 'advisory' ? <><Spinner size={12} /> Generating...</> : 'Generate with AI'}
+                          {reportLoading === 'advisory' ? <><Spinner size={12} /> Generating...</> : (reportContent.advisory ? 'Re-generate' : 'Generate with AI')}
                         </button>
+                        <button
+                          onClick={() => handleEditReport('advisory')}
+                          disabled={reportEditing === 'advisory' || reportLoading === 'advisory'}
+                          style={{ ...actionBtn('var(--surface-2)') }}
+                        >
+                          {reportContent.advisory ? 'Edit' : 'Write Manually'}
+                        </button>
+                        {reportIds.advisory && (
+                          <button
+                            onClick={() => handleDeleteReport('advisory')}
+                            style={{ ...actionBtn('var(--surface-2)'), color: 'var(--red)' }}
+                          >
+                            Delete
+                          </button>
+                        )}
                         {vuln.advisory_url && (
                           <a
                             href={vuln.advisory_url}
@@ -1158,7 +1321,14 @@ Question: `;
                         {reportContent.advisory && <CopyButton text={reportContent.advisory} label="Copy All" />}
                       </div>
 
-                      {reportContent.advisory ? (
+                      {reportEditing === 'advisory' ? (
+                        <ReportEditor
+                          draft={reportDraft}
+                          onChange={setReportDraft}
+                          onSave={() => handleSaveReport('advisory')}
+                          onCancel={() => setReportEditing(null)}
+                        />
+                      ) : reportContent.advisory ? (
                         // GitHub advisories are markdown; render them as
                         // such so headings / code blocks / lists show up
                         // properly instead of as a wall of text.
@@ -1173,7 +1343,7 @@ Question: `;
                           <Spinner /> Generating advisory...
                         </div>
                       ) : (
-                        <EmptyState>Click "Generate with AI" to create the GitHub security advisory content.</EmptyState>
+                        <EmptyState>Generate with AI or click <strong>Write Manually</strong> to author the advisory by hand.</EmptyState>
                       )}
                     </div>
                   )}
@@ -1184,15 +1354,37 @@ Question: `;
                       <div style={{ display: 'flex', gap: 8 }}>
                         <button
                           onClick={() => handleGenerateReport('summary')}
-                          disabled={reportLoading === 'summary'}
+                          disabled={reportLoading === 'summary' || reportEditing === 'summary'}
                           style={{ ...actionBtn('var(--blue)'), display: 'flex', alignItems: 'center', gap: 6, color: '#fff', opacity: reportLoading === 'summary' ? 0.7 : 1 }}
                         >
-                          {reportLoading === 'summary' ? <><Spinner size={12} /> Generating...</> : 'Generate with AI'}
+                          {reportLoading === 'summary' ? <><Spinner size={12} /> Generating...</> : (reportContent.summary ? 'Re-generate' : 'Generate with AI')}
                         </button>
+                        <button
+                          onClick={() => handleEditReport('summary')}
+                          disabled={reportEditing === 'summary' || reportLoading === 'summary'}
+                          style={{ ...actionBtn('var(--surface-2)') }}
+                        >
+                          {reportContent.summary ? 'Edit' : 'Write Manually'}
+                        </button>
+                        {reportIds.summary && (
+                          <button
+                            onClick={() => handleDeleteReport('summary')}
+                            style={{ ...actionBtn('var(--surface-2)'), color: 'var(--red)' }}
+                          >
+                            Delete
+                          </button>
+                        )}
                         {reportContent.summary && <CopyButton text={reportContent.summary} label="Copy All" />}
                       </div>
 
-                      {reportContent.summary ? (
+                      {reportEditing === 'summary' ? (
+                        <ReportEditor
+                          draft={reportDraft}
+                          onChange={setReportDraft}
+                          onSave={() => handleSaveReport('summary')}
+                          onCancel={() => setReportEditing(null)}
+                        />
+                      ) : reportContent.summary ? (
                         // Executive summaries are markdown-rich; render
                         // headings, bullets, bold, code spans properly
                         // rather than as one run-on paragraph.
@@ -1207,7 +1399,7 @@ Question: `;
                           <Spinner /> Generating executive summary...
                         </div>
                       ) : (
-                        <EmptyState>Click "Generate with AI" to create a non-technical executive summary.</EmptyState>
+                        <EmptyState>Generate with AI or click <strong>Write Manually</strong> to author a non-technical executive summary by hand.</EmptyState>
                       )}
                     </div>
                   )}

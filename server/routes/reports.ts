@@ -89,6 +89,38 @@ router.get('/:id', (req: Request, res: Response) => {
   }
 });
 
+// POST /api/reports - manual create (no AI). For the "Write
+// Manually" path in the UI, where the user wants to author a report
+// from scratch without calling a provider. AI-generated reports go
+// through /reports/generate which does both the AI call and the DB
+// insert in one step.
+router.post('/', (req: Request, res: Response) => {
+  try {
+    const { vuln_id, type, format, content } = (req.body || {}) as {
+      vuln_id?: number; type?: string; format?: string; content?: string;
+    };
+    if (!vuln_id || isNaN(Number(vuln_id))) {
+      res.status(400).json({ error: 'vuln_id is required' });
+      return;
+    }
+    if (!getVulnerabilityById(Number(vuln_id))) {
+      res.status(404).json({ error: 'vuln_id does not exist' });
+      return;
+    }
+    const id = createReport({
+      vuln_id: Number(vuln_id),
+      type: type || 'manual',
+      format: format || 'markdown',
+      content: content || '',
+      generated_by: 'manual',
+    } as any);
+    res.status(201).json(getReportById(id));
+  } catch (err: any) {
+    console.error('[Reports] Manual create error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // PUT /api/reports/:id - edit the content (or type/format) of a report.
 // Main use case: user refines the AI-generated disclosure before sending
 // it to the vendor.

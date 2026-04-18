@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getProjects, apiFetch, type Project } from '@/lib/api';
+import {
+  getProjects, apiFetch,
+  createChecklist, deleteChecklist,
+  createChecklistItem, deleteChecklistItem,
+  type Project,
+} from '@/lib/api';
 import { useToast } from '@/components/Toast';
 
 // Use the shared apiFetch helper so this page works in packaged Electron,
@@ -47,6 +52,10 @@ export default function Checklists() {
   const [projectId, setProjectId] = useState<number | ''>('');
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
+  // Modals: null = closed. For-a-checklist add-item state lives on
+  // `selected` itself so one state is enough to drive both.
+  const [newChecklistOpen, setNewChecklistOpen] = useState(false);
+  const [addItemOpen, setAddItemOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -135,6 +144,16 @@ export default function Checklists() {
           >
             {verifying ? 'Verifying...' : 'Auto-Verify Against Project'}
           </button>
+          <button
+            onClick={() => setNewChecklistOpen(true)}
+            style={{
+              padding: '8px 14px', background: 'var(--blue)',
+              color: '#fff', border: 'none', borderRadius: 6, fontSize: 12,
+              fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            + New Checklist
+          </button>
         </div>
       </div>
 
@@ -143,8 +162,19 @@ export default function Checklists() {
           {loading ? (
             <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)' }}>Loading...</div>
           ) : checklists.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-              No checklists loaded. Restart server to seed defaults.
+            <div style={{ padding: 30, textAlign: 'center', color: 'var(--muted)', fontSize: 13, display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center' }}>
+              <div>No checklists yet.</div>
+              <button
+                onClick={() => setNewChecklistOpen(true)}
+                style={{
+                  padding: '8px 16px', fontSize: 12, fontWeight: 600,
+                  border: '1px solid var(--blue)44', borderRadius: 5,
+                  background: 'var(--blue)22', color: 'var(--blue)',
+                  cursor: 'pointer',
+                }}
+              >
+                + Create your first checklist
+              </button>
             </div>
           ) : (
             checklists.map(cl => (
@@ -176,7 +206,7 @@ export default function Checklists() {
             </div>
           ) : (
             <div>
-              <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <h3 style={{ margin: 0, color: 'var(--text)', fontSize: 16, flex: 1 }}>{selected.name}</h3>
                 <span style={{
                   padding: '4px 12px', borderRadius: 10, fontSize: 12, fontWeight: 600,
@@ -185,6 +215,36 @@ export default function Checklists() {
                 }}>
                   {selected.progress_pct}% complete
                 </span>
+                <button
+                  onClick={() => setAddItemOpen(true)}
+                  style={{
+                    padding: '5px 12px', fontSize: 11, fontWeight: 600,
+                    border: '1px solid var(--border)', borderRadius: 4,
+                    background: 'var(--surface-2)', color: 'var(--text)', cursor: 'pointer',
+                  }}
+                >
+                  + Add item
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!window.confirm(`Delete checklist "${selected.name}" and all ${selected.total_items} items? This cannot be undone.`)) return;
+                    try {
+                      await deleteChecklist(selected.id);
+                      setSelected(null);
+                      await load();
+                      toast('Checklist deleted', 'success');
+                    } catch (err: any) {
+                      toast(`Delete failed: ${err.message || err}`, 'error');
+                    }
+                  }}
+                  style={{
+                    padding: '5px 12px', fontSize: 11, fontWeight: 600,
+                    border: '1px solid var(--red)44', borderRadius: 4,
+                    background: 'transparent', color: 'var(--red)', cursor: 'pointer',
+                  }}
+                >
+                  Delete
+                </button>
               </div>
               <div style={{ padding: '8px 0' }}>
                 {selected.items.map(item => {
@@ -210,6 +270,24 @@ export default function Checklists() {
                           {item.vuln_id && <span style={{ fontSize: 10, color: 'var(--blue)', fontFamily: 'monospace' }}>linked to #{item.vuln_id}</span>}
                         </div>
                       </div>
+                      <button
+                        onClick={async () => {
+                          if (!window.confirm(`Delete item "${item.title.slice(0, 40)}"?`)) return;
+                          try {
+                            await deleteChecklistItem(item.id);
+                            await loadChecklist(selected.id);
+                            await load();
+                          } catch (err: any) {
+                            toast(`Delete failed: ${err.message || err}`, 'error');
+                          }
+                        }}
+                        title="Delete this item"
+                        style={{
+                          background: 'transparent', border: 'none',
+                          color: 'var(--muted)', fontSize: 16, lineHeight: 1,
+                          cursor: 'pointer', padding: 0,
+                        }}
+                      >&times;</button>
                     </div>
                   );
                 })}
@@ -218,9 +296,173 @@ export default function Checklists() {
           )}
         </div>
       </div>
+
+      {/* New checklist modal */}
+      {newChecklistOpen && (
+        <NewChecklistModal
+          onClose={() => setNewChecklistOpen(false)}
+          onCreated={async () => { setNewChecklistOpen(false); await load(); }}
+        />
+      )}
+
+      {/* Add item modal - only openable while a checklist is selected */}
+      {addItemOpen && selected && (
+        <NewItemModal
+          checklist={selected}
+          onClose={() => setAddItemOpen(false)}
+          onCreated={async () => {
+            setAddItemOpen(false);
+            await loadChecklist(selected.id);
+            await load();
+          }}
+        />
+      )}
     </div>
   );
 }
+
+function NewChecklistModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void | Promise<void> }) {
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!name.trim()) { toast('Name required', 'error'); return; }
+    setSaving(true);
+    try {
+      await createChecklist({
+        name: name.trim(),
+        category: category.trim() || undefined,
+        source_url: sourceUrl.trim() || undefined,
+      });
+      toast('Checklist created', 'success');
+      await onCreated();
+    } catch (err: any) {
+      toast(`Create failed: ${err.message || err}`, 'error');
+    } finally { setSaving(false); }
+  };
+
+  return <ChecklistFormShell title="New Checklist" onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Create" submitDisabled={!name.trim()}>
+    <FieldLabel>Name (required)</FieldLabel>
+    <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="e.g. OWASP API Top 10" style={modalInputStyle} />
+    <FieldLabel>Category (optional)</FieldLabel>
+    <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. API Security" style={modalInputStyle} />
+    <FieldLabel>Source URL (optional)</FieldLabel>
+    <input value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} placeholder="https://..." style={modalInputStyle} />
+  </ChecklistFormShell>;
+}
+
+function NewItemModal({ checklist, onClose, onCreated }: {
+  checklist: ChecklistDetail;
+  onClose: () => void;
+  onCreated: () => void | Promise<void>;
+}) {
+  const { toast } = useToast() as { toast: (a: string, b?: string) => void };
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
+  const [severity, setSeverity] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!title.trim()) { toast('Title required', 'error'); return; }
+    setSaving(true);
+    try {
+      await createChecklistItem(checklist.id, {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        category: category.trim() || undefined,
+        severity: severity || undefined,
+      });
+      await onCreated();
+    } catch (err: any) {
+      toast(`Create failed: ${err.message || err}`, 'error');
+    } finally { setSaving(false); }
+  };
+
+  return <ChecklistFormShell title={`Add item to "${checklist.name}"`} onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Add item" submitDisabled={!title.trim()}>
+    <FieldLabel>Title (required)</FieldLabel>
+    <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus placeholder="e.g. Validate user input against a JSON Schema" style={modalInputStyle} />
+    <FieldLabel>Description (optional; markdown supported at render time)</FieldLabel>
+    <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} style={{ ...modalInputStyle, resize: 'vertical' }} />
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div>
+        <FieldLabel>Category</FieldLabel>
+        <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="optional" style={modalInputStyle} />
+      </div>
+      <div>
+        <FieldLabel>Severity</FieldLabel>
+        <select value={severity} onChange={(e) => setSeverity(e.target.value)} style={modalInputStyle}>
+          <option value="">-</option>
+          <option value="Critical">Critical</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+      </div>
+    </div>
+  </ChecklistFormShell>;
+}
+
+function ChecklistFormShell({ title, onClose, onSubmit, saving, submitLabel, submitDisabled, children }: {
+  title: string;
+  onClose: () => void;
+  onSubmit: () => void | Promise<void>;
+  saving: boolean;
+  submitLabel: string;
+  submitDisabled?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 1000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, padding: 22, width: 'min(560px, 95vw)',
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}
+      >
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{title}</div>
+        {children}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
+          <button onClick={onClose} disabled={saving} style={{
+            padding: '8px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)',
+            borderRadius: 5, color: 'var(--text)', fontSize: 13, cursor: 'pointer',
+          }}>Cancel</button>
+          <button
+            onClick={onSubmit}
+            disabled={saving || submitDisabled}
+            style={{
+              padding: '8px 18px', background: 'var(--blue)', color: '#fff',
+              border: 'none', borderRadius: 5, fontSize: 13, fontWeight: 700,
+              cursor: (saving || submitDisabled) ? 'not-allowed' : 'pointer',
+              opacity: (saving || submitDisabled) ? 0.6 : 1,
+            }}
+          >{saving ? 'Saving...' : submitLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 3, marginTop: 6 }}>{children}</div>;
+}
+
+const modalInputStyle: React.CSSProperties = {
+  width: '100%', padding: '7px 10px', background: 'var(--bg)',
+  border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text)',
+  fontSize: 13, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
+};
 
 const selectStyle: React.CSSProperties = {
   padding: '8px 12px', background: 'var(--bg)', border: '1px solid var(--border)',

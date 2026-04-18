@@ -66,6 +66,10 @@ export default function Runtime() {
   const [loading, setLoading] = useState(true);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [newJobOpen, setNewJobOpen] = useState(false);
+  // Prefill state for "Clone job": when the user hits the clone button
+  // on a completed/failed row, we copy its type + config into this
+  // state and open the New Job modal. null = start blank.
+  const [cloneFrom, setCloneFrom] = useState<{ type: string; config: Record<string, any> } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -242,8 +246,31 @@ export default function Runtime() {
                             style={smallBtn('var(--yellow)')}>Stop</button>
                         )}
                         {(job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') && (
-                          <button onClick={(e) => { e.stopPropagation(); handleDelete(job.id); }}
-                            style={smallBtn('var(--red)')}>Delete</button>
+                          <>
+                            {/* Clone: pre-fill New Job modal with this
+                                job's type + config so the user can
+                                tweak a single field and relaunch
+                                without re-entering everything. */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                let cfg: Record<string, any> = {};
+                                try {
+                                  cfg = typeof (job as any).config === 'string'
+                                    ? JSON.parse((job as any).config)
+                                    : ((job as any).config || {});
+                                } catch { cfg = {}; }
+                                setCloneFrom({ type: job.type, config: cfg });
+                                setNewJobOpen(true);
+                              }}
+                              title="Clone this job's config into a new run"
+                              style={smallBtn('var(--blue)')}
+                            >
+                              Clone
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); handleDelete(job.id); }}
+                              style={smallBtn('var(--red)')}>Delete</button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -262,7 +289,13 @@ export default function Runtime() {
         </div>
       )}
 
-      {newJobOpen && <NewJobModal onClose={() => setNewJobOpen(false)} onCreated={() => { setNewJobOpen(false); load(); }} />}
+      {newJobOpen && (
+        <NewJobModal
+          initial={cloneFrom}
+          onClose={() => { setNewJobOpen(false); setCloneFrom(null); }}
+          onCreated={() => { setNewJobOpen(false); setCloneFrom(null); load(); }}
+        />
+      )}
     </div>
   );
 }
@@ -403,11 +436,20 @@ function JobDetail({ job }: { job: RuntimeJob }) {
 
 // ── New Job modal ──────────────────────────────────────────────────────────
 
-function NewJobModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+function NewJobModal({ initial, onClose, onCreated }: {
+  initial?: { type: string; config: Record<string, any> } | null;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const { toast } = useToast() as { toast: (a: string, b?: string) => void };
-  const [jobType, setJobType] = useState<'fuzz' | 'debug' | 'capture' | 'portscan' | 'sandbox' | 'vm'>('fuzz');
+  // When cloning, start with the source job's type + config so the
+  // user can tweak a single field and relaunch without re-filling the
+  // whole form.
+  const [jobType, setJobType] = useState<'fuzz' | 'debug' | 'capture' | 'portscan' | 'sandbox' | 'vm'>(
+    (initial?.type as any) || 'fuzz',
+  );
   const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState<Record<string, any>>({});
+  const [formData, setFormData] = useState<Record<string, any>>(initial?.config || {});
 
   const update = (key: string, val: any) => setFormData(prev => ({ ...prev, [key]: val }));
 
