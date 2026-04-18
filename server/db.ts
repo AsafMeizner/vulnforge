@@ -948,6 +948,11 @@ function migrateSchema(): void {
     "ALTER TABLE scan_findings ADD COLUMN ai_verification TEXT DEFAULT ''",
     "ALTER TABLE scan_findings ADD COLUMN impact TEXT DEFAULT ''",
     "ALTER TABLE scan_findings ADD COLUMN suggested_fix TEXT DEFAULT ''",
+    // Vulnerabilities: a dedicated column for human-authored triage
+    // notes. Kept separate from ai_triage / ai_summary so the UI can
+    // show both side-by-side and the user can write their own analysis
+    // without any AI provider involved.
+    "ALTER TABLE vulnerabilities ADD COLUMN manual_triage TEXT DEFAULT ''",
   ];
 
   // Subsystem B: capability tables (ai_providers + integrations) pick up
@@ -1204,7 +1209,7 @@ const VULN_COLUMNS = new Set([
   'response', 'rejection_reason',
   'sub_findings',
   'disclosure_content', 'how_to_submit_content',
-  'ai_triage', 'ai_summary',
+  'ai_triage', 'ai_summary', 'manual_triage',
   'submitted_at', 'resolved_at',
 ]);
 

@@ -80,6 +80,40 @@ export default function AIPage() {
     }
   }, [toast]);
 
+  // Shared handler for both the empty-state CTA buttons and the
+  // persistent "Add another provider" toolbar. Ollama and Claude CLI
+  // enable on add (they need no API key); the others land disabled
+  // so the user sees them in the list with a clear next step.
+  const addProviderOfKind = useCallback(async (
+    kind: 'claude' | 'openai' | 'gemini' | 'ollama' | 'claude_cli',
+  ) => {
+    const defaults: Record<string, Partial<AIProvider>> = {
+      claude:     { name: 'claude',     model: 'claude-sonnet-4-20250514' },
+      openai:     { name: 'openai',     model: 'gpt-4o' },
+      gemini:     { name: 'gemini',     model: 'gemini-2.5-flash' },
+      ollama:     { name: 'ollama',     model: 'qwen3:8b', base_url: 'http://localhost:11434' },
+      claude_cli: { name: 'claude_cli', model: 'claude-sonnet-4-20250514' },
+    };
+    const noKeyNeeded = kind === 'ollama' || kind === 'claude_cli';
+    try {
+      const res = await apiFetch('/api/ai/providers', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...defaults[kind], enabled: noKeyNeeded }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await loadProviders();
+      toast(
+        noKeyNeeded
+          ? `Added ${kind} (enabled - ready to use)`
+          : `Added ${kind} (paste API key below to enable)`,
+        'success',
+      );
+    } catch (err: any) {
+      toast(`Failed to add ${kind}: ${err.message}`, 'error');
+    }
+  }, [loadProviders, toast]);
+
   const loadModelRegistry = useCallback(async () => {
     try {
       const data = await getAIModels();
@@ -404,6 +438,42 @@ export default function AIPage() {
       {/* ── Providers tab ── */}
       {tab === 'providers' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto' }}>
+          {/* Persistent add-a-provider toolbar - visible regardless of
+              list length. Without this, users who add one provider
+              can't add another without deleting first. */}
+          {!providersLoading && providers.length > 0 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+              padding: '10px 14px', background: 'var(--surface)',
+              border: '1px solid var(--border)', borderRadius: 8,
+            }}>
+              <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}>
+                Add another provider:
+              </span>
+              {(['claude', 'openai', 'gemini', 'ollama', 'claude_cli'] as const).map(kind => (
+                <button
+                  key={kind}
+                  onClick={() => addProviderOfKind(kind)}
+                  disabled={providers.some(p => p.name.toLowerCase() === kind)}
+                  title={providers.some(p => p.name.toLowerCase() === kind)
+                    ? `${kind} already added - edit the row below to change model or key`
+                    : `Add a ${kind} provider`}
+                  style={{
+                    padding: '4px 10px', fontSize: 12, fontWeight: 600,
+                    border: '1px solid var(--border)', borderRadius: 5,
+                    background: providers.some(p => p.name.toLowerCase() === kind)
+                      ? 'var(--surface-2)' : 'var(--surface)',
+                    color: providers.some(p => p.name.toLowerCase() === kind)
+                      ? 'var(--muted)' : 'var(--text)',
+                    cursor: providers.some(p => p.name.toLowerCase() === kind) ? 'not-allowed' : 'pointer',
+                    opacity: providers.some(p => p.name.toLowerCase() === kind) ? 0.55 : 1,
+                  }}
+                >
+                  + {kind}
+                </button>
+              ))}
+            </div>
+          )}
           {providersLoading ? (
             <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Loading providers...</div>
           ) : providers.length === 0 ? (
@@ -427,27 +497,7 @@ export default function AIPage() {
                 {(['claude', 'openai', 'gemini', 'ollama', 'claude_cli'] as const).map(kind => (
                   <button
                     key={kind}
-                    onClick={async () => {
-                      const defaults: Record<string, Partial<AIProvider>> = {
-                        claude:     { name: 'claude',     model: 'claude-sonnet-4-20250514' },
-                        openai:     { name: 'openai',     model: 'gpt-4o' },
-                        gemini:     { name: 'gemini',     model: 'gemini-2.5-flash' },
-                        ollama:     { name: 'ollama',     model: 'qwen3:8b', base_url: 'http://localhost:11434' },
-                        claude_cli: { name: 'claude_cli', model: 'claude-sonnet-4-20250514' },
-                      };
-                      try {
-                        const res = await apiFetch('/api/ai/providers', {
-                          method: 'POST',
-                          headers: { 'content-type': 'application/json' },
-                          body: JSON.stringify({ ...defaults[kind], enabled: kind === 'ollama' || kind === 'claude_cli' }),
-                        });
-                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                        await loadProviders();
-                        toast('success', `Added ${kind} - ${kind === 'ollama' || kind === 'claude_cli' ? 'enabled' : 'paste API key to enable'}`);
-                      } catch (err: any) {
-                        toast('error', `Failed to add ${kind}: ${err.message}`);
-                      }
-                    }}
+                    onClick={() => addProviderOfKind(kind)}
                     style={{
                       padding: '6px 12px', fontSize: 12, fontWeight: 600,
                       border: '1px solid var(--border)', borderRadius: 6,

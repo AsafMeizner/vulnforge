@@ -44,6 +44,10 @@ export interface Vulnerability {
   advisory_url: string | null;
   ai_triage: string | null;
   ai_summary?: string | null;
+  // Human-authored triage notes. Always editable by the user and
+  // independent of ai_triage - a user can triage a finding manually
+  // without ever running an AI call.
+  manual_triage?: string | null;
   tool_name?: string | null;
   confidence?: number | null;
   verified?: number;

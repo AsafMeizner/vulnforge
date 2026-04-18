@@ -245,7 +245,19 @@ router.post('/providers/:id/test', async (req: Request, res: Response) => {
         res.json({ ok: false, error: `Provider '${row.name}' is not registered` });
         return;
       }
-      const result = await instance.testConnection();
+      // Some plugin-supplied provider implementations don't implement
+      // testConnection (it's an optional part of the protocol). Detect
+      // that and return a friendlier message instead of letting
+      // "instance.testConnection is not a function" bubble up to the UI.
+      if (typeof (instance as any).testConnection !== 'function') {
+        res.json({
+          ok: false,
+          error: `Provider '${row.name}' does not support connectivity testing. ` +
+                 `You can still use it - or open the provider row to verify its base_url.`,
+        });
+        return;
+      }
+      const result = await (instance as any).testConnection();
       res.json(result);
     } catch (innerErr: any) {
       res.json({ ok: false, error: innerErr.message });

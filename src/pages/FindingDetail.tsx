@@ -29,6 +29,7 @@ import { useToast } from '@/components/Toast';
 import { NotesPanel } from '@/components/NotesPanel';
 import { Markdown } from '@/components/Markdown';
 import { highlightReact } from '@/lib/hljs';
+import { FileViewerModal } from '@/components/FileViewerModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -159,6 +160,104 @@ function EmptyState({ children, action }: { children: React.ReactNode; action?: 
     }}>
       <div>{children}</div>
       {action}
+    </div>
+  );
+}
+
+/**
+ * A self-contained "manual triage" editor. Always shown, never
+ * depends on an AI provider. Starts collapsed into a compact "Write
+ * your analysis" button; expands into a textarea with Save/Cancel.
+ *
+ * The textarea accepts markdown (rendered elsewhere on read) so users
+ * can paste/write headings and code blocks just like AI output.
+ */
+function ManualTriageField({
+  value, onSave,
+}: {
+  value: string;
+  onSave: (next: string) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const [saving, setSaving] = useState(false);
+  // Sync when the parent vuln reloads (e.g. after save).
+  useEffect(() => { setDraft(value); }, [value]);
+
+  return (
+    <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          Manual Triage{value ? '' : ' (optional)'}
+        </div>
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            style={{
+              marginLeft: 'auto',
+              padding: '3px 10px', fontSize: 11, fontWeight: 600,
+              border: '1px solid var(--border)', borderRadius: 5,
+              background: 'var(--surface-2)', color: 'var(--text)', cursor: 'pointer',
+            }}
+          >
+            {value ? 'Edit' : 'Write manually'}
+          </button>
+        )}
+      </div>
+      {editing ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Your analysis. Supports markdown: # headings, `code`, ```fenced blocks```, bullet lists."
+            style={{
+              width: '100%', minHeight: 140, resize: 'vertical',
+              background: 'var(--bg)', color: 'var(--text)',
+              border: '1px solid var(--border)', borderRadius: 6,
+              padding: '10px 12px', fontSize: 13, lineHeight: 1.5,
+              fontFamily: 'ui-monospace, SF Mono, Menlo, Consolas, monospace',
+            }}
+          />
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => { setDraft(value); setEditing(false); }}
+              disabled={saving}
+              style={{
+                padding: '5px 12px', fontSize: 12,
+                border: '1px solid var(--border)', borderRadius: 5,
+                background: 'transparent', color: 'var(--muted)', cursor: 'pointer',
+              }}
+            >Cancel</button>
+            <button
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await onSave(draft.trim());
+                  setEditing(false);
+                } finally { setSaving(false); }
+              }}
+              disabled={saving}
+              style={{
+                padding: '5px 14px', fontSize: 12, fontWeight: 600,
+                border: '1px solid var(--green)', borderRadius: 5,
+                background: 'var(--green)', color: '#fff', cursor: saving ? 'wait' : 'pointer',
+                opacity: saving ? 0.7 : 1,
+              }}
+            >{saving ? 'Saving...' : 'Save'}</button>
+          </div>
+        </div>
+      ) : value ? (
+        // Render as markdown so users can write structured notes.
+        <InfoBox color="var(--blue)">{value}</InfoBox>
+      ) : (
+        <div style={{
+          fontSize: 12, color: 'var(--muted)',
+          padding: '10px 12px', border: '1px dashed var(--border)', borderRadius: 6,
+        }}>
+          Write your own analysis — root cause, repro steps, verdict —
+          without any AI. Visible only to you, editable anytime.
+        </div>
+      )}
     </div>
   );
 }
@@ -301,6 +400,8 @@ export default function FindingDetail({ vulnId, onClose }: FindingDetailProps) {
   const [vuln, setVuln] = useState<Vulnerability | null>(null);
   const [tab, setTab] = useState<Tab>('overview');
   const [reportSubTab, setReportSubTab] = useState<ReportSubTab>('email');
+  // "View file in full" modal, triggered from the Suggested Fix section.
+  const [fileViewerOpen, setFileViewerOpen] = useState(false);
 
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<Partial<Vulnerability>>({});
@@ -897,6 +998,31 @@ Question: `;
                       <InfoBox color="var(--green)">
                         {suggestedFix ?? vuln.suggested_fix}
                       </InfoBox>
+                      {/* Shortcut to open the affected file with the
+                          flagged lines highlighted - the fix makes a
+                          lot more sense when you can see the
+                          surrounding code it's patching. Only shown
+                          when we have both a file path and a project
+                          id to resolve it against. */}
+                      {vuln.file && (vuln as any).project_id && (
+                        <div style={{ marginTop: 8 }}>
+                          <button
+                            onClick={() => setFileViewerOpen(true)}
+                            style={{
+                              padding: '5px 12px', fontSize: 12,
+                              border: '1px solid var(--border)', borderRadius: 5,
+                              background: 'var(--surface-2)', color: 'var(--text)',
+                              cursor: 'pointer',
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                            }}
+                          >
+                            <span>&#128193;</span>
+                            View {vuln.file.split(/[/\\]/).pop()}
+                            {vuln.line_start ? ` : ${vuln.line_start}` : ''}
+                            {' '}in full
+                          </button>
+                        </div>
+                      )}
                     </Field>
                   )}
 
@@ -1141,7 +1267,13 @@ Question: `;
                     </div>
                   ) : (
                     <EmptyState>
-                      No AI triage yet.
+                      {/* AI is optional - distinguish "no AI run" from
+                          workflow status so users who triaged manually
+                          don't see a contradictory "No triage yet". */}
+                      <div style={{ textAlign: 'center' }}>
+                        No AI analysis yet. AI triage is <em>optional</em> —
+                        you can also write your own analysis in the Manual Triage box below.
+                      </div>
                       <button
                         onClick={runTriage}
                         disabled={triaging}
@@ -1151,6 +1283,23 @@ Question: `;
                       </button>
                     </EmptyState>
                   )}
+
+                  {/* Manual Triage - always shown, always editable,
+                      independent of any AI state. This is the "AI is
+                      not required" UX escape hatch: any user can write
+                      their own verdict without touching a provider. */}
+                  <ManualTriageField
+                    value={vuln.manual_triage || ''}
+                    onSave={async (next) => {
+                      try {
+                        await updateVulnerability(vuln.id, { manual_triage: next } as any);
+                        toast('Saved manual triage', 'success');
+                        await load();
+                      } catch (err: any) {
+                        toast(`Failed to save: ${err.message}`, 'error');
+                      }
+                    }}
+                  />
 
                   {/* Deep Analysis */}
                   {(deepAnalysis || deepAnalyzing) && (
@@ -1345,6 +1494,18 @@ Question: `;
           </>
         )}
       </div>
+
+      {/* "View file in full" modal - opened from the Suggested Fix
+          section so users can see the fix in its surrounding context. */}
+      {fileViewerOpen && vuln?.file && (vuln as any).project_id && (
+        <FileViewerModal
+          projectId={(vuln as any).project_id}
+          path={vuln.file}
+          lineStart={vuln.line_start ?? null}
+          lineEnd={vuln.line_end ?? null}
+          onClose={() => setFileViewerOpen(false)}
+        />
+      )}
 
       <style>{`
         @keyframes slideInRight {
