@@ -4,6 +4,9 @@
   "description": "AI-powered security research platform - find, triage, and fix vulnerabilities",
   "type": "module",
   "main": "electron/main.js",
+  "bin": {
+    "vulnforge": "cli/vulnforge.mjs"
+  },
   "scripts": {
     "dev": "concurrently \"vite\" \"tsx watch server/index.ts\"",
     "dev:server": "tsx watch server/index.ts",

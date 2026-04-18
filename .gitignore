@@ -65,6 +65,7 @@ tmp/
 /release5/
 /release6/
 /release-artifacts/
+/release*/
 # Runtime port discovery file written by server startup for vite to read
 /.vulnforge-port
 
@@ -87,3 +88,9 @@ tmp/
 /electron/main.js
 /electron/preload.js
 /electron/*.js.map
+
+# Superpowers specs (local only)
+docs/superpowers/
+
+# Project-level Claude Code config (local only)
+.claude/

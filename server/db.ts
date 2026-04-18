@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { ulid as __ulid } from './utils/ulid.js';
+import { encryptSecret, decryptSecret, isEncrypted } from './lib/crypto.js';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -851,6 +852,9 @@ function createTables(): void {
   backfillSyncColumns();
   seedDefaultNotesProvider();
   seedDefaultPermissions();
+  // One-time encryption pass on any legacy plaintext secret columns.
+  // Idempotent - isEncrypted() guards prevent double-encrypt on reboot.
+  migrateAIProviderSecrets();
   persistDb();
 }
 
@@ -1438,35 +1442,80 @@ export function updatePlugin(id: number, p: Partial<Plugin>): void {
 }
 
 // ── AI Providers CRUD ──────────────────────────────────────────────────────
+// Security CR-08: api_key is encrypted at rest via server/lib/crypto.
+// Every read path decrypts before returning; every write encrypts
+// before storing. Callers continue to pass / receive plaintext so
+// encryption is transparent above this layer.
+
+function _decryptProviderRow(row: AIProvider | null): AIProvider | null {
+  if (!row) return row;
+  try {
+    return { ...row, api_key: (row as any).api_key ? decryptSecret((row as any).api_key) : (row as any).api_key };
+  } catch (err: any) {
+    // Surface a placeholder so the UI can at least render the rest of
+    // the row even if one key is unreadable (e.g. operator rotated
+    // VULNFORGE_DATA_KEY without running a re-encrypt pass).
+    console.warn(`[crypto] could not decrypt api_key for provider "${row.name}": ${err?.message || err}`);
+    return { ...row, api_key: '__undecryptable__' } as any;
+  }
+}
 
 export function getAllAIProviders(): AIProvider[] {
-  return execQuery('SELECT * FROM ai_providers ORDER BY name') as unknown as AIProvider[];
+  const rows = execQuery('SELECT * FROM ai_providers ORDER BY name') as unknown as AIProvider[];
+  return rows.map((r) => _decryptProviderRow(r) as AIProvider);
 }
 
 export function getAIProviderById(id: number): AIProvider | null {
   const rows = execQuery('SELECT * FROM ai_providers WHERE id = ?', [id]);
-  return rows[0] as AIProvider || null;
+  return _decryptProviderRow(rows[0] as AIProvider || null);
 }
 
 export function getEnabledAIProvider(): AIProvider | null {
   const rows = execQuery('SELECT * FROM ai_providers WHERE enabled = 1 LIMIT 1');
-  return rows[0] as AIProvider || null;
+  return _decryptProviderRow(rows[0] as AIProvider || null);
 }
 
 export function upsertAIProvider(p: AIProvider): number {
+  const encryptedKey = p.api_key ? encryptSecret(p.api_key) : null;
   const existing = execQuery('SELECT * FROM ai_providers WHERE name = ?', [p.name]);
   if (existing.length > 0) {
     db.run(
       `UPDATE ai_providers SET model = ?, api_key = ?, base_url = ?, enabled = ?, config = ? WHERE name = ?`,
-      [p.model || null, p.api_key || null, p.base_url || null, p.enabled ?? 0, p.config || null, p.name]
+      [p.model || null, encryptedKey, p.base_url || null, p.enabled ?? 0, p.config || null, p.name]
     );
     persistDb();
     return existing[0].id as number;
   }
   return execRun(
     `INSERT INTO ai_providers (name, model, api_key, base_url, enabled, config) VALUES (?, ?, ?, ?, ?, ?)`,
-    [p.name, p.model || null, p.api_key || null, p.base_url || null, p.enabled ?? 0, p.config || null]
+    [p.name, p.model || null, encryptedKey, p.base_url || null, p.enabled ?? 0, p.config || null]
   );
+}
+
+/**
+ * One-time migration: find plaintext api_key rows and encrypt them.
+ * Called once from initDb(). Safe to re-run — isEncrypted() makes
+ * encryptSecret() idempotent.
+ */
+export function migrateAIProviderSecrets(): void {
+  try {
+    const rows = execQuery('SELECT id, name, api_key FROM ai_providers WHERE api_key IS NOT NULL AND api_key != \'\'');
+    let migrated = 0;
+    for (const r of rows) {
+      const key = (r as any).api_key as string;
+      if (!isEncrypted(key)) {
+        const enc = encryptSecret(key);
+        db.run('UPDATE ai_providers SET api_key = ? WHERE id = ?', [enc, (r as any).id]);
+        migrated++;
+      }
+    }
+    if (migrated > 0) {
+      persistDb();
+      console.log(`[crypto] migrated ${migrated} plaintext api_key rows to encrypted form`);
+    }
+  } catch (err: any) {
+    console.warn(`[crypto] migrateAIProviderSecrets failed: ${err?.message || err}`);
+  }
 }
 
 // ── Reports CRUD ───────────────────────────────────────────────────────────
