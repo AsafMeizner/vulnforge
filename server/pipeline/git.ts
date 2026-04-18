@@ -1,4 +1,4 @@
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import path from 'path';
@@ -11,6 +11,27 @@ const execFileAsync = promisify(execFile);
 export interface CloneOptions {
   branch?: string;
   depth?: number;     // default 1 (shallow)
+  /**
+   * Total timeout in ms. Default 30 minutes. The single biggest cause of
+   * the "pipeline stuck at 5%" complaint is that cloning a large repo
+   * (Linux kernel, Chromium) takes longer than a 5-minute execFile cap.
+   */
+  timeoutMs?: number;
+  /**
+   * If set, called with every progress line git emits on stderr plus a
+   * parsed 0-100 percent when the line looks like "Receiving objects:
+   * NN% (x/y)" or "Resolving deltas: NN%". Caller typically wires this
+   * to broadcastProgress so the UI can see live bytes/percent and
+   * doesn't look frozen for multi-minute clones.
+   */
+  onProgress?: (line: string, percent?: number) => void;
+  /**
+   * If set, we emit a heartbeat via onProgress at least every N ms,
+   * even if git hasn't logged anything. Protects against the "UI looks
+   * dead" problem when git is doing slow local work (resolving deltas,
+   * writing files).
+   */
+  heartbeatMs?: number;
 }
 
 export interface CloneResult {
@@ -103,24 +124,93 @@ export function repoNameFromUrl(url: string): string {
 }
 
 /**
- * Clone a git repo into the local repos directory.
+ * Parse a git stderr line like "Receiving objects: 42% (123/456), 12 MiB | 3 MiB/s"
+ * into a 0-100 percent. Returns undefined for unparseable lines.
+ *
+ * Git's progress lines are the *only* way to know what's happening
+ * during a clone of a multi-gigabyte repo - without them the UI just
+ * sees `stage=cloning progress=5` for 20 minutes, which is what
+ * triggered the "it just didn't progress" complaint.
+ */
+function parseGitProgress(line: string): number | undefined {
+  // Receiving objects: 12% (23432/195000)  <-- network download
+  // Resolving deltas: 89% (12345/15000)    <-- local work
+  const m = line.match(/(?:Receiving objects|Resolving deltas|Unpacking objects|Checking out files):\s+(\d{1,3})%/);
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : undefined;
+}
+
+/**
+ * Clone a git repo into the local repos directory with live progress
+ * streamed back via `opts.onProgress`. Uses `spawn` (not execFileAsync)
+ * so stderr is readable line-by-line as git emits it.
+ *
+ * Git only emits progress when it thinks it's on a TTY, so we force it
+ * with --progress. Without that flag, a clone of a large repo is
+ * completely silent on stderr until it finishes or fails.
  */
 export async function cloneRepo(url: string, opts: CloneOptions = {}): Promise<CloneResult> {
   const name = repoNameFromUrl(url);
   const hash = crypto.randomBytes(4).toString('hex');
   const localPath = path.join(REPOS_DIR, `${name}-${hash}`);
 
-  const args = ['clone'];
+  const args = ['clone', '--progress'];
   if (opts.depth) args.push('--depth', String(opts.depth));
   else args.push('--depth', '1');  // shallow by default
   if (opts.branch) args.push('--branch', opts.branch);
   args.push('--', url, localPath);
 
-  try {
-    await execFileAsync('git', args, { timeout: 300_000 }); // 5 min timeout
-  } catch (err: any) {
-    throw new Error(`Git clone failed: ${err.stderr || err.message}`);
-  }
+  const totalTimeout = opts.timeoutMs ?? 30 * 60_000; // 30 min default
+  const heartbeat = opts.heartbeatMs ?? 3_000;
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn('git', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let lastErr = '';
+    let lastEmit = Date.now();
+    let lastLine = 'starting clone';
+
+    // Overall watchdog. If git hangs for the full timeout, kill it and
+    // reject with a human-readable message instead of letting the
+    // pipeline sit in `cloning` state until the heat death of the drive.
+    const killTimer = setTimeout(() => {
+      try { child.kill('SIGTERM'); } catch { /* ignore */ }
+      reject(new Error(`Git clone timed out after ${Math.round(totalTimeout / 60_000)}m (last: ${lastLine})`));
+    }, totalTimeout);
+
+    // Heartbeat. If stderr has been quiet for too long, emit the last
+    // known line again so the UI at least shows "still working".
+    const heartbeatTimer = setInterval(() => {
+      if (Date.now() - lastEmit > heartbeat && opts.onProgress) {
+        opts.onProgress(`still working: ${lastLine}`, parseGitProgress(lastLine));
+      }
+    }, heartbeat);
+
+    const onLine = (buf: Buffer) => {
+      // Git uses \r to overwrite a progress line and \n for final line.
+      // Split on either so we see each progress update as its own event.
+      const text = buf.toString('utf8');
+      for (const raw of text.split(/[\r\n]+/)) {
+        const line = raw.trim();
+        if (!line) continue;
+        lastErr += line + '\n';
+        lastLine = line;
+        lastEmit = Date.now();
+        if (opts.onProgress) opts.onProgress(line, parseGitProgress(line));
+      }
+    };
+    child.stderr?.on('data', onLine);
+    child.stdout?.on('data', onLine);
+    child.on('error', (err) => {
+      clearTimeout(killTimer); clearInterval(heartbeatTimer);
+      reject(new Error(`Git clone failed to start: ${err.message}`));
+    });
+    child.on('close', (code) => {
+      clearTimeout(killTimer); clearInterval(heartbeatTimer);
+      if (code === 0) resolve();
+      else reject(new Error(`Git clone failed (exit ${code}): ${lastErr.slice(-400).trim()}`));
+    });
+  });
 
   // Get branch and commit hash
   let branch = opts.branch || 'main';

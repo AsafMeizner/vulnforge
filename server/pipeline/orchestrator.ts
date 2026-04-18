@@ -161,7 +161,40 @@ async function runPipelineAsync(
 
     try {
       updateProject(projectId, { clone_status: 'cloning' } as any);
-      const result = await cloneRepo(opts.url, { branch: opts.branch, depth: opts.depth || 1 });
+      // Stream git's own progress into the UI. Without this the user
+      // sees a single "cloning 5%" message for the entire clone, which
+      // for anything bigger than a small repo looks like the pipeline
+      // has frozen. Percent (when parseable) updates the DB row so
+      // the progress bar moves; the line itself becomes current_stage
+      // so they see the actual "Receiving objects: 42% (12k/180k)"
+      // text (including network speed) git emits.
+      let lastBroadcast = 0;
+      const result = await cloneRepo(opts.url, {
+        branch: opts.branch,
+        depth: opts.depth || 1,
+        onProgress: (line, percent) => {
+          // Throttle DB writes / websocket blasts to ~4 per second.
+          const now = Date.now();
+          if (now - lastBroadcast < 250) return;
+          lastBroadcast = now;
+          // Map the 0-100 clone percent onto the 5-18 pipeline range
+          // (cloning is stage 1 of the whole pipeline), so the overall
+          // progress bar still behaves.
+          const stageProgress = percent != null
+            ? Math.round(5 + (percent / 100) * 13)
+            : undefined;
+          updatePipelineRun(pipelineId, {
+            current_stage: `cloning: ${line.slice(0, 160)}`,
+            ...(stageProgress !== undefined ? { progress: stageProgress } : {}),
+          });
+          broadcastProgress('pipeline', pipelineId, {
+            step: 'cloning',
+            detail: line.slice(0, 200),
+            progress: stageProgress,
+            status: 'running',
+          });
+        },
+      });
       projectPath = result.localPath;
 
       updateProject(projectId, {
