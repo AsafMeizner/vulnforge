@@ -84,7 +84,7 @@ Clients cannot bypass anonymization by crafting a custom request - the pool endp
 
 ## Audit
 
-Every auth event (login success/fail, refresh accepted/rejected, logout, device revocation) writes to `audit_log`. Admins read via the admin UI or via a SELECT - currently not streamed to an external SIEM (operator's choice to add - see [`../operator/monitoring.md`](../operator/monitoring.md) when we write it).
+Every auth event (login success/fail, refresh accepted/rejected, logout, device revocation) writes to `audit_log`. Admins read via the admin UI (Audit page) or via a SELECT on the DB - currently not streamed to an external SIEM (that's an operator's choice to add on top).
 
 ## Incident response checklist
 

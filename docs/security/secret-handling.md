@@ -6,13 +6,14 @@
 | -------------------- | ----------------------------------------------- | --------------------------------------------------------------------------- |
 | JWT signing secret   | `/var/lib/vulnforge/.env::VULNFORGE_JWT_SECRET` | Base64, 48 bytes of entropy                                                 |
 | Bootstrap token      | `.env::VULNFORGE_BOOTSTRAP_TOKEN` (one-time)    | Hex, 24 bytes                                                               |
+| Master data key      | `VULNFORGE_DATA_KEY` env OR `<dataDir>/master.key` (chmod 600) | 32B random; see [encryption.md](encryption.md) |
 | User password hashes | `users.password_hash` DB column                 | `$2a$12$...` bcrypt                                                         |
 | Refresh token hashes | `refresh_tokens.token_hash`                     | `$2a$06$...` bcrypt (raw token has 256 bits of entropy so cost 6 is enough) |
-| OIDC client secrets  | `oidc_providers.client_secret`                  | Plain TEXT - protect the DB file                                            |
-| Integration tokens   | `integrations.config` JSON field                | Plain TEXT                                                                  |
-| AI provider API keys | `ai_providers.config` JSON field                | Plain TEXT                                                                  |
+| OIDC client secrets  | `oidc_providers.client_secret`                  | `vf1:` AES-256-GCM envelope (at-rest encrypted)                             |
+| Integration configs  | `integrations.config` JSON field                | `vf1:` AES-256-GCM envelope (whole JSON blob)                               |
+| AI provider API keys | `ai_providers.api_key` column                   | `vf1:` AES-256-GCM envelope                                                 |
 
-The DB file is the secondary trust boundary: anything inside must be treated as sensitive. File permissions on `/var/lib/vulnforge/vulnforge.db` should be `600` owned by the service user.
+The DB file is the secondary trust boundary. The rows in the last three entries are envelope-encrypted with the master data key, so a DB-file leak alone no longer hands over live credentials - the attacker also needs the master key. See [`encryption.md`](encryption.md) for the master-key lifecycle and rotation story. File permissions on `/var/lib/vulnforge/vulnforge.db` should still be `600` owned by the service user, belt-and-suspenders.
 
 ## Rotation procedures
 

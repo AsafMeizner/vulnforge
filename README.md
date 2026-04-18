@@ -312,7 +312,7 @@ All long-form docs live under [`docs/`](docs/):
 | **Operator**     | [install (bare metal)](docs/operator/install-server.md) · [install (Docker)](docs/operator/install-docker.md) · [upgrade](docs/operator/upgrade.md) · [OIDC setup](docs/operator/oidc-setup.md) · [backup / restore](docs/operator/backup-restore.md) |
 | **User**         | [first launch](docs/user/first-launch.md) · [privacy scopes](docs/user/privacy-scopes.md) · [team-mode switching](docs/user/team-mode-switching.md) · [AI providers](docs/user/ai-providers.md)                                                       |
 | **Developer**    | [building](docs/developer/building.md) · [migrations](docs/developer/migrations.md) · [MCP tools](docs/developer/mcp-tools.md)                                                                                                                        |
-| **Security**     | [threat model](docs/security/threat-model.md) · [secret handling](docs/security/secret-handling.md) · [sync security](docs/security/sync-security.md)                                                                                                 |
+| **Security**     | [threat model](docs/security/threat-model.md) · [secret handling](docs/security/secret-handling.md) · [at-rest encryption](docs/security/encryption.md) · [SSRF guard](docs/security/ssrf-guard.md) · [prompt fencing](docs/security/prompt-fencing.md) · [sync security](docs/security/sync-security.md) |
 
 Architectural notes live under [`docs/architecture/`](docs/architecture/).
 

@@ -31,7 +31,7 @@ server.tool(
 3. Use Zod for argument validation - bad args fail fast with a clear error.
 4. Call into existing server-side code (DB functions, sync repo, pipeline) - don't duplicate logic.
 5. Return structured content. JSON strings are fine; the agent can parse.
-6. Document it here or in [`../user/mcp.md`](../user/mcp.md) if end users should know.
+6. Document it here. If end users need to know about the tool, add a row to the MCP section in the main `README.md`.
 
 ## Naming conventions
 

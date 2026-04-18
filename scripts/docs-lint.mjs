@@ -21,6 +21,13 @@ const WATCHED = [
   'server/integrations/',
   'server/workers/',
   'server/deployment/',
+  // Security-critical helpers (CR-08..CR-15) - every change here has a
+  // matching doc page under docs/security/. Touching the helpers
+  // without updating the doc is a red flag because the doc is what
+  // the reviewer's checklist reads from.
+  'server/lib/crypto.ts',
+  'server/lib/net.ts',
+  'server/ai/prompts/fence.ts',
   'electron/',
   'Dockerfile.server',
   'scripts/install-server',

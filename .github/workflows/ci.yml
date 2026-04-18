@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [server, frontend]
+        target: [server, frontend, electron, electron-preload]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -48,11 +48,12 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: typecheck ${{ matrix.target }}
         run: |
-          if [ "${{ matrix.target }}" = "server" ]; then
-            npx tsc --noEmit -p tsconfig.server.json
-          else
-            npx tsc --noEmit -p tsconfig.app.json
-          fi
+          case "${{ matrix.target }}" in
+            server)            npx tsc --noEmit -p tsconfig.server.json ;;
+            frontend)          npx tsc --noEmit -p tsconfig.app.json ;;
+            electron)          npx tsc --noEmit -p tsconfig.electron.json ;;
+            electron-preload)  npx tsc --noEmit -p tsconfig.electron-preload.json ;;
+          esac
 
   # ── 3. Tests on three Node majors to catch version drift ──
   test:
@@ -83,7 +84,7 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  # ── 4. Build both artifacts on Linux + macOS + Windows ──
+  # ── 4. Build all three artifacts on Linux + macOS + Windows ──
   build:
     name: build (${{ matrix.os }})
     needs: [typecheck, test]
@@ -103,6 +104,8 @@ jobs:
         run: npm run build
       - name: build server
         run: npm run build:server
+      - name: build electron (main + preload)
+        run: npm run build:electron
 
   # ── 5. Security audit (non-blocking warning for high/critical) ──
   audit:
@@ -147,10 +150,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ── 7. All-green gate for branch protection ──
+  # ── 7. Markdown link check (catches dead internal links before they merge) ──
+  markdown-links:
+    name: markdown-links
+    needs: docs-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+      - name: check internal markdown links
+        run: node scripts/link-check.mjs
+
+  # ── 8. All-green gate for branch protection ──
   ci-gate:
     name: ci-gate
-    needs: [docs-lint, typecheck, test, build, audit, docker-build]
+    needs:
+      [docs-lint, typecheck, test, build, audit, docker-build, markdown-links]
     if: always()
     runs-on: ubuntu-latest
     steps:
