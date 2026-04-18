@@ -76,6 +76,7 @@ tmp/
 /scanner-reloaded.png
 /scanner.png
 /page-*.png
+/verify-*.png
 
 # Server tarball + docker artifacts (copied into release-artifacts/ by
 # the release script)

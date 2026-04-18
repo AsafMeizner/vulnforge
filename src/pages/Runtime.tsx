@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import {
   listRuntimeJobs,
   getRuntimeJob,
@@ -200,9 +200,13 @@ export default function Runtime() {
             </thead>
             <tbody>
               {jobs.map(job => (
-                <>
+                // The outer iteration element needs the React key - without
+                // it React warns every render and reconciliation is wrong
+                // for the expanded-detail row (the inner <tr key={job.id}>
+                // used to be the key holder but a fragment parent gets
+                // ignored).
+                <Fragment key={job.id}>
                   <tr
-                    key={job.id}
                     style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer' }}
                     onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
                   >
@@ -276,13 +280,13 @@ export default function Runtime() {
                     </td>
                   </tr>
                   {expandedJobId === job.id && (
-                    <tr key={`${job.id}-detail`}>
+                    <tr>
                       <td colSpan={5} style={{ padding: 0, background: 'var(--bg)' }}>
                         <JobDetail job={job} />
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>
