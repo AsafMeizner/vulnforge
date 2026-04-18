@@ -4,6 +4,7 @@ import {
   createPipelineRun,
   updatePipelineRun,
   getPipelineRun,
+  getActivePipelineRuns,
   getProjectById,
   updateProject,
   createProject,
@@ -672,14 +673,62 @@ async function waitForScansComplete(
   });
 }
 
-/** Cancel a running pipeline. */
+/**
+ * Cancel a running pipeline.
+ *
+ * Two code paths:
+ *   1. The pipeline is in memory (normal case) - call its cancel closure
+ *      which propagates the signal to every running stage.
+ *   2. The pipeline is an orphan (DB says it's running, but there's no
+ *      in-memory handle - e.g. the server restarted mid-clone). We
+ *      heal the zombie by flipping the DB row to status='cancelled'
+ *      directly so the UI can stop polling it forever.
+ *
+ * Returns true in either case; false only when the row doesn't exist
+ * or is already in a terminal state.
+ */
 export function cancelPipeline(pipelineId: string): boolean {
   const active = activePipelines.get(pipelineId);
   if (active) {
     active.cancel();
     return true;
   }
-  return false;
+  // Orphan path: no worker, but maybe a stale DB row.
+  const row = getPipelineRun(pipelineId);
+  if (!row) return false;
+  const terminal = ['ready', 'completed', 'failed', 'cancelled'];
+  if (terminal.includes(row.status)) return false;
+  updatePipelineRun(pipelineId, {
+    status: 'cancelled',
+    current_stage: 'cancelled',
+    error: 'Cancelled (orphan recovery - no live worker)',
+    completed_at: new Date().toISOString(),
+  });
+  return true;
+}
+
+/**
+ * Boot-time reconciliation: any pipeline in a non-terminal status when
+ * the process starts up can't possibly still be running (we just booted).
+ * Flip them to failed so the UI doesn't show fake "in-progress" rows
+ * and so users can start a fresh pipeline on the same project.
+ *
+ * Called once from server startup. Safe to call multiple times.
+ */
+export function reconcileOrphanPipelines(): { reaped: number } {
+  const active = getActivePipelineRuns();
+  let reaped = 0;
+  for (const row of active) {
+    if (activePipelines.has(row.id)) continue; // really running (rare - same process)
+    updatePipelineRun(row.id, {
+      status: 'failed',
+      error: 'Orphaned at server startup (worker died)',
+      completed_at: new Date().toISOString(),
+    });
+    reaped++;
+  }
+  if (reaped > 0) console.log(`[pipeline] reconcileOrphanPipelines reaped ${reaped}`);
+  return { reaped };
 }
 
 /** Pause a running pipeline - preserves progress for later resume. */

@@ -86,6 +86,17 @@ async function main(): Promise<void> {
   await initDb();
   console.log('[DB] Database ready');
 
+  // Boot-time reconciliation: any pipeline_runs row still in a
+  // non-terminal status was orphaned by a previous crash/restart (the
+  // worker only lives in memory). Flip them to failed so the UI stops
+  // polling ghosts and users can start fresh runs on the same project.
+  try {
+    const { reconcileOrphanPipelines } = await import('./pipeline/orchestrator.js');
+    reconcileOrphanPipelines();
+  } catch (err: any) {
+    console.warn('[Pipeline] reconcileOrphanPipelines failed:', err.message);
+  }
+
   // Load routing rules from database
   try {
     const { initRoutingFromDb } = await import('./ai/routing.js');
