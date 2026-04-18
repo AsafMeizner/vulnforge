@@ -593,6 +593,7 @@ Be technical, precise, and actionable.`;
   app.put('/api/ai/providers/:id', async (req, res) => {
     try {
       const { getAIProviderById, upsertAIProvider } = await import('./db.js');
+      const { assertSafeExternalUrl, SsrfError } = await import('./lib/net.js');
       const id = Number(req.params.id);
       const existing = getAIProviderById(id);
       if (!existing) {
@@ -602,6 +603,22 @@ Be technical, precise, and actionable.`;
       // Don't overwrite key with masked value
       const updates = { ...req.body };
       if (updates.api_key === '***') delete updates.api_key;
+
+      // CR-12: validate base_url against SSRF before persisting. Only
+      // validate if the caller actually touched base_url - null/empty is
+      // allowed (providers like anthropic/openai use the SDK default).
+      if (typeof updates.base_url === 'string' && updates.base_url.trim()) {
+        try {
+          await assertSafeExternalUrl(updates.base_url, { field: 'base_url' });
+        } catch (err: any) {
+          res.status(err instanceof SsrfError ? 400 : 500).json({
+            error: err?.message || 'base_url validation failed',
+            code: err?.code || 'VALIDATION_FAILED',
+          });
+          return;
+        }
+      }
+
       upsertAIProvider({ ...existing, ...updates });
       res.json({ success: true });
     } catch (err: any) {
@@ -615,11 +632,26 @@ Be technical, precise, and actionable.`;
   app.post('/api/ai/providers', async (req, res) => {
     try {
       const { upsertAIProvider, getAllAIProviders } = await import('./db.js');
+      const { assertSafeExternalUrl, SsrfError } = await import('./lib/net.js');
       const body = req.body || {};
       if (!body.name || typeof body.name !== 'string') {
         res.status(400).json({ error: 'name is required' });
         return;
       }
+
+      // CR-12: validate base_url against SSRF before persisting.
+      if (typeof body.base_url === 'string' && body.base_url.trim()) {
+        try {
+          await assertSafeExternalUrl(body.base_url, { field: 'base_url' });
+        } catch (err: any) {
+          res.status(err instanceof SsrfError ? 400 : 500).json({
+            error: err?.message || 'base_url validation failed',
+            code: err?.code || 'VALIDATION_FAILED',
+          });
+          return;
+        }
+      }
+
       upsertAIProvider({
         name: body.name,
         model: body.model || null,

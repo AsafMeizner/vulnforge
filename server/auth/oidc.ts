@@ -23,6 +23,7 @@
 import { randomBytes, createHash } from 'crypto';
 import { getDb, persistDb } from '../db.js';
 import { encryptSecret, decryptSecret, isEncrypted } from '../lib/crypto.js';
+import { assertSafeExternalUrl } from '../lib/net.js';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -134,6 +135,12 @@ const DISCOVERY_TTL_MS = 24 * 60 * 60 * 1000;
 export async function discoverProvider(provider: OidcProviderRow): Promise<OidcDiscovery> {
   const cached = discoveryCache.get(provider.issuer_url);
   if (cached && Date.now() - cached.at < DISCOVERY_TTL_MS) return cached.data;
+
+  // CR-12: validate the stored issuer before fetching. Server-mode
+  // deployments reject loopback / RFC1918 / cloud-metadata destinations;
+  // desktop mode allows loopback (self-hosted Keycloak at localhost).
+  await assertSafeExternalUrl(provider.issuer_url, { field: 'issuer_url' });
+
   const wellKnown = provider.issuer_url.replace(/\/$/, '') + '/.well-known/openid-configuration';
   const resp = await fetch(wellKnown);
   if (!resp.ok) throw new Error(`discovery failed ${resp.status} ${wellKnown}`);
@@ -141,6 +148,21 @@ export async function discoverProvider(provider: OidcProviderRow): Promise<OidcD
   if (!data.authorization_endpoint || !data.token_endpoint) {
     throw new Error(`discovery incomplete - missing endpoints`);
   }
+
+  // CR-12: the IdP hands back URLs the server will subsequently fetch.
+  // A malicious or compromised IdP could point token_endpoint at our own
+  // loopback admin API. Re-validate each endpoint the same way we did
+  // the issuer_url.
+  await assertSafeExternalUrl(data.token_endpoint, { field: 'token_endpoint' });
+  if (data.userinfo_endpoint) {
+    await assertSafeExternalUrl(data.userinfo_endpoint, { field: 'userinfo_endpoint' });
+  }
+  if (data.jwks_uri) {
+    await assertSafeExternalUrl(data.jwks_uri, { field: 'jwks_uri' });
+  }
+  // authorization_endpoint is not fetched by the server (browser follows
+  // the 302) so server-side SSRF isn't a concern for that one.
+
   discoveryCache.set(provider.issuer_url, { at: Date.now(), data });
   return data;
 }
@@ -286,7 +308,15 @@ export function mapRoleFromProvider(
 
 // ── Provider CRUD (admin UI) ────────────────────────────────────────────────
 
-export function upsertOidcProvider(row: Omit<OidcProviderRow, 'id' | 'created_at'>): number {
+export async function upsertOidcProvider(
+  row: Omit<OidcProviderRow, 'id' | 'created_at'>,
+): Promise<number> {
+  // CR-12: validate issuer_url against SSRF before persisting. Throws a
+  // SsrfError with .status = 400 on failure; callers can surface to HTTP.
+  if (row.issuer_url) {
+    await assertSafeExternalUrl(row.issuer_url, { field: 'issuer_url' });
+  }
+
   const db = getDb();
   // CR-09 fix: encrypt client_secret before it hits SQLite.
   // encryptSecret is idempotent via isEncrypted(); safe to call on
@@ -300,8 +330,14 @@ export function upsertOidcProvider(row: Omit<OidcProviderRow, 'id' | 'created_at
      row.scopes, row.role_mapping_json, row.enabled, Date.now()],
   );
   persistDb();
-  const idRow = db.exec('SELECT last_insert_rowid() AS id');
-  return (idRow[0]?.values?.[0]?.[0] as number) ?? 0;
+  const idStmt = db.prepare('SELECT last_insert_rowid() AS id');
+  let newId = 0;
+  if (idStmt.step()) {
+    const val = idStmt.get()[0];
+    if (typeof val === 'number') newId = val;
+  }
+  idStmt.free();
+  return newId;
 }
 
 /**
