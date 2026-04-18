@@ -106,17 +106,17 @@ export function broadcast(msg: object): void {
 
 /**
  * Send a message only to clients subscribed to the given jobId.
- * Falls back to global broadcast if there are no specific subscribers
- * (ensures clients that didn't subscribe still receive job events).
+ *
+ * Security CR-13: no-subscriber fallback removed. Previously, if
+ * nothing was subscribed to a job, we broadcast the event to EVERY
+ * connected client - which leaked per-job details (project id, file
+ * names, finding ids, error text) to clients that never asked for
+ * them, including cross-origin listeners. If a client wants an event
+ * for a job, it must explicitly subscribe.
  */
 export function broadcastToJob(jobId: string, msg: object): void {
   const subs = subscriptions.get(jobId);
-
-  if (!subs || subs.size === 0) {
-    // No targeted subscribers - broadcast globally
-    broadcast(msg);
-    return;
-  }
+  if (!subs || subs.size === 0) return;
 
   const payload = JSON.stringify(msg);
   for (const ws of subs) {

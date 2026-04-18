@@ -663,6 +663,35 @@ Be technical, precise, and actionable.`;
     res.json({ status: 'ok', ts: new Date().toISOString() });
   });
 
+  // CR-11: global error-wrapper. Handlers that either throw or call
+  // `next(err)` now funnel through here instead of each one calling
+  // `res.status(500).json({ error: err.message })` and leaking SQL
+  // messages, file paths, stack frames, etc. to the client.
+  //
+  // Development mode keeps full detail to debug locally; production
+  // returns a generic message + request id. `req.requestId` is
+  // stamped by the dev middleware above (if present) or generated
+  // here as a fallback.
+  app.use((err: any, req: any, res: any, _next: any) => {
+    const requestId = req.requestId
+      || `rq-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const status = Number(err?.status) >= 400 && Number(err?.status) < 600
+      ? Number(err.status)
+      : 500;
+    const isProd = process.env.NODE_ENV === 'production';
+    console.error(`[err ${requestId}]`, req.method, req.originalUrl, err?.stack || err);
+    if (res.headersSent) return;
+    if (isProd) {
+      res.status(status).json({ error: 'Internal server error', request_id: requestId });
+    } else {
+      res.status(status).json({
+        error: err?.message || 'Internal server error',
+        request_id: requestId,
+        ...(err?.stack ? { stack: String(err.stack).split('\n').slice(0, 8) } : {}),
+      });
+    }
+  });
+
   // ── HTTP server ───────────────────────────────────────────────────────
   const server = createServer(app);
 
@@ -681,6 +710,28 @@ Be technical, precise, and actionable.`;
     if (!wss) {
       socket.destroy();
       return;
+    }
+    // CR-13: reject cross-origin upgrades. Browsers send Origin on
+    // the upgrade request; a missing / mismatching origin means it's
+    // either a non-browser client (acceptable - we auth below via
+    // query token) or a cross-origin browser page trying to tap
+    // somebody else's VulnForge over the LAN.
+    const origin = req.headers.origin;
+    if (origin) {
+      const envAllow = (process.env.VULNFORGE_CORS_ORIGIN || '').split(',')
+        .map((s) => s.trim()).filter(Boolean);
+      const allow = envAllow.length && !envAllow.includes('*')
+        ? new Set(envAllow)
+        : new Set<string>([
+          'http://localhost:5173', 'http://localhost:3000',
+          'http://127.0.0.1:5173', 'http://127.0.0.1:3000',
+          'app://vulnforge',  // Electron custom protocol
+        ]);
+      if (!envAllow.includes('*') && !allow.has(origin)) {
+        console.warn(`[WS] refusing upgrade from origin ${origin}`);
+        socket.destroy();
+        return;
+      }
     }
     wss.handleUpgrade(req, socket as any, head, (ws) => {
       wss.emit('connection', ws, req);

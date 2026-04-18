@@ -22,6 +22,7 @@
  */
 import { randomBytes, createHash } from 'crypto';
 import { getDb, persistDb } from '../db.js';
+import { encryptSecret, decryptSecret, isEncrypted } from '../lib/crypto.js';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,12 @@ export function getOidcProvider(name: string): OidcProviderRow | null {
     stmt.free();
     const row: Record<string, any> = {};
     cols.forEach((c: string, i: number) => { row[c] = vals[i]; });
+    // Security CR-09: client_secret is stored encrypted. Decrypt
+    // transparently so the OIDC flow sees plaintext.
+    if (typeof row.client_secret === 'string' && row.client_secret) {
+      try { row.client_secret = decryptSecret(row.client_secret); }
+      catch { row.client_secret = '__undecryptable__'; }
+    }
     return row as OidcProviderRow;
   } catch { return null; }
 }
@@ -281,16 +288,49 @@ export function mapRoleFromProvider(
 
 export function upsertOidcProvider(row: Omit<OidcProviderRow, 'id' | 'created_at'>): number {
   const db = getDb();
+  // CR-09 fix: encrypt client_secret before it hits SQLite.
+  // encryptSecret is idempotent via isEncrypted(); safe to call on
+  // field updates where the secret isn't changing.
+  const secretCipher = row.client_secret ? encryptSecret(row.client_secret) : null;
   db.run(
     `INSERT OR REPLACE INTO oidc_providers
        (name, issuer_url, client_id, client_secret, scopes, role_mapping_json, enabled, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [row.name, row.issuer_url, row.client_id, row.client_secret,
+    [row.name, row.issuer_url, row.client_id, secretCipher,
      row.scopes, row.role_mapping_json, row.enabled, Date.now()],
   );
   persistDb();
   const idRow = db.exec('SELECT last_insert_rowid() AS id');
   return (idRow[0]?.values?.[0]?.[0] as number) ?? 0;
+}
+
+/**
+ * Boot-time migration. Scans oidc_providers for rows whose
+ * client_secret is still plaintext (no `vf1:` prefix) and encrypts
+ * them in place. Safe to run repeatedly - the prefix check stops
+ * double-encrypting. Called once from initDb() after schema setup.
+ */
+export function migrateOidcSecrets(): void {
+  try {
+    const db = getDb();
+    const stmt = db.prepare('SELECT id, client_secret FROM oidc_providers WHERE client_secret IS NOT NULL');
+    const rows: Array<{ id: number; secret: string }> = [];
+    while (stmt.step()) {
+      const [id, secret] = stmt.get() as [number, string];
+      rows.push({ id, secret });
+    }
+    stmt.free();
+    let migrated = 0;
+    for (const r of rows) {
+      if (typeof r.secret === 'string' && r.secret && !isEncrypted(r.secret)) {
+        db.run('UPDATE oidc_providers SET client_secret = ? WHERE id = ?', [encryptSecret(r.secret), r.id]);
+        migrated++;
+      }
+    }
+    if (migrated > 0) { persistDb(); console.log(`[crypto] migrated ${migrated} OIDC client_secret rows`); }
+  } catch (err: any) {
+    console.warn(`[crypto] migrateOidcSecrets failed: ${err?.message || err}`);
+  }
 }
 
 export function listOidcProviders(): OidcProviderRow[] {

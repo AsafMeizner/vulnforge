@@ -1966,19 +1966,36 @@ export interface IntegrationTicketRow {
   created_at?: string;
 }
 
+// CR-10 helpers: integrations.config carries Slack/Jira/GitHub tokens
+// + webhook URLs. Encrypt the whole JSON blob at rest, decrypt on
+// read. Keeps the shape opaque at the SQLite layer so a DB leak
+// doesn't hand over the tokens.
+
+function _decryptIntegrationRow(row: IntegrationRow | null): IntegrationRow | null {
+  if (!row) return row;
+  try {
+    return { ...row, config: row.config ? decryptSecret(row.config) : (row.config as any) };
+  } catch (err: any) {
+    console.warn(`[crypto] could not decrypt integrations.config for "${row.name}": ${err?.message || err}`);
+    return { ...row, config: '{"__undecryptable__":true}' };
+  }
+}
+
 export function getIntegrations(): IntegrationRow[] {
-  return execQuery('SELECT * FROM integrations ORDER BY name') as unknown as IntegrationRow[];
+  const rows = execQuery('SELECT * FROM integrations ORDER BY name') as unknown as IntegrationRow[];
+  return rows.map((r) => _decryptIntegrationRow(r) as IntegrationRow);
 }
 
 export function getIntegrationById(id: number): IntegrationRow | null {
   const rows = execQuery('SELECT * FROM integrations WHERE id = ?', [id]);
-  return rows[0] as IntegrationRow || null;
+  return _decryptIntegrationRow(rows[0] as IntegrationRow || null);
 }
 
 export function createIntegration(i: IntegrationRow): number {
+  const cipher = i.config ? encryptSecret(i.config) : encryptSecret('{}');
   return execRun(
     'INSERT INTO integrations (name, type, enabled, config) VALUES (?, ?, ?, ?)',
-    [i.name, i.type, i.enabled ?? 0, i.config || '{}']
+    [i.name, i.type, i.enabled ?? 0, cipher]
   );
 }
 
@@ -1986,9 +2003,43 @@ export function updateIntegration(id: number, updates: Partial<IntegrationRow>):
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
   if (fields.length === 0) return;
   const setClause = fields.map(f => `${f} = ?`).join(', ');
-  const values = fields.map(f => (updates as any)[f]);
+  const values = fields.map(f => {
+    // Encrypt config on the way in so every caller doesn't have to
+    // remember (and so the typed-integration code path doesn't need
+    // to know about crypto). All other columns pass through.
+    if (f === 'config') {
+      const v = (updates as any)[f];
+      return v ? encryptSecret(String(v)) : v;
+    }
+    return (updates as any)[f];
+  });
   db.run(`UPDATE integrations SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
+}
+
+/**
+ * Boot-time migration for integrations.config rows. Same shape as
+ * migrateAIProviderSecrets() - walks pre-existing plaintext rows and
+ * encrypts them in place. Idempotent.
+ */
+export function migrateIntegrationSecrets(): void {
+  try {
+    const rows = execQuery('SELECT id, name, config FROM integrations WHERE config IS NOT NULL AND config != \'\'');
+    let migrated = 0;
+    for (const r of rows) {
+      const cfg = (r as any).config as string;
+      if (!isEncrypted(cfg)) {
+        db.run('UPDATE integrations SET config = ? WHERE id = ?', [encryptSecret(cfg), (r as any).id]);
+        migrated++;
+      }
+    }
+    if (migrated > 0) {
+      persistDb();
+      console.log(`[crypto] migrated ${migrated} integrations.config rows to encrypted form`);
+    }
+  } catch (err: any) {
+    console.warn(`[crypto] migrateIntegrationSecrets failed: ${err?.message || err}`);
+  }
 }
 
 export function deleteIntegration(id: number): void {
