@@ -97,6 +97,112 @@ function runShellCommand(cmd: string, cwd?: string): Promise<string> {
   });
 }
 
+/**
+ * Split a run_command template into [argv0, ...args] and substitute
+ * `{target}` / `{output}` placeholders with values validated against a
+ * shell-metachar deny-list. Spawned without a shell so metacharacters
+ * that slip through (they won't) have nothing to interpret. Fixes
+ * CR-05: the previous replace()-then-spawn(shell:true) path let
+ * `target = "; rm -rf ~ ;"` escape into the parent shell.
+ *
+ * Template splitting is naive (whitespace-separated). Catalog entries
+ * must not embed quoted strings with spaces in their args -- use the
+ * typed-integration path (server/plugins/integrations/*.ts) for that.
+ */
+function runArgvCommand(
+  template: string,
+  substitutions: Record<string, string>,
+  cwd?: string,
+): Promise<string> {
+  // Reject the substituted values up front. Any value reaching a
+  // spawned child must not look like a shell escape attempt; even
+  // though we're not using shell:true, some children (git, bash
+  // plugins) may re-invoke a shell of their own.
+  const BAD = /[;&|`$<>\n\r]|\$\(|--upload-pack|--receive-pack/;
+  for (const [k, v] of Object.entries(substitutions)) {
+    if (typeof v !== 'string') {
+      return Promise.reject(new Error(`Plugin substitution "${k}" must be string`));
+    }
+    if (BAD.test(v)) {
+      return Promise.reject(new Error(
+        `Plugin substitution "${k}" contains shell metacharacters and was rejected.`,
+      ));
+    }
+  }
+
+  const tokens = template.trim().split(/\s+/);
+  if (tokens.length === 0) {
+    return Promise.reject(new Error('Empty run_command'));
+  }
+  const resolved = tokens.map((tok) => {
+    // Only two placeholder forms are supported; unknown placeholders
+    // pass through verbatim (useful for static flags).
+    return tok
+      .replace(/\{target\}/g, substitutions.target ?? '')
+      .replace(/\{output\}/g, substitutions.output ?? '');
+  });
+  const [exe, ...args] = resolved;
+  return new Promise((resolve, reject) => {
+    const child = spawn(exe, args, {
+      shell: false, // key line - no shell interpretation
+      cwd: cwd || PLUGINS_ROOT,
+      env: process.env,
+    });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d: Buffer) => { stdout += d.toString(); });
+    child.stderr.on('data', (d: Buffer) => { stderr += d.toString(); });
+    child.on('close', (code) => {
+      if (code === 0) resolve(stdout);
+      else reject(new Error(`Command exited ${code}: ${(stderr || stdout).trim()}`));
+    });
+    child.on('error', reject);
+  });
+}
+
+/**
+ * Validate a user-supplied git URL before passing it to `git clone`.
+ * Fixes CR-06: the old regex `/^(https?:\/\/|git@)[^\s]+$/` accepted
+ * `git@foo;rm -rf~;` and anything else shell-dangerous, and didn't
+ * block `--upload-pack=whatever` which git honours.
+ *
+ * Rules:
+ *   - scheme MUST be https (plain http or ssh refused; most public
+ *     forges support https clone, and blocking ssh closes off
+ *     authorised-key exfil via an attacker-controlled URL).
+ *   - host must be on the allowlist (overridable via env).
+ *   - path must not contain shell metachars or git option flags.
+ */
+function validateGitUrl(raw: string): string {
+  if (typeof raw !== 'string' || !raw) {
+    throw new Error('git URL required');
+  }
+  // Reject shell metachars + git option flags anywhere in the URL.
+  // git honours --upload-pack / --receive-pack even when embedded
+  // in a URL's path or query string on some versions.
+  if (/[;&|`$<>\n\r]|\$\(|--upload-pack|--receive-pack/.test(raw)) {
+    throw new Error('git URL contains forbidden characters or options');
+  }
+  let u: URL;
+  try { u = new URL(raw); } catch { throw new Error('git URL is not a valid URL'); }
+  if (u.protocol !== 'https:') {
+    throw new Error('git URL must use https:// (http / ssh / file are refused for security)');
+  }
+  const defaultHosts = ['github.com', 'gitlab.com', 'bitbucket.org', 'codeberg.org', 'git.sr.ht'];
+  const envAllow = (process.env.VULNFORGE_GIT_ALLOWLIST || '').split(',')
+    .map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const allow = new Set<string>([...defaultHosts, ...envAllow]);
+  const host = u.hostname.toLowerCase();
+  const matches = [...allow].some((a) => host === a || host.endsWith('.' + a));
+  if (!matches) {
+    throw new Error(
+      `git URL host "${host}" is not on the allowlist. ` +
+      `Set VULNFORGE_GIT_ALLOWLIST to a comma-separated list of hostnames to extend.`,
+    );
+  }
+  return u.toString();
+}
+
 async function isBinaryAvailable(bin: string): Promise<boolean> {
   // Try standard lookup first
   const which = process.platform === 'win32' ? 'where' : 'which';
@@ -144,15 +250,21 @@ export class PluginManager {
       getCatalogEntryByUrl(nameOrUrl) ?? getCatalogEntry(nameOrUrl);
 
     if (!entry) {
-      const urlName = nameOrUrl.split('/').pop() ?? nameOrUrl;
+      // CR-06 fix: validate the git URL here before it ever touches
+      // a shell. Refuses non-https, disallowed hosts, shell metachars,
+      // and git option injection (`--upload-pack`). We then use a
+      // placeholder install_command that the install path below knows
+      // to route through argv-based execFile rather than shell:true.
+      const cleanUrl = validateGitUrl(nameOrUrl);
+      const urlName = new URL(cleanUrl).pathname.replace(/\.git$/, '').split('/').filter(Boolean).pop() ?? 'plugin';
       entry = {
         name: urlName,
-        source_url: nameOrUrl,
-        website_url: nameOrUrl,
+        source_url: cleanUrl,
+        website_url: cleanUrl,
         type: 'scanner',
-        description: `Installed from ${nameOrUrl}`,
-        long_description: `User-installed plugin from ${nameOrUrl}`,
-        install_command: `git clone ${nameOrUrl}`,
+        description: `Installed from ${cleanUrl}`,
+        long_description: `User-installed plugin from ${cleanUrl}`,
+        install_command: `__git_clone__ ${cleanUrl}`, // marker - not a real shell command
         run_command: '',
         parse_output: 'text',
         requires: [],
@@ -189,7 +301,26 @@ export class PluginManager {
       broadcastProgress('plugin-install', pid, { step: 'Downloading & installing', detail: 'This may take a few minutes...', progress: 30, status: 'running' });
       await integration.install(installDir);
       broadcastProgress('plugin-install', pid, { step: 'Installation files ready', progress: 80, status: 'running' });
+    } else if (entry.install_command.startsWith('__git_clone__ ')) {
+      // Safer path for the install-from-URL case. Uses execFile (no
+      // shell) + `--` separator so the URL is positional and any
+      // accidentally-embedded flag / metachar can't be interpreted.
+      const url = entry.install_command.slice('__git_clone__ '.length).trim();
+      console.log(`[PluginManager] Cloning "${entry.name}" via execFile git clone: ${url}`);
+      broadcastProgress('plugin-install', pid, { step: 'Cloning repository', detail: url, progress: 30, status: 'running' });
+      const { execFileNoThrow } = await import('../utils/execFileNoThrow.js');
+      if (!existsSync(installDir)) mkdirSync(installDir, { recursive: true });
+      const gitResult = await execFileNoThrow('git', ['clone', '--depth', '1', '--', url, installDir], {
+        timeout: 120_000,
+      });
+      if (!gitResult.ok) {
+        throw new Error(`git clone failed: ${gitResult.stderr || gitResult.stdout}`);
+      }
+      broadcastProgress('plugin-install', pid, { step: 'Clone complete', progress: 80, status: 'running' });
     } else {
+      // Catalog-defined install_command strings go through the shell
+      // path on purpose (they need pipes / &&). These are maintained
+      // by VulnForge, not user-supplied, so shell expansion is safe.
       console.log(`[PluginManager] Installing "${entry.name}" via shell: ${entry.install_command}`);
       broadcastProgress('plugin-install', pid, { step: 'Running install command', detail: entry.install_command, progress: 30, status: 'running' });
       await runShellCommand(entry.install_command, PLUGINS_ROOT);
@@ -296,12 +427,17 @@ export class PluginManager {
         PLUGINS_ROOT,
         `${plugin.name.replace(/\s+/g, '-')}-output-${Date.now()}.txt`
       );
-      const cmd = runCmd
-        .replace(/\{target\}/g, target)
-        .replace(/\{output\}/g, outputFile);
 
-      console.log(`[PluginManager] Running plugin "${plugin.name}" (shell): ${cmd}`);
-      const output = await runShellCommand(cmd, plugin.install_path ?? PLUGINS_ROOT);
+      // CR-05 fix: use the argv-based executor. Shell substitution
+      // with untrusted user input (target path) was a confirmed RCE
+      // path. runArgvCommand rejects shell metachars in subs and
+      // spawns without a shell so `; rm -rf ~` can't escape.
+      console.log(`[PluginManager] Running plugin "${plugin.name}" (argv): ${runCmd}`);
+      const output = await runArgvCommand(
+        runCmd,
+        { target, output: outputFile },
+        plugin.install_path ?? PLUGINS_ROOT,
+      );
 
       const parseType = plugin.manifest
         ? ((JSON.parse(plugin.manifest) as any).parse_output ?? 'text')

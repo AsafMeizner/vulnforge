@@ -10,7 +10,11 @@ export function setupMcpServer(app: Express): void {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // CR-04 fix: do NOT emit a wildcard Access-Control-Allow-Origin.
+    // The Express-level cors() middleware already echoes the right
+    // origin for allow-listed clients; adding '*' here made the SSE
+    // endpoint reachable by any website the user visits, which
+    // combined with CR-03 (no auth) was a drive-by attack path.
     res.flushHeaders();
 
     // Send server capabilities

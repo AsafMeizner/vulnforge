@@ -690,11 +690,53 @@ Be technical, precise, and actionable.`;
   console.log('[WS] WebSocket server initialized at /ws');
 
   // ── MCP server via SSE at /mcp ────────────────────────────────────────
+  // Security CR-03: gate /mcp behind the same authMiddleware as /api.
+  // MCP exposes 101 DB-mutating tools (create_vulnerability,
+  // start_pipeline, run_tool, set_ai_routing, etc.). Previously it
+  // was registered outside /api so every request reached it anonymously,
+  // which combined with CR-05 (command injection via run_tool) meant
+  // remote code execution.
+  app.use('/mcp', authMiddleware as any);
   setupMcpServer(app);
-  console.log('[MCP] MCP server initialized at /mcp');
+  console.log('[MCP] MCP server initialized at /mcp (auth-gated)');
 
   // ── Start ─────────────────────────────────────────────────────────────
-  const HOST = process.env.VULNFORGE_HOST || '0.0.0.0';
+  // Security CR-07: default to loopback. Binding 0.0.0.0 exposes every
+  // network interface, which combined with the historical "empty users
+  // table = admin" shortcut (CR-02) meant anyone on the LAN could POST
+  // as admin. Teams that actually want a shared server set
+  // VULNFORGE_HOST=0.0.0.0 explicitly and typically also configure
+  // TLS + users.
+  const HOST = process.env.VULNFORGE_HOST || '127.0.0.1';
+  // Emit a loud warning if a publicly-bound process has zero users —
+  // the "empty users = admin" convenience in authMiddleware will treat
+  // every request as admin. Refuse to boot with that combination since
+  // it means "anyone on the LAN is admin until setup completes".
+  if (HOST === '0.0.0.0' || HOST === '::') {
+    try {
+      const { countUsers } = await import('./db.js');
+      if (countUsers() === 0) {
+        console.error(
+          '[FATAL] Bound to %s with zero users in DB. ' +
+          'This would grant every incoming request admin privileges ' +
+          '(see authMiddleware). Either:\n' +
+          '  1. Set VULNFORGE_HOST=127.0.0.1 (single-user/desktop mode)\n' +
+          '  2. Run the setup flow first to seed an initial admin user\n' +
+          '  3. Set VULNFORGE_ALLOW_UNAUTH_PUBLIC=1 if you really know what you are doing',
+          HOST,
+        );
+        if (process.env.VULNFORGE_ALLOW_UNAUTH_PUBLIC !== '1') {
+          process.exit(2);
+        }
+      } else {
+        console.warn(
+          '[WARN] Bound to %s. Ensure you have set up TLS termination + users; ' +
+          'otherwise credentials cross the network in plaintext.',
+          HOST,
+        );
+      }
+    } catch { /* DB not ready; authMiddleware will re-check */ }
+  }
 
   // Dynamic port selection: try preferred PORT, increment on EADDRINUSE
   // up to 20 times (3001 -> 3020 by default). Useful in desktop mode

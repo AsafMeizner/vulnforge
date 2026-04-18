@@ -77,16 +77,75 @@ export type AuthenticatedRequest = Request;
  * base64url segments and far longer than `vf_<hex>` tokens, so there's no
  * ambiguity in practice.
  */
-export function authMiddleware(req: AuthenticatedRequest, _res: Response, next: NextFunction): void {
-  // Skip auth if no users configured (single-user mode)
+// Paths that are intentionally unauthenticated. Everything else
+// (including /api/*, /mcp, /ws) requires a valid token or the mode
+// gate below. Keep this list tight — anything added here is exposed
+// to the network without auth.
+const PUBLIC_PATH_PREFIXES = [
+  '/api/health',
+  '/api/config',
+  '/api/auth/login',
+  '/api/auth/setup',
+  '/api/auth-session/login',
+  '/api/auth-session/refresh',
+  '/api/auth-session/bootstrap',   // one-time setup token
+  '/api/auth-oidc',                // OIDC discovery + callback
+] as const;
+
+/**
+ * "Desktop mode" - single-user local-loopback install. Detected from
+ * the host binding: when we're pinned to 127.0.0.1 / ::1 the user is
+ * physically at the machine, nobody else can reach us, and the
+ * historical "no users = skip auth" convenience is acceptable.
+ *
+ * "Server mode" is everything else (0.0.0.0, custom interface) and
+ * MUST have a seeded admin. The previous code's "empty users table =
+ * admin" shortcut (CR-02) meant a freshly-bootstrapped server
+ * deployment accepted every anonymous request as admin, which is a
+ * catastrophic default. Now that shortcut only applies when the
+ * binding proves we're local.
+ */
+function isDesktopMode(): boolean {
+  const host = process.env.VULNFORGE_HOST || '127.0.0.1';
+  return host === '127.0.0.1' || host === 'localhost' || host === '::1';
+}
+
+function isPublicPath(p: string): boolean {
+  for (const prefix of PUBLIC_PATH_PREFIXES) {
+    if (p === prefix || p.startsWith(prefix + '/') || p.startsWith(prefix + '?')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  // Public routes skip auth entirely. Do this BEFORE touching the DB
+  // so startup can serve /health before the users table is created.
+  if (isPublicPath(req.path)) return next();
+
+  // Desktop-mode empty-users shortcut. Only allowed when bound to
+  // loopback (isDesktopMode). Server mode refuses until setup runs
+  // (CR-02). Wrapped in try because authMiddleware may fire before
+  // initDb() on the very first request.
   try {
     const userCount = countUsers();
     if (userCount === 0) {
-      req.user = { id: 0, username: 'local', role: 'admin' };
-      return next();
+      if (isDesktopMode()) {
+        req.user = { id: 0, username: 'local', role: 'admin' };
+        return next();
+      }
+      // Server mode + no users = not bootstrapped. Refuse with a
+      // clear message so the operator knows to run setup.
+      res.status(503).json({
+        error: 'Server not bootstrapped. Run setup on this host first, or set VULNFORGE_HOST=127.0.0.1 for single-user mode.',
+      });
+      return;
     }
   } catch {
-    return next(); // DB not ready yet
+    // DB not ready yet - let the handler decide. The handler itself
+    // will fail with a clear error instead of granting admin.
+    return next();
   }
 
   const authHeader = req.headers.authorization;
@@ -115,9 +174,11 @@ export function authMiddleware(req: AuthenticatedRequest, _res: Response, next: 
     }
   }
 
-  // No valid auth - allow read-only anonymous; write routes gate via RBAC.
-  req.user = { id: 0, username: 'anonymous', role: 'viewer' };
-  next();
+  // CR-01 fix: invalid/missing auth no longer falls through to an
+  // "anonymous viewer". Return 401 so every request is either
+  // authenticated or visibly rejected. Routes that truly need
+  // unauthenticated access go on the PUBLIC_PATH_PREFIXES allowlist.
+  res.status(401).json({ error: 'Authentication required' });
 }
 
 /**
