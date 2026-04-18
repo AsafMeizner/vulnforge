@@ -206,7 +206,22 @@ export async function routeAI(request: AIRequest): Promise<AIResponse> {
     .map(p => p.name.toLowerCase());
 
   if (enabledNames.length === 0) {
-    throw new Error('No AI provider enabled. Configure an AI provider in settings.');
+    // Give the user useful diagnostics. If they have routing rules or
+    // disabled provider rows, the generic "configure an AI provider"
+    // message is misleading - they think they DID configure something.
+    const total = allProviders.length;
+    let rulesHint = '';
+    try {
+      const rules = getRoutingRules();
+      if (rules.length > 0) {
+        const unique = Array.from(new Set(rules.map((r) => r.provider))).join(', ');
+        rulesHint = ` Routing rules already point at: ${unique}, but none of those provider rows are marked enabled.`;
+      }
+    } catch { /* best-effort */ }
+    const detail = total === 0
+      ? 'No AI provider rows exist. Open AI → Providers and add one (Claude/OpenAI/Gemini need API keys; Ollama + Claude CLI run locally).'
+      : `${total} provider row(s) exist but none are enabled. Open AI → Providers and toggle Enable.`;
+    throw new Error(`No AI provider enabled. ${detail}${rulesHint}`);
   }
 
   if (task) {

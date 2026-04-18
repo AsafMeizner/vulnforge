@@ -407,8 +407,58 @@ export default function AIPage() {
           {providersLoading ? (
             <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Loading providers...</div>
           ) : providers.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--muted)', fontSize: 13, border: '1px dashed var(--border)', borderRadius: 8 }}>
-              No AI providers configured.
+            <div style={{
+              padding: 24, color: 'var(--text)', fontSize: 13,
+              border: '1px dashed var(--border)', borderRadius: 8,
+              background: 'color-mix(in srgb, var(--blue) 5%, transparent)',
+              display: 'flex', flexDirection: 'column', gap: 12,
+            }}>
+              <div style={{ fontWeight: 600 }}>No AI providers configured yet</div>
+              <div style={{ color: 'var(--muted)', lineHeight: 1.6 }}>
+                Routing selections only say <em>which</em> provider handles each task; you
+                still need to add a provider row here with an API key (or a base URL for Ollama).
+                Without at least one enabled provider, every AI call returns
+                <code style={{ background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 3, margin: '0 3px' }}>
+                  No AI provider enabled
+                </code>
+                regardless of what you picked in Routing.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {(['claude', 'openai', 'gemini', 'ollama', 'claude_cli'] as const).map(kind => (
+                  <button
+                    key={kind}
+                    onClick={async () => {
+                      const defaults: Record<string, Partial<AIProvider>> = {
+                        claude:     { name: 'claude',     model: 'claude-sonnet-4-20250514' },
+                        openai:     { name: 'openai',     model: 'gpt-4o' },
+                        gemini:     { name: 'gemini',     model: 'gemini-2.5-flash' },
+                        ollama:     { name: 'ollama',     model: 'qwen3:8b', base_url: 'http://localhost:11434' },
+                        claude_cli: { name: 'claude_cli', model: 'claude-sonnet-4-20250514' },
+                      };
+                      try {
+                        const res = await apiFetch('/api/ai/providers', {
+                          method: 'POST',
+                          headers: { 'content-type': 'application/json' },
+                          body: JSON.stringify({ ...defaults[kind], enabled: kind === 'ollama' || kind === 'claude_cli' }),
+                        });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        await loadProviders();
+                        toast('success', `Added ${kind} - ${kind === 'ollama' || kind === 'claude_cli' ? 'enabled' : 'paste API key to enable'}`);
+                      } catch (err: any) {
+                        toast('error', `Failed to add ${kind}: ${err.message}`);
+                      }
+                    }}
+                    style={{
+                      padding: '6px 12px', fontSize: 12, fontWeight: 600,
+                      border: '1px solid var(--border)', borderRadius: 6,
+                      background: 'var(--surface)', color: 'var(--text)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    + Add {kind}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             providers.map(p => {
