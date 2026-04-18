@@ -54,6 +54,25 @@ router.post('/sessions/:id/next-step', async (req: Request, res: Response) => {
   }
 });
 
+// POST /sessions/:id/manual-step
+// Body: { thought: string, action?: string, args?: object }
+// Manual step entry that makes no AI call - lets users drive the
+// investigation themselves when they don't want/need a provider.
+router.post('/sessions/:id/manual-step', async (req: Request, res: Response) => {
+  try {
+    const { thought, action, args } = req.body || {};
+    if (typeof thought !== 'string' || !thought.trim()) {
+      res.status(400).json({ error: 'thought (string) required' });
+      return;
+    }
+    const { addManualStep } = await import('../pipeline/ai/investigate.js');
+    const step = addManualStep(String(req.params.id), { thought, action, args });
+    res.status(201).json(step);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.post('/sessions/:id/execute/:step', async (req: Request, res: Response) => {
   try {
     const step = await executeStep(String(req.params.id), Number(req.params.step));

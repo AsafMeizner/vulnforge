@@ -955,6 +955,18 @@ export const startInvestigation = (body: { goal: string; finding_id?: number }) 
 export const proposeNextStep = (id: string) =>
   request<InvestigateStep>(`/ai-investigate/sessions/${id}/next-step`, { method: 'POST' });
 
+// Manual-step entry: lets the user write their own step without an
+// AI call. Accepts a free-form `thought` and an optional action/args
+// pair (for users who want the existing dispatcher to run something).
+export const addManualInvestigateStep = (
+  id: string,
+  body: { thought: string; action?: string; args?: Record<string, any> },
+) =>
+  request<InvestigateStep>(`/ai-investigate/sessions/${id}/manual-step`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
 export const executeInvestigateStep = (id: string, stepIndex: number) =>
   request<InvestigateStep>(`/ai-investigate/sessions/${id}/execute/${stepIndex}`, { method: 'POST' });
 

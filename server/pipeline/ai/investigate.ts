@@ -98,6 +98,42 @@ export async function startInvestigation(goal: string, findingId?: number): Prom
   return session;
 }
 
+/**
+ * Append a user-written step to the session. Unlike proposeNextStep(),
+ * this makes no AI call - it's the "I know what I want to do next,
+ * let me write it myself" escape hatch, so users can drive an
+ * investigation without any AI provider configured.
+ *
+ * The new step enters as `status: 'approved'` (the user wrote it, so
+ * they implicitly approve it) but `proposed_action: 'note'` which is
+ * a no-op action. Users can edit it further by calling this again or
+ * by executing it via executeStep (which will dispatch the action if
+ * they provided one that the dispatcher recognises).
+ */
+export function addManualStep(
+  sessionId: string,
+  opts: { thought: string; action?: string; args?: Record<string, any> },
+): InvestigateStep {
+  const session = loadSession(sessionId);
+  if (!session) throw new Error(`Investigation ${sessionId} not found`);
+  if (session.status !== 'active') throw new Error(`Investigation ${sessionId} is ${session.status}`);
+
+  const step: InvestigateStep = {
+    index: session.steps.length,
+    thought: opts.thought || '(no thought)',
+    proposed_action: opts.action || 'note',
+    proposed_args: opts.args,
+    // Manual entries start pending so the user can still "Execute"
+    // them if they picked a real action type. The index lets them
+    // delete with a separate call if they change their mind.
+    status: 'pending',
+  };
+  session.steps.push(step);
+  session.updated_at = new Date().toISOString();
+  saveSession(session);
+  return step;
+}
+
 export async function proposeNextStep(sessionId: string): Promise<InvestigateStep> {
   const session = loadSession(sessionId);
   if (!session) throw new Error(`Investigation ${sessionId} not found`);

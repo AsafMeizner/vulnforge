@@ -4,6 +4,7 @@ import {
   getInvestigation,
   startInvestigation,
   proposeNextStep,
+  addManualInvestigateStep,
   executeInvestigateStep,
   rejectInvestigateStep,
   cancelInvestigation,
@@ -11,6 +12,7 @@ import {
   type InvestigateStep,
 } from '@/lib/api';
 import { useToast } from '@/components/Toast';
+import { FindingCombo } from '@/components/FindingCombo';
 
 function statusColor(status: string): string {
   switch (status) {
@@ -32,6 +34,10 @@ export default function Investigate() {
   const [selected, setSelected] = useState<InvestigateSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [proposing, setProposing] = useState(false);
+  // "+ Add Step Manually" modal open state. When true, renders a
+  // small form at the bottom of the component where the user can
+  // type a free-form step without touching AI.
+  const [addManualOpen, setAddManualOpen] = useState(false);
   const [newModalOpen, setNewModalOpen] = useState(false);
 
   const loadSessions = useCallback(async () => {
@@ -55,6 +61,21 @@ export default function Investigate() {
   }, [selected]);
 
   useEffect(() => { loadSessions(); }, [loadSessions]);
+
+  const handleAddManualStep = async (thought: string, action?: string) => {
+    if (!selected) return;
+    try {
+      await addManualInvestigateStep(selected.id, {
+        thought,
+        action: action?.trim() || 'note',
+      });
+      await refreshSelected();
+      toast('Step added', 'success');
+      setAddManualOpen(false);
+    } catch (err: any) {
+      toast(`Add step failed: ${err.message}`, 'error');
+    }
+  };
 
   const handlePropose = async () => {
     if (!selected) return;
@@ -182,7 +203,15 @@ export default function Investigate() {
                         padding: '8px 14px', background: 'var(--blue)', color: '#fff',
                         border: 'none', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer',
                         opacity: proposing ? 0.5 : 1,
-                      }}>{proposing ? 'Thinking...' : 'Propose Next Step'}</button>
+                      }} title="Ask the AI to propose the next step (requires a provider)">
+                        {proposing ? 'Thinking...' : 'Propose Next Step (AI)'}
+                      </button>
+                      <button onClick={() => setAddManualOpen(true)} style={{
+                        padding: '8px 14px', background: 'var(--surface-2)', color: 'var(--text)',
+                        border: '1px solid var(--border)', borderRadius: 5, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                      }} title="Write your own next step without any AI">
+                        + Add Step Manually
+                      </button>
                       <button onClick={handleCancel} style={{
                         padding: '8px 14px', background: 'transparent', color: 'var(--muted)',
                         border: '1px solid var(--border)', borderRadius: 5, fontSize: 12, cursor: 'pointer',
@@ -196,7 +225,9 @@ export default function Investigate() {
               <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
                 {selected.steps.length === 0 ? (
                   <div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                    No steps yet. Click "Propose Next Step" to begin.
+                    No steps yet. Click <strong>Propose Next Step</strong> to have AI suggest one,
+                    or <strong>+ Add Step Manually</strong> to write your own.
+                    <br />AI is optional — you can drive the whole investigation by hand.
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -224,6 +255,108 @@ export default function Investigate() {
           loadSessions();
         }}
       />}
+
+      {/* "Add step manually" modal - free-form thought + optional
+          action name. No AI call, no provider required. */}
+      {addManualOpen && (
+        <ManualStepModal
+          onClose={() => setAddManualOpen(false)}
+          onSubmit={handleAddManualStep}
+        />
+      )}
+    </div>
+  );
+}
+
+function ManualStepModal({ onClose, onSubmit }: {
+  onClose: () => void;
+  onSubmit: (thought: string, action?: string) => Promise<void>;
+}) {
+  const [thought, setThought] = useState('');
+  const [action, setAction] = useState('');
+  const [saving, setSaving] = useState(false);
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, width: 'min(640px, 95vw)', padding: 20,
+          display: 'flex', flexDirection: 'column', gap: 14,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+          Add step manually
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
+          Write your own reasoning about what to do next. No AI call is made.
+          Leave "Action" blank to save it as a free-form note, or enter an action
+          name like <code>read_file</code>, <code>find_callers</code>,
+          <code>git_blame</code>, or <code>run_tool</code> to make the step
+          executable later.
+        </div>
+        <div>
+          <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+            Thought / reasoning
+          </label>
+          <textarea
+            value={thought}
+            onChange={(e) => setThought(e.target.value)}
+            placeholder="e.g. The malloc() on line 3932 takes a uint64_t cast to size_t. On 32-bit this truncates..."
+            autoFocus
+            style={{
+              width: '100%', minHeight: 120, resize: 'vertical',
+              padding: '8px 10px', background: 'var(--bg)',
+              border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text)',
+              fontSize: 13, outline: 'none', boxSizing: 'border-box',
+              fontFamily: 'inherit', lineHeight: 1.5,
+            }}
+          />
+        </div>
+        <div>
+          <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+            Action (optional) — leave blank for a plain note
+          </label>
+          <input
+            value={action}
+            onChange={(e) => setAction(e.target.value)}
+            placeholder="read_file / find_callers / run_tool / ..."
+            style={{
+              width: '100%', padding: '7px 10px', background: 'var(--bg)',
+              border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text)',
+              fontSize: 13, outline: 'none', boxSizing: 'border-box',
+              fontFamily: 'ui-monospace, SF Mono, Menlo, Consolas, monospace',
+            }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} disabled={saving} style={{
+            padding: '8px 16px', background: 'var(--surface-2)', border: '1px solid var(--border)',
+            borderRadius: 5, color: 'var(--text)', fontSize: 13, cursor: 'pointer',
+          }}>Cancel</button>
+          <button
+            onClick={async () => {
+              if (!thought.trim()) return;
+              setSaving(true);
+              try { await onSubmit(thought.trim(), action); }
+              finally { setSaving(false); }
+            }}
+            disabled={saving || !thought.trim()}
+            style={{
+              padding: '8px 18px', background: 'var(--green)', color: '#fff',
+              border: 'none', borderRadius: 5, fontSize: 13, fontWeight: 700,
+              cursor: (saving || !thought.trim()) ? 'not-allowed' : 'pointer',
+              opacity: (saving || !thought.trim()) ? 0.6 : 1,
+            }}
+          >{saving ? 'Saving...' : 'Add Step'}</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -297,14 +430,15 @@ function NewSessionModal({ onClose, onCreated }: {
 }) {
   const { toast } = useToast() as { toast: (a: string, b?: string) => void };
   const [goal, setGoal] = useState('');
-  const [findingId, setFindingId] = useState('');
+  // Store the selected finding's numeric id. Null means "not linked."
+  const [findingId, setFindingId] = useState<number | null>(null);
 
   const handleCreate = async () => {
     if (!goal.trim()) { toast('Goal required', 'error'); return; }
     try {
       const s = await startInvestigation({
         goal: goal.trim(),
-        finding_id: findingId ? Number(findingId) : undefined,
+        finding_id: findingId ?? undefined,
       });
       onCreated(s);
     } catch (err: any) {
@@ -341,12 +475,13 @@ function NewSessionModal({ onClose, onCreated }: {
           <label style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
             Link to finding (optional)
           </label>
-          <input value={findingId} onChange={e => setFindingId(e.target.value)} placeholder="finding ID"
-            style={{
-              width: '100%', padding: '8px 10px', background: 'var(--bg)',
-              border: '1px solid var(--border)', borderRadius: 5, color: 'var(--text)',
-              fontSize: 13, outline: 'none', boxSizing: 'border-box',
-            }}
+          {/* Searchable combobox - type a few letters of the finding
+              title or paste the id. Replaces the old raw-number input
+              which required users to remember numeric ids. */}
+          <FindingCombo
+            value={findingId}
+            onChange={setFindingId}
+            placeholder="Search findings by title or paste id..."
           />
         </div>
 
