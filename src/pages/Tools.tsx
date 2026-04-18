@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getTools, getTool, getPlugins, getPluginModules, getVulnerabilities } from '@/lib/api';
+import { getTools, getTool, getPlugins, getPluginModules, getVulnerabilities, updateTool } from '@/lib/api';
 import type { Tool, Vulnerability } from '@/lib/types';
 import { useToast } from '@/components/Toast';
 
@@ -397,8 +397,10 @@ export default function Tools({ onNavigateToScanner }: ToolsProps) {
                   </div>
                 )}
 
-                {/* Status row */}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {/* Status row + enable/disable toggle. Before this
+                    button existed there was no way to turn a tool on
+                    or off from the UI - users had to edit the DB. */}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                   <span style={{
                     fontSize: 12,
                     color: selected.enabled ? 'var(--green)' : 'var(--muted)',
@@ -419,6 +421,27 @@ export default function Tools({ onNavigateToScanner }: ToolsProps) {
                   }}>
                     {selected.category}
                   </span>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await updateTool(Number(selected.id), { enabled: !selected.enabled });
+                        await load();
+                        toast(`${selected.name} ${!selected.enabled ? 'enabled' : 'disabled'}`, 'success');
+                      } catch (err: any) {
+                        toast(`Toggle failed: ${err.message}`, 'error');
+                      }
+                    }}
+                    style={{
+                      padding: '4px 12px', fontSize: 12, fontWeight: 600,
+                      border: `1px solid ${selected.enabled ? 'var(--yellow)44' : 'var(--green)44'}`,
+                      borderRadius: 4,
+                      background: 'transparent',
+                      color: selected.enabled ? 'var(--yellow)' : 'var(--green)',
+                      cursor: 'pointer', marginLeft: 'auto',
+                    }}
+                  >
+                    {selected.enabled ? 'Disable' : 'Enable'}
+                  </button>
                 </div>
 
                 {/* Findings by this tool */}

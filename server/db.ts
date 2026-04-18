@@ -1323,6 +1323,38 @@ export function upsertTool(t: Tool): number {
   );
 }
 
+export function updateTool(id: number, t: Partial<Tool>): void {
+  const allowed = new Set(['name', 'category', 'description', 'docs', 'track_record', 'file_path', 'config_schema', 'enabled']);
+  const fields = Object.keys(t).filter((k) => allowed.has(k));
+  if (fields.length === 0) return;
+  const setClause = fields.map((f) => `${f} = ?`).join(', ');
+  // Coerce enabled to a 0/1 integer since SQLite doesn't have booleans
+  // and the column is INTEGER.
+  const values = fields.map((f) => {
+    const v = (t as any)[f];
+    if (f === 'enabled') return v ? 1 : 0;
+    return v ?? null;
+  });
+  db.run(`UPDATE tools SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
+}
+
+export function deleteTool(id: number): void {
+  db.run('DELETE FROM tools WHERE id = ?', [id]);
+  persistDb();
+}
+
+// Bulk delete vulnerabilities by id list. Kept separate from
+// deleteVulnerability() so the UI can show a "Delete N" action with
+// one round-trip instead of N.
+export function deleteVulnerabilitiesBulk(ids: number[]): number {
+  if (!Array.isArray(ids) || ids.length === 0) return 0;
+  const placeholders = ids.map(() => '?').join(',');
+  db.run(`DELETE FROM vulnerabilities WHERE id IN (${placeholders})`, ids);
+  persistDb();
+  return ids.length;
+}
+
 // ── Checklists CRUD ────────────────────────────────────────────────────────
 
 export function getAllChecklists(): Checklist[] {
@@ -1353,6 +1385,27 @@ export function createChecklistItem(item: ChecklistItem): number {
      item.severity || null, item.tool_names || null, item.verified || 0,
      item.vuln_id || null, item.notes || null]
   );
+}
+
+export function updateChecklist(id: number, c: Partial<Checklist>): void {
+  const allowed = new Set(['name', 'source_url', 'category', 'total_items']);
+  const fields = Object.keys(c).filter((k) => allowed.has(k));
+  if (fields.length === 0) return;
+  const setClause = fields.map((f) => `${f} = ?`).join(', ');
+  const values = fields.map((f) => (c as any)[f] ?? null);
+  db.run(`UPDATE checklists SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
+}
+
+export function deleteChecklist(id: number): void {
+  db.run('DELETE FROM checklist_items WHERE checklist_id = ?', [id]);
+  db.run('DELETE FROM checklists WHERE id = ?', [id]);
+  persistDb();
+}
+
+export function deleteChecklistItem(id: number): void {
+  db.run('DELETE FROM checklist_items WHERE id = ?', [id]);
+  persistDb();
 }
 
 // ── Plugins CRUD ───────────────────────────────────────────────────────────
@@ -1432,6 +1485,25 @@ export function createReport(r: Report): number {
     `INSERT INTO reports (vuln_id, type, format, content, generated_by) VALUES (?, ?, ?, ?, ?)`,
     [r.vuln_id || null, r.type || null, r.format || null, r.content || null, r.generated_by || null]
   );
+}
+
+// Edit an existing report (typically the AI-generated content after
+// the user refined it). Only the content-bearing columns are
+// whitelisted here - reports don't have an owner/timestamp relationship
+// that should be user-editable.
+export function updateReport(id: number, r: Partial<Report>): void {
+  const allowed = new Set(['type', 'format', 'content', 'generated_by']);
+  const fields = Object.keys(r).filter((k) => allowed.has(k));
+  if (fields.length === 0) return;
+  const setClause = fields.map((f) => `${f} = ?`).join(', ');
+  const values = fields.map((f) => (r as any)[f] ?? null);
+  db.run(`UPDATE reports SET ${setClause} WHERE id = ?`, [...values, id]);
+  persistDb();
+}
+
+export function deleteReport(id: number): void {
+  db.run('DELETE FROM reports WHERE id = ?', [id]);
+  persistDb();
 }
 
 // ── ScanFindings CRUD ──────────────────────────────────────────────────────

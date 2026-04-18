@@ -3,6 +3,11 @@ import {
   getAllChecklists,
   getChecklistById,
   getChecklistItems,
+  createChecklist,
+  createChecklistItem,
+  updateChecklist,
+  deleteChecklist,
+  deleteChecklistItem,
   getDb,
   persistDb,
 } from '../db.js';
@@ -196,6 +201,85 @@ router.post('/items/:id/verify', async (req: Request, res: Response) => {
     console.error(`[POST /checklists/items/${req.params.id}/verify] error:`, err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── CRUD: create, edit, delete ────────────────────────────────────────────
+// Previously checklists could only be verified; users couldn't add
+// their own. These endpoints fill that gap.
+
+// POST /api/checklists  body: { name, source_url?, category? }
+router.post('/', (req: Request, res: Response) => {
+  try {
+    const { name, source_url, category } = (req.body || {}) as {
+      name?: string; source_url?: string; category?: string;
+    };
+    if (!name || !name.trim()) {
+      res.status(400).json({ error: 'name is required' });
+      return;
+    }
+    const id = createChecklist({
+      name: name.trim(),
+      source_url: source_url || undefined,
+      category: category || undefined,
+      total_items: 0,
+    } as any);
+    res.status(201).json(getChecklistById(id));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT /api/checklists/:id
+router.put('/:id', (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+    const existing = getChecklistById(id);
+    if (!existing) { res.status(404).json({ error: 'not found' }); return; }
+    updateChecklist(id, req.body || {});
+    res.json(getChecklistById(id));
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/checklists/:id  cascades to items
+router.delete('/:id', (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+    if (!getChecklistById(id)) { res.status(404).json({ error: 'not found' }); return; }
+    deleteChecklist(id);
+    res.status(204).send();
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// POST /api/checklists/:id/items  body: { title, description?, category?, severity? }
+router.post('/:id/items', (req: Request, res: Response) => {
+  try {
+    const checklist_id = Number(req.params.id);
+    if (isNaN(checklist_id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+    if (!getChecklistById(checklist_id)) { res.status(404).json({ error: 'checklist not found' }); return; }
+    const { title, description, category, severity } = (req.body || {}) as {
+      title?: string; description?: string; category?: string; severity?: string;
+    };
+    if (!title || !title.trim()) { res.status(400).json({ error: 'title required' }); return; }
+    const id = createChecklistItem({
+      checklist_id,
+      title: title.trim(),
+      description: description || undefined,
+      category: category || undefined,
+      severity: severity || undefined,
+      verified: 0,
+    } as any);
+    res.status(201).json({ id, checklist_id, title });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// DELETE /api/checklists/items/:id
+router.delete('/items/:id', (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+    deleteChecklistItem(id);
+    res.status(204).send();
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
 export default router;

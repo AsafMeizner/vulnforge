@@ -260,6 +260,44 @@ export const updateProject = (id: number, body: Partial<Project>) =>
     body: JSON.stringify(body),
   });
 
+// Permanently delete an investigation session (different from
+// cancelInvestigation, which flips status to 'cancelled' but keeps
+// the row around).
+export const deleteInvestigation = (id: string) =>
+  request<void>(`/ai-investigate/sessions/${id}`, { method: 'DELETE' });
+
+// Enable/disable a tool row. Empty-row toggles feed here.
+export const updateTool = (id: number, body: { enabled?: boolean; name?: string; category?: string; description?: string; docs?: string }) =>
+  request<Tool>(`/tools/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+
+// Delete a tool row. Leaves the .py file on disk.
+export const deleteTool = (id: number) =>
+  request<void>(`/tools/${id}`, { method: 'DELETE' });
+
+// Bulk delete vulnerabilities. Returns { deleted: N }.
+export const bulkDeleteVulnerabilities = (ids: number[]) =>
+  request<{ deleted: number }>(`/vulnerabilities/bulk-delete`, {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+
+// Edit the content/type/format of a report row.
+export const updateReport = (id: number, body: { content?: string; type?: string; format?: string }) =>
+  request<Report>(`/reports/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+
+export const deleteReport = (id: number) =>
+  request<void>(`/reports/${id}`, { method: 'DELETE' });
+
+// Checklist CRUD
+export const createChecklist = (body: { name: string; source_url?: string; category?: string }) =>
+  request<{ id: number; name: string }>(`/checklists`, { method: 'POST', body: JSON.stringify(body) });
+export const deleteChecklist = (id: number) =>
+  request<void>(`/checklists/${id}`, { method: 'DELETE' });
+export const createChecklistItem = (checklist_id: number, body: { title: string; description?: string; category?: string; severity?: string }) =>
+  request<{ id: number }>(`/checklists/${checklist_id}/items`, { method: 'POST', body: JSON.stringify(body) });
+export const deleteChecklistItem = (id: number) =>
+  request<void>(`/checklists/items/${id}`, { method: 'DELETE' });
+
 // Delete a project + all of its findings.
 export const deleteProject = (id: number) =>
   request<void>(`/projects/${id}`, { method: 'DELETE' });

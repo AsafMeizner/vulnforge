@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getVulnerabilities, apiFetch } from '@/lib/api';
+import { getVulnerabilities, apiFetch, bulkDeleteVulnerabilities } from '@/lib/api';
 import type { Vulnerability, Severity, VulnStatus } from '@/lib/types';
 import { SeverityBadge, StatusBadge, CvssScore } from '@/components/Badge';
 import { FindingDetailModal } from './FindingDetail';
@@ -38,6 +38,11 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
   // effectiveSearch/load(). Without this, every keystroke fires a
   // network GET; typing a 20-char query sent 20 requests.
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  // Set of selected vulnerability ids for bulk actions (delete for
+  // now; bulk-mark-triaged etc. can reuse the same selection model
+  // later). Backed by a plain Set so add/remove is O(1).
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('found_at');
   const [sortAsc, setSortAsc] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(initialVulnId ?? null);
@@ -289,9 +294,73 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
           )
         ) : (
           <div style={{ overflowX: 'auto' }}>
+            {/* Bulk-action bar. Only visible when the user has
+                selected 1+ rows. Currently just delete; future bulk
+                actions (mark triaged, change status, export) plug into
+                the same selectedIds set. */}
+            {selectedIds.size > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '8px 14px', borderBottom: '1px solid var(--border)',
+                background: 'color-mix(in srgb, var(--blue) 8%, transparent)',
+              }}>
+                <strong style={{ fontSize: 12, color: 'var(--text)' }}>
+                  {selectedIds.size} selected
+                </strong>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  style={{
+                    padding: '3px 10px', fontSize: 11,
+                    border: '1px solid var(--border)', borderRadius: 4,
+                    background: 'transparent', color: 'var(--muted)', cursor: 'pointer',
+                  }}
+                >Clear</button>
+                <button
+                  onClick={async () => {
+                    const ids = Array.from(selectedIds);
+                    if (!window.confirm(`Delete ${ids.length} finding${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+                    setBulkDeleting(true);
+                    try {
+                      await bulkDeleteVulnerabilities(ids);
+                      toast(`Deleted ${ids.length} finding${ids.length === 1 ? '' : 's'}`, 'success');
+                      setSelectedIds(new Set());
+                      await load();
+                    } catch (err: any) {
+                      toast(`Bulk delete failed: ${err.message || err}`, 'error');
+                    } finally { setBulkDeleting(false); }
+                  }}
+                  disabled={bulkDeleting}
+                  style={{
+                    padding: '4px 12px', fontSize: 12, fontWeight: 600,
+                    border: '1px solid var(--red)44', borderRadius: 4,
+                    background: 'var(--red)22', color: 'var(--red)',
+                    cursor: bulkDeleting ? 'wait' : 'pointer',
+                    opacity: bulkDeleting ? 0.6 : 1,
+                    marginLeft: 'auto',
+                  }}
+                >
+                  {bulkDeleting ? 'Deleting...' : `Delete ${selectedIds.size}`}
+                </button>
+              </div>
+            )}
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ padding: '9px 8px 9px 14px', width: 24 }}>
+                    {/* Header checkbox = "select all on this page" */}
+                    <input
+                      type="checkbox"
+                      checked={sortedVulns.length > 0 && sortedVulns.every((v) => selectedIds.has(v.id))}
+                      onChange={(e) => {
+                        const next = new Set(selectedIds);
+                        if (e.target.checked) sortedVulns.forEach((v) => next.add(v.id));
+                        else sortedVulns.forEach((v) => next.delete(v.id));
+                        setSelectedIds(next);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ cursor: 'pointer' }}
+                    />
+                  </th>
                   {([
                     ['Project', 'project'],
                     ['Title', 'title'],
@@ -326,6 +395,7 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
               <tbody ref={tableRef}>
                 {sortedVulns.map((v, idx) => {
                   const isFocused = idx === focusedIdx && selectedId == null;
+                  const isSelected = selectedIds.has(v.id);
                   return (
                     <tr
                       key={v.id}
@@ -333,13 +403,30 @@ export default function Findings({ initialVulnId, searchQuery = '', onNavigate }
                       style={{
                         borderBottom: '1px solid var(--border)',
                         cursor: 'pointer',
-                        background: isFocused ? 'var(--surface-2)' : '',
+                        background: isSelected ? 'color-mix(in srgb, var(--blue) 10%, transparent)'
+                          : isFocused ? 'var(--surface-2)' : '',
                         outline: isFocused ? '1px solid var(--blue)' : 'none',
                         outlineOffset: -1,
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = isFocused ? 'var(--surface-2)' : '')}
+                      onMouseEnter={e => (e.currentTarget.style.background = isSelected
+                        ? 'color-mix(in srgb, var(--blue) 14%, transparent)'
+                        : 'var(--surface-2)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = isSelected
+                        ? 'color-mix(in srgb, var(--blue) 10%, transparent)'
+                        : isFocused ? 'var(--surface-2)' : '')}
                     >
+                      <td style={{ padding: '9px 8px 9px 14px', width: 24 }} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            const next = new Set(selectedIds);
+                            if (e.target.checked) next.add(v.id); else next.delete(v.id);
+                            setSelectedIds(next);
+                          }}
+                          style={{ cursor: 'pointer' }}
+                        />
+                      </td>
                       <td style={{ padding: '9px 14px', color: 'var(--muted)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.project}</td>
                       <td style={{ padding: '9px 14px', color: 'var(--text)', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {(v as any).verified === 1 && (

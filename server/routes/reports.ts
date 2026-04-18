@@ -3,6 +3,8 @@ import {
   getAllReports,
   getReportById,
   createReport,
+  updateReport,
+  deleteReport,
   getVulnerabilityById,
 } from '../db.js';
 
@@ -83,6 +85,38 @@ router.get('/:id', (req: Request, res: Response) => {
     res.json(report);
   } catch (err: any) {
     console.error('[Reports] Get error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/reports/:id - edit the content (or type/format) of a report.
+// Main use case: user refines the AI-generated disclosure before sending
+// it to the vendor.
+router.put('/:id', (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+    const existing = getReportById(id);
+    if (!existing) { res.status(404).json({ error: 'Report not found' }); return; }
+    updateReport(id, req.body || {});
+    res.json(getReportById(id));
+  } catch (err: any) {
+    console.error('[Reports] Update error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/reports/:id - throw away a report the user doesn't want
+// to keep (wrong template, bad AI output, etc.).
+router.delete('/:id', (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
+    const existing = getReportById(id);
+    if (!existing) { res.status(404).json({ error: 'Report not found' }); return; }
+    deleteReport(id);
+    res.status(204).send();
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });

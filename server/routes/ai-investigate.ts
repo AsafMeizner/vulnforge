@@ -100,6 +100,22 @@ router.post('/sessions/:id/cancel', (req: Request, res: Response) => {
   }
 });
 
+// DELETE /sessions/:id - permanently remove an investigation row from
+// the session_state store. Different from cancel (which flips status
+// to 'cancelled' but keeps the record around). Users needed a way to
+// actually clear finished or abandoned investigations from the
+// sidebar instead of accumulating history forever.
+router.delete('/sessions/:id', async (req: Request, res: Response) => {
+  try {
+    const { deleteInvestigation } = await import('../pipeline/ai/investigate.js');
+    const removed = deleteInvestigation(String(req.params.id));
+    if (!removed) { res.status(404).json({ error: 'Investigation not found' }); return; }
+    res.status(204).send();
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Assumption extraction ────────────────────────────────────────────────
 
 router.post('/assumptions', async (req: Request, res: Response) => {

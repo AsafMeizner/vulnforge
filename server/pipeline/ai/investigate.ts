@@ -8,6 +8,7 @@ import { promisify } from 'util';
 import {
   setSessionState,
   getSessionState,
+  deleteSessionState,
   getVulnerabilityById,
 } from '../../db.js';
 import { routeAI } from '../../ai/router.js';
@@ -240,6 +241,23 @@ export function cancelInvestigation(sessionId: string): void {
   session.status = 'cancelled';
   session.updated_at = new Date().toISOString();
   saveSession(session);
+}
+
+/**
+ * Permanently delete a session. Different from cancelInvestigation()
+ * which leaves the row in the DB as 'cancelled' - delete actually
+ * removes it. We need both: users sometimes keep cancelled sessions
+ * as a record, and sometimes want them gone.
+ *
+ * Returns true if a row was removed, false if nothing matched.
+ */
+export function deleteInvestigation(sessionId: string): boolean {
+  const session = loadSession(sessionId);
+  if (!session) return false;
+  // Sessions are persisted under setSessionState('global', null,
+  // `investigation:${id}`) - remove by writing the deleteSessionState.
+  deleteSessionState('global', null, `investigation:${sessionId}`);
+  return true;
 }
 
 async function resolveProjectPath(session: InvestigateSession): Promise<string> {

@@ -6,6 +6,7 @@ import {
   createVulnerability,
   updateVulnerability,
   deleteVulnerability,
+  deleteVulnerabilitiesBulk,
   type VulnFilters,
 } from '../db.js';
 
@@ -58,6 +59,34 @@ router.get('/:id', (req: Request, res: Response) => {
     res.json(vuln);
   } catch (err: any) {
     console.error(`GET /vulnerabilities/${req.params.id} error:`, err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/vulnerabilities/bulk-delete
+// Body: { ids: number[] }
+// Dedicated bulk path so the UI's multi-select delete needs one
+// request instead of N serial DELETEs. Must be declared BEFORE the
+// `/:id` param routes below, otherwise Express tries to parse
+// "bulk-delete" as a numeric id and returns "Invalid ID".
+router.post('/bulk-delete', (req: Request, res: Response) => {
+  try {
+    const rawIds = (req.body || {}).ids;
+    if (!Array.isArray(rawIds)) {
+      res.status(400).json({ error: 'ids: number[] required in body' });
+      return;
+    }
+    const ids = rawIds
+      .map((n: unknown) => Number(n))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (ids.length === 0) {
+      res.status(400).json({ error: 'ids must contain at least one positive integer' });
+      return;
+    }
+    const deleted = deleteVulnerabilitiesBulk(ids);
+    res.json({ deleted });
+  } catch (err: any) {
+    console.error('POST /vulnerabilities/bulk-delete error:', err);
     res.status(500).json({ error: err.message });
   }
 });

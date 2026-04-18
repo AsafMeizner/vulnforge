@@ -8,11 +8,13 @@ import {
   executeInvestigateStep,
   rejectInvestigateStep,
   cancelInvestigation,
+  deleteInvestigation,
   type InvestigateSession,
   type InvestigateStep,
 } from '@/lib/api';
 import { useToast } from '@/components/Toast';
 import { FindingCombo } from '@/components/FindingCombo';
+import { Markdown } from '@/components/Markdown';
 
 function statusColor(status: string): string {
   switch (status) {
@@ -114,6 +116,25 @@ export default function Investigate() {
     }
   };
 
+  /**
+   * Permanently delete a session from the server + drop it from the
+   * sidebar immediately. Confirms with the goal text so the user
+   * isn't surprised. Previously there was no way to remove a session;
+   * cancelled sessions stuck around forever.
+   */
+  const handleDeleteSession = async (s: InvestigateSession) => {
+    const label = s.goal.slice(0, 60) + (s.goal.length > 60 ? '…' : '');
+    if (!confirm(`Delete investigation "${label}"?\n\nThis cannot be undone.`)) return;
+    try {
+      await deleteInvestigation(s.id);
+      setSessions((prev) => prev.filter((x) => x.id !== s.id));
+      if (selected?.id === s.id) setSelected(null);
+      toast('Investigation deleted', 'success');
+    } catch (err: any) {
+      toast(`Delete failed: ${err.message}`, 'error');
+    }
+  };
+
   const handleCancel = async () => {
     if (!selected) return;
     if (!confirm('Cancel this investigation?')) return;
@@ -161,9 +182,18 @@ export default function Investigate() {
                   background: selected?.id === s.id ? 'var(--surface-2)' : 'transparent',
                   cursor: 'pointer',
                   borderLeft: `3px solid ${statusColor(s.status)}`,
+                  position: 'relative',
+                }}
+                onMouseEnter={(e) => {
+                  const btn = e.currentTarget.querySelector('.inv-del-btn') as HTMLElement | null;
+                  if (btn) btn.style.opacity = '1';
+                }}
+                onMouseLeave={(e) => {
+                  const btn = e.currentTarget.querySelector('.inv-del-btn') as HTMLElement | null;
+                  if (btn) btn.style.opacity = '0';
                 }}
               >
-                <div style={{ color: 'var(--text)', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+                <div style={{ color: 'var(--text)', fontSize: 13, fontWeight: 600, marginBottom: 4, paddingRight: 20 }}>
                   {s.goal.slice(0, 60)}
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -175,6 +205,20 @@ export default function Investigate() {
                   <span style={{ color: 'var(--muted)', fontSize: 11 }}>{s.steps.length} steps</span>
                   {s.finding_id && <span style={{ color: 'var(--muted)', fontSize: 11 }}>#{s.finding_id}</span>}
                 </div>
+                {/* Hover-revealed delete (x). Stops propagation so
+                    clicking it doesn't also select the row. */}
+                <button
+                  className="inv-del-btn"
+                  onClick={(e) => { e.stopPropagation(); handleDeleteSession(s); }}
+                  title="Delete this investigation permanently"
+                  style={{
+                    position: 'absolute', top: 8, right: 8,
+                    background: 'transparent', border: 'none',
+                    color: 'var(--muted)', fontSize: 15, lineHeight: 1,
+                    cursor: 'pointer', padding: 2,
+                    opacity: 0, transition: 'opacity 0.12s',
+                  }}
+                >&times;</button>
               </div>
             ))
           )}
@@ -400,11 +444,24 @@ function StepCard({ step, onExecute, onReject }: {
       {step.result && (
         <div style={{ marginBottom: 8 }}>
           <div style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>Result</div>
-          <pre style={{
-            margin: 0, padding: 8, background: '#000', color: '#0f0',
-            borderRadius: 4, fontSize: 11, fontFamily: 'monospace',
-            overflow: 'auto', maxHeight: 240, whiteSpace: 'pre-wrap',
-          }}>{step.result}</pre>
+          {/* Markdown when the result looks like prose (AI reasoning,
+              file content with code fences, etc); stay with a terminal-
+              style pre when it starts with ANSI or tab-separated data. */}
+          {/\x1b\[|^\t/.test(step.result) ? (
+            <pre style={{
+              margin: 0, padding: 8, background: '#000', color: '#0f0',
+              borderRadius: 4, fontSize: 11, fontFamily: 'monospace',
+              overflow: 'auto', maxHeight: 240, whiteSpace: 'pre-wrap',
+            }}>{step.result}</pre>
+          ) : (
+            <div style={{
+              padding: '8px 10px', background: 'var(--bg)',
+              border: '1px solid var(--border)', borderRadius: 4,
+              fontSize: 12, maxHeight: 320, overflow: 'auto',
+            }}>
+              <Markdown>{step.result}</Markdown>
+            </div>
+          )}
         </div>
       )}
 
