@@ -20,6 +20,15 @@ import { randomBytes } from 'crypto';
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 
+// Pin iss + aud so the signing secret can safely be reused for other
+// purposes in the future (e.g. refresh-token wrapping, invite links)
+// without token-confusion enabling privilege escalation. Every produced
+// token carries these claims; every consumed token is rejected if they
+// don't match. Values are stable across versions - change them only as
+// part of a coordinated migration.
+const JWT_ISSUER = 'vulnforge';
+const JWT_AUDIENCE = 'vulnforge-api';
+
 let cachedSecret: string | null = null;
 
 export function setJwtSecret(secret: string): void {
@@ -56,7 +65,12 @@ export function signAccessToken(
   return jwt.sign(
     { sub: claims.sub, role: claims.role, device_id: claims.device_id },
     getJwtSecret(),
-    { algorithm: 'HS256', expiresIn: ACCESS_TOKEN_TTL_SECONDS },
+    {
+      algorithm: 'HS256',
+      expiresIn: ACCESS_TOKEN_TTL_SECONDS,
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    },
   );
 }
 
@@ -68,7 +82,11 @@ export interface VerifyResult {
 
 export function verifyAccessToken(token: string): VerifyResult {
   try {
-    const decoded = jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] }) as unknown as AccessTokenClaims;
+    const decoded = jwt.verify(token, getJwtSecret(), {
+      algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    }) as unknown as AccessTokenClaims;
     if (typeof decoded !== 'object' || typeof decoded.sub !== 'number') {
       return { ok: false, error: 'malformed' };
     }

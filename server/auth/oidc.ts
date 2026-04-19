@@ -17,10 +17,12 @@
  * that don't need SSO never load the OIDC code path.
  *
  * HTTP calls use the built-in fetch so no extra dependency is required
- * for this scaffolding pass. Full openid-client integration (JWT signature
- * verification on id_token) is a follow-up task.
+ * for this scaffolding pass. id_token signature verification is done
+ * locally via Node's native JWK -> KeyObject path + jsonwebtoken; see
+ * verifyIdToken() below.
  */
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, createHash, createPublicKey } from 'crypto';
+import jwt from 'jsonwebtoken';
 import { getDb, persistDb } from '../db.js';
 import { encryptSecret, decryptSecret, isEncrypted } from '../lib/crypto.js';
 import { assertSafeExternalUrl } from '../lib/net.js';
@@ -167,6 +169,125 @@ export async function discoverProvider(provider: OidcProviderRow): Promise<OidcD
   return data;
 }
 
+// ── JWKS + id_token signature verification ─────────────────────────────────
+//
+// Previously this file decoded the id_token payload with zero signature
+// verification. Any network-positioned attacker (compromised IdP, BGP
+// hijack, DNS poisoning, a malicious self-hosted Keycloak) could hand
+// back a hand-rolled base64-JSON body in `id_token` and we'd trust its
+// `sub` + `email` - instant identity spoofing including `admin`.
+//
+// The fix: fetch JWKS once per issuer (cached 1h), pick the key by
+// `kid`, convert the JWK -> PEM via Node's native jwk->KeyObject path,
+// and hand the whole thing to `jsonwebtoken.verify` with iss / aud /
+// exp enforced. Zero new deps - we already ship jsonwebtoken + Node
+// 18's crypto.createPublicKey({ format: 'jwk', ... }).
+
+const JWKS_TTL_MS = 60 * 60 * 1000;
+
+interface Jwk {
+  kid?: string;
+  kty: string;
+  alg?: string;
+  n?: string;
+  e?: string;
+  x?: string;
+  y?: string;
+  crv?: string;
+  use?: string;
+}
+
+const jwksCache = new Map<string, { at: number; keys: Jwk[] }>();
+
+async function fetchJwks(jwksUri: string): Promise<Jwk[]> {
+  const cached = jwksCache.get(jwksUri);
+  if (cached && Date.now() - cached.at < JWKS_TTL_MS) return cached.keys;
+
+  await assertSafeExternalUrl(jwksUri, { field: 'jwks_uri' });
+  const resp = await fetch(jwksUri);
+  if (!resp.ok) throw new Error(`jwks fetch failed ${resp.status} ${jwksUri}`);
+  const body = await resp.json() as { keys?: Jwk[] };
+  const keys = Array.isArray(body.keys) ? body.keys : [];
+  jwksCache.set(jwksUri, { at: Date.now(), keys });
+  return keys;
+}
+
+/** Force a JWKS refresh - used when the id_token references a `kid` we don't know. */
+async function refreshJwks(jwksUri: string): Promise<Jwk[]> {
+  jwksCache.delete(jwksUri);
+  return fetchJwks(jwksUri);
+}
+
+/**
+ * Verify an id_token against the provider's JWKS + standard claims.
+ * Throws on any failure; returns the decoded payload on success.
+ *
+ * Allowed algorithms are pinned to asymmetric JWT algs. HS* is
+ * refused - the `alg: 'none'` bypass is implicitly refused by the
+ * allowlist + `jwt.verify` rejects it internally anyway.
+ */
+async function verifyIdToken(
+  idToken: string,
+  provider: OidcProviderRow,
+  discovery: OidcDiscovery,
+  expectedNonce: string,
+): Promise<Record<string, any>> {
+  if (!discovery.jwks_uri) {
+    throw new Error('OIDC provider has no jwks_uri - refusing unverified id_token');
+  }
+
+  // Decode header without verification to extract kid + alg.
+  const parts = idToken.split('.');
+  if (parts.length !== 3) throw new Error('malformed id_token (wrong segment count)');
+  let header: { alg?: string; kid?: string };
+  try {
+    header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'));
+  } catch {
+    throw new Error('malformed id_token header');
+  }
+  const alg = header.alg;
+  const ALLOWED_ALGS = ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'PS256', 'PS384', 'PS512'] as const;
+  if (!alg || !(ALLOWED_ALGS as readonly string[]).includes(alg)) {
+    throw new Error(`id_token alg not allowed: ${alg || '(none)'}`);
+  }
+
+  let keys = await fetchJwks(discovery.jwks_uri);
+  let jwk = header.kid ? keys.find(k => k.kid === header.kid) : keys[0];
+  if (!jwk) {
+    // Key rotation: refresh once and retry.
+    keys = await refreshJwks(discovery.jwks_uri);
+    jwk = header.kid ? keys.find(k => k.kid === header.kid) : keys[0];
+  }
+  if (!jwk) {
+    throw new Error(`no JWKS key matches id_token kid=${header.kid || '(none)'}`);
+  }
+
+  // Convert the JWK to a PEM public key via Node's native path.
+  let pem: string;
+  try {
+    const keyObj = createPublicKey({ format: 'jwk', key: jwk as any });
+    pem = keyObj.export({ format: 'pem', type: 'spki' }) as string;
+  } catch (err: any) {
+    throw new Error(`failed to import JWK: ${err?.message || err}`);
+  }
+
+  const payload = jwt.verify(idToken, pem, {
+    algorithms: [alg as any],
+    // Trim trailing slash differences the same way the issuer check in
+    // the spec does. Most IdPs are strict about this so we match what
+    // they emit.
+    issuer: provider.issuer_url.replace(/\/$/, ''),
+    audience: provider.client_id,
+  }) as Record<string, any>;
+
+  // Extra claim that `jwt.verify` doesn't check for us.
+  if (!expectedNonce) throw new Error('internal error - no expected nonce');
+  if (payload.nonce !== expectedNonce) {
+    throw new Error('id_token nonce mismatch');
+  }
+  return payload;
+}
+
 // ── Flow: build authorize URL ───────────────────────────────────────────────
 
 export async function buildAuthorizeUrl(
@@ -238,16 +359,25 @@ export async function handleCallback(
 
   let sub = 'unknown';
   let email: string | null = null;
-  if (tokens.id_token) {
-    const parts = tokens.id_token.split('.');
-    if (parts.length === 3) {
-      try {
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as { sub?: string; email?: string };
-        if (payload.sub) sub = payload.sub;
-        if (payload.email) email = payload.email;
-      } catch { /* malformed - fall through */ }
-    }
+  if (!tokens.id_token) {
+    return { ok: false, error: 'token response missing id_token', code: 'NO_ID_TOKEN' };
   }
+
+  // Verify id_token signature + iss / aud / exp / nonce claims. Bail
+  // on any failure - we used to trust the unverified payload which
+  // meant any network-positioned attacker could impersonate any user.
+  let payload: Record<string, any>;
+  try {
+    payload = await verifyIdToken(tokens.id_token, provider, discovery, rec.nonce);
+  } catch (err: any) {
+    return {
+      ok: false,
+      error: `id_token verification failed: ${err?.message || err}`,
+      code: 'ID_TOKEN_INVALID',
+    };
+  }
+  if (typeof payload.sub === 'string' && payload.sub) sub = payload.sub;
+  if (typeof payload.email === 'string' && payload.email) email = payload.email;
   if (!email && tokens.access_token && discovery.userinfo_endpoint) {
     try {
       const ui = await fetch(discovery.userinfo_endpoint, {

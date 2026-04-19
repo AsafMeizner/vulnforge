@@ -46,4 +46,30 @@ describe('signAccessToken + verifyAccessToken', () => {
   it('exposes access-token TTL config', () => {
     expect(JWT_CONFIG.ACCESS_TOKEN_TTL_SECONDS).toBe(15 * 60);
   });
+
+  it('rejects a token signed for a different issuer', () => {
+    // Same secret, but "iss" claim pointing at a different issuer name.
+    // This is the token-confusion attack: a future use-case that reuses
+    // the JWT secret (invite links, refresh wrap) must not be usable as
+    // a session token.
+    const token = jwt.sign(
+      { sub: 1, role: 'admin', device_id: 'x' },
+      'unit-test-jwt-secret-exceeding-32-char-minimum-ok',
+      { algorithm: 'HS256', expiresIn: '15m', issuer: 'some-other-app', audience: 'vulnforge-api' },
+    );
+    const result = verifyAccessToken(token);
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('invalid-signature');
+  });
+
+  it('rejects a token signed for a different audience', () => {
+    const token = jwt.sign(
+      { sub: 1, role: 'admin', device_id: 'x' },
+      'unit-test-jwt-secret-exceeding-32-char-minimum-ok',
+      { algorithm: 'HS256', expiresIn: '15m', issuer: 'vulnforge', audience: 'some-other-api' },
+    );
+    const result = verifyAccessToken(token);
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('invalid-signature');
+  });
 });

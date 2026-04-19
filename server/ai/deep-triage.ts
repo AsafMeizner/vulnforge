@@ -19,6 +19,7 @@
  */
 import { routeAI } from './router.js';
 import { describeTool } from '../lib/tool-descriptions.js';
+import { fenceUntrusted, withInjectionGuard } from './prompts/fence.js';
 import type { ScanFinding } from '../db.js';
 
 export type DeepTriageVerdict =
@@ -52,25 +53,44 @@ export interface DeepTriageResult {
 }
 
 function shortSystemPrompt(): string {
-  return (
+  // CR-14: every stage's system prompt must go through
+  // withInjectionGuard(). Previously this was a bare string and the
+  // four-stage chain re-fed prior stage output as user text, so a
+  // single poisoned finding could hijack every downstream stage.
+  return withInjectionGuard(
     'You are a senior application-security engineer triaging findings ' +
     'from static analysis tools. Answer concisely. Do not speculate ' +
-    'beyond what the code shows. When unsure, say so explicitly.'
+    'beyond what the code shows. When unsure, say so explicitly.',
   );
+}
+
+/** Strip newlines / tag syntax from inline fields. */
+function sanitizeInline(s: unknown): string {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/<\/?[a-z_][^>]*>/gi, '[tag-stripped]')
+    .slice(0, 400);
 }
 
 function buildContext(finding: ScanFinding): string {
   const toolDesc = describeTool(finding.tool_name || '') || '';
   const parts: string[] = [];
-  parts.push(`Scanner: ${finding.tool_name || 'unknown'}`);
-  if (toolDesc) parts.push(`Scanner check: ${toolDesc}`);
-  parts.push(`Severity (tool-reported): ${finding.severity}`);
-  if (finding.confidence) parts.push(`Confidence (tool-reported): ${finding.confidence}`);
-  if (finding.cwe) parts.push(`CWE: ${finding.cwe}`);
-  if (finding.file) parts.push(`File: ${finding.file}${finding.line_start ? ':' + finding.line_start : ''}`);
-  parts.push(`Title: ${finding.title || '(none)'}`);
-  if (finding.description) parts.push(`\nDescription:\n${finding.description}`);
-  if (finding.code_snippet) parts.push(`\nCode snippet:\n\`\`\`\n${finding.code_snippet}\n\`\`\``);
+  parts.push(`Scanner: ${sanitizeInline(finding.tool_name) || 'unknown'}`);
+  if (toolDesc) parts.push(`Scanner check: ${sanitizeInline(toolDesc)}`);
+  parts.push(`Severity (tool-reported): ${sanitizeInline(finding.severity)}`);
+  if (finding.confidence) parts.push(`Confidence (tool-reported): ${sanitizeInline(finding.confidence)}`);
+  if (finding.cwe) parts.push(`CWE: ${sanitizeInline(finding.cwe)}`);
+  if (finding.file) parts.push(`File: ${sanitizeInline(finding.file)}${finding.line_start ? ':' + (Number(finding.line_start) || '?') : ''}`);
+  parts.push(`Title: ${sanitizeInline(finding.title) || '(none)'}`);
+  if (finding.description) {
+    parts.push('\nDescription (untrusted):');
+    parts.push(fenceUntrusted('description', finding.description));
+  }
+  if (finding.code_snippet) {
+    parts.push('\nCode snippet (untrusted - source under analysis):');
+    parts.push(fenceUntrusted('code_snippet', finding.code_snippet));
+  }
   return parts.join('\n');
 }
 
@@ -141,10 +161,12 @@ export async function deepTriageFinding(finding: ScanFinding): Promise<DeepTriag
     'Answer in 3-6 lines.';
   stages.verify = await callStage('verify', verifyPrompt, system);
 
-  // Stage 2 — TEST
+  // Stage 2 — TEST. Prior-stage output is ALSO untrusted - a
+  // successful injection in stage 1 would otherwise get re-read as
+  // "authoritative reasoning" in stage 2.
   const testPrompt =
     `${ctx}\n\n` +
-    `Verification notes so far:\n${stages.verify}\n\n` +
+    `Verification notes so far (untrusted - prior stage output):\n${fenceUntrusted('stage_verify', stages.verify)}\n\n` +
     'Task: sketch a test case that would prove this bug is real.\n' +
     'Describe: the input, the expected observable (crash, wrong output, ' +
     'leaked secret, etc.), and how you would set up the test fixture.\n' +
@@ -154,7 +176,7 @@ export async function deepTriageFinding(finding: ScanFinding): Promise<DeepTriag
   // Stage 3 — WRITE (proof of concept)
   const writePrompt =
     `${ctx}\n\n` +
-    `Test plan:\n${stages.test}\n\n` +
+    `Test plan (untrusted - prior stage output):\n${fenceUntrusted('stage_test', stages.test)}\n\n` +
     'Task: write a minimal proof-of-concept snippet that triggers the bug.\n' +
     'One runnable file or one shell pipeline. Avoid scaffolding that is not ' +
     'strictly necessary. If a PoC is not possible without more context, say so ' +
@@ -164,9 +186,9 @@ export async function deepTriageFinding(finding: ScanFinding): Promise<DeepTriag
   // Stage 4 — VERDICT
   const verdictPrompt =
     `${ctx}\n\n` +
-    `Verification:\n${stages.verify}\n\n` +
-    `Test plan:\n${stages.test}\n\n` +
-    `Proof of concept:\n${stages.write}\n\n` +
+    `Verification (untrusted - prior stage output):\n${fenceUntrusted('stage_verify', stages.verify)}\n\n` +
+    `Test plan (untrusted - prior stage output):\n${fenceUntrusted('stage_test', stages.test)}\n\n` +
+    `Proof of concept (untrusted - prior stage output):\n${fenceUntrusted('stage_write', stages.write)}\n\n` +
     'Task: give a final verdict.\n' +
     'Reply with exactly these lines at the top:\n' +
     '  Verdict: <verified | likely | rejected | needs-runtime | insufficient>\n' +
