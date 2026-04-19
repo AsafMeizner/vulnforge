@@ -27,7 +27,7 @@ Runs in two modes from the same `server/` codebase:
 - `npm run build:electron` - Compile `electron/main.ts` + `preload.ts`
 - `npm run build:desktop` - Full Electron installer (uses electron-builder)
 - `npm run electron:dev` - Dev-mode Electron with HMR
-- `npm test` - Full vitest suite (252 tests across 21 files)
+- `npm test` - Full vitest suite (267 tests across 22 files)
 - `npm run test:coverage` - Coverage report (v8)
 - `npm run migrate` - Run DB migrations standalone
 

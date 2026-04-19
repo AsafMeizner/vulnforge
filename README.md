@@ -321,10 +321,10 @@ Architectural notes live under [`docs/architecture/`](docs/architecture/).
 ## Stats
 
 - **Frontend:** 22 pages · React 19 · hash routing · inline styles + CSS vars
-- **Backend:** 29 REST route modules · 39 DB tables · 101 MCP tools
+- **Backend:** 30 REST route modules · 39 DB tables · 101 MCP tools
 - **Static analysis:** 48 Python tools + 10 integrated plugins + 17 CVE patterns + 15 config checks
 - **Runtime:** 10 executor types - libFuzzer, gdb, tcpdump, nmap, angr, radare2, core-dump, git-bisect, Docker sandbox, QEMU stub
-- **Tests:** 252 vitest tests across 21 files (unit + integration against real SQLite)
+- **Tests:** 267 vitest tests across 22 files (unit + integration against real SQLite)
 - **Security:** AES-256-GCM at-rest encryption for AI keys / OIDC client secrets / integration configs · SSRF guard on all outbound URLs · prompt-injection fences on every AI prompt · IPC path-allowlist on Electron shell.openPath
 
 ---
