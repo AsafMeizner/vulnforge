@@ -187,8 +187,9 @@ const navGroups: NavGroup[] = [
     defaultOpen: true,
     items: [
       { id: 'findings',   label: 'Findings'   },
-      { id: 'hypotheses', label: 'Hypotheses' },
       { id: 'review',     label: 'Review'     },
+      { id: 'checklists', label: 'Checklists' },
+      { id: 'hypotheses', label: 'Hypotheses' },
       { id: 'investigate',label: 'Investigate'},
     ],
   },
@@ -216,7 +217,6 @@ const navGroups: NavGroup[] = [
     items: [
       { id: 'projects',   label: 'Projects'   },
       { id: 'tools',      label: 'Tools'      },
-      { id: 'checklists', label: 'Checklists' },
       { id: 'ai',         label: 'AI'         },
       { id: 'plugins',    label: 'Plugins'    },
       { id: 'settings',   label: 'Settings'   },

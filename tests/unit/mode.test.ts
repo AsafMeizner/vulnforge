@@ -43,10 +43,36 @@ describe('deployment mode', () => {
     expect(getDeploymentMode()).toBe('desktop');
   });
 
-  it('unset + no electron → defaults to server', () => {
+  it('unset + no electron + explicit 0.0.0.0 host → server', () => {
     delete process.env.VULNFORGE_MODE;
     delete process.env.ELECTRON_RUN_AS_NODE;
-    expect(getDeploymentMode()).toBe('server');
+    process.env.VULNFORGE_HOST = '0.0.0.0';
+    try {
+      expect(getDeploymentMode()).toBe('server');
+    } finally {
+      delete process.env.VULNFORGE_HOST;
+    }
+  });
+
+  it('unset + no electron + default (unset) host → desktop', () => {
+    // Plain `npm run dev` case - no env vars set. The canonical
+    // helper now matches what the legacy auth.ts local helper did
+    // so local-dev keeps working without extra plumbing.
+    delete process.env.VULNFORGE_MODE;
+    delete process.env.ELECTRON_RUN_AS_NODE;
+    delete process.env.VULNFORGE_HOST;
+    expect(getDeploymentMode()).toBe('desktop');
+  });
+
+  it('unset + no electron + loopback host → desktop', () => {
+    delete process.env.VULNFORGE_MODE;
+    delete process.env.ELECTRON_RUN_AS_NODE;
+    process.env.VULNFORGE_HOST = '127.0.0.1';
+    try {
+      expect(getDeploymentMode()).toBe('desktop');
+    } finally {
+      delete process.env.VULNFORGE_HOST;
+    }
   });
 
   it('ELECTRON_RUN_AS_NODE → desktop mode', () => {
