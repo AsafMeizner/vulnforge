@@ -1,4 +1,8 @@
 import type { ServiceIntegration, ServiceConfig, TicketResult, ConfigField } from './types.js';
+import { assertSafeExternalUrl } from '../lib/net.js';
+
+const LINEAR_ENDPOINT = 'https://api.linear.app/graphql';
+const LINEAR_ALLOWED_HOSTS = ['api.linear.app'];
 
 export class LinearIntegration implements ServiceIntegration {
   readonly name = 'linear';
@@ -10,7 +14,11 @@ export class LinearIntegration implements ServiceIntegration {
 
   async testConnection(config: ServiceConfig): Promise<{ ok: boolean; error?: string }> {
     try {
-      const res = await fetch('https://api.linear.app/graphql', {
+      await assertSafeExternalUrl(LINEAR_ENDPOINT, {
+        field: 'linear.api',
+        allowedHosts: LINEAR_ALLOWED_HOSTS,
+      });
+      const res = await fetch(LINEAR_ENDPOINT, {
         method: 'POST',
         headers: this.headers(config),
         body: JSON.stringify({ query: '{ viewer { id name } }' }),
@@ -35,7 +43,11 @@ export class LinearIntegration implements ServiceIntegration {
       }
     `;
 
-    const res = await fetch('https://api.linear.app/graphql', {
+    await assertSafeExternalUrl(LINEAR_ENDPOINT, {
+      field: 'linear.api',
+      allowedHosts: LINEAR_ALLOWED_HOSTS,
+    });
+    const res = await fetch(LINEAR_ENDPOINT, {
       method: 'POST',
       headers: this.headers(config),
       body: JSON.stringify({

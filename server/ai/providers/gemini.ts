@@ -1,3 +1,8 @@
+import { assertSafeExternalUrl } from '../../lib/net.js';
+
+const GEMINI_HOST = 'generativelanguage.googleapis.com';
+const GEMINI_ALLOWED_HOSTS = [GEMINI_HOST];
+
 export interface GeminiMessage {
   role: 'user' | 'model';
   parts: Array<{ text: string }>;
@@ -24,7 +29,14 @@ export async function chatGemini(
   options: GeminiOptions
 ): Promise<ChatResponse> {
   const model = options.model || 'gemini-2.5-flash';
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${options.apiKey}`;
+  // API key goes in the header (x-goog-api-key), NOT the query string,
+  // so it doesn't land in request-log lines / reverse-proxy access
+  // logs / referer headers.
+  const url = `https://${GEMINI_HOST}/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  await assertSafeExternalUrl(url, {
+    field: 'gemini.api',
+    allowedHosts: GEMINI_ALLOWED_HOSTS,
+  });
 
   // Gemini uses 'user'/'model' roles; system messages are prepended to first user turn
   let systemText = '';
@@ -61,7 +73,10 @@ export async function chatGemini(
 
   const response = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': options.apiKey,
+    },
     body: JSON.stringify(body),
   });
 

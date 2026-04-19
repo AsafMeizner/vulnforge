@@ -1,4 +1,5 @@
 import type { ServiceIntegration, ServiceConfig, TicketResult, ConfigField } from './types.js';
+import { assertSafeExternalUrl } from '../lib/net.js';
 
 export class SlackIntegration implements ServiceIntegration {
   readonly name = 'slack';
@@ -10,6 +11,7 @@ export class SlackIntegration implements ServiceIntegration {
 
   async testConnection(config: ServiceConfig): Promise<{ ok: boolean; error?: string }> {
     try {
+      await assertSafeExternalUrl(config.webhook_url, { field: 'slack.webhook_url' });
       const res = await fetch(config.webhook_url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,6 +31,7 @@ export class SlackIntegration implements ServiceIntegration {
   }
 
   async sendNotification(message: string, config: ServiceConfig): Promise<void> {
+    await assertSafeExternalUrl(config.webhook_url, { field: 'slack.webhook_url' });
     const res = await fetch(config.webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

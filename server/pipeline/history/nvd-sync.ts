@@ -13,8 +13,10 @@ import {
   getCveProjectMatches,
   type Project,
 } from '../../db.js';
+import { assertSafeExternalUrl } from '../../lib/net.js';
 
 const NVD_BASE = 'https://services.nvd.nist.gov/rest/json/cves/2.0';
+const NVD_ALLOWED_HOSTS = ['services.nvd.nist.gov'];
 
 export interface SyncResult {
   fetched: number;
@@ -32,6 +34,10 @@ export async function syncRecentCVEs(days = 30): Promise<SyncResult> {
   const url = `${NVD_BASE}?pubStartDate=${encodeURIComponent(pubStartDate)}&pubEndDate=${encodeURIComponent(pubEndDate)}&resultsPerPage=200`;
 
   try {
+    await assertSafeExternalUrl(url, {
+      field: 'nvd.api',
+      allowedHosts: NVD_ALLOWED_HOSTS,
+    });
     const res = await fetch(url, {
       headers: { 'User-Agent': 'VulnForge/1.0' },
     });

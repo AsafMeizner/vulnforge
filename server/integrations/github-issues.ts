@@ -1,4 +1,8 @@
 import type { ServiceIntegration, ServiceConfig, TicketResult, ConfigField } from './types.js';
+import { assertSafeExternalUrl } from '../lib/net.js';
+
+const GH_API_HOST = 'api.github.com';
+const GH_ALLOWED_HOSTS = [GH_API_HOST];
 
 export class GitHubIssuesIntegration implements ServiceIntegration {
   readonly name = 'github';
@@ -12,9 +16,9 @@ export class GitHubIssuesIntegration implements ServiceIntegration {
 
   async testConnection(config: ServiceConfig): Promise<{ ok: boolean; error?: string }> {
     try {
-      const res = await fetch(`https://api.github.com/repos/${config.owner}/${config.repo}`, {
-        headers: this.headers(config),
-      });
+      const url = `https://${GH_API_HOST}/repos/${encodeURIComponent(config.owner)}/${encodeURIComponent(config.repo)}`;
+      await assertSafeExternalUrl(url, { field: 'github.api', allowedHosts: GH_ALLOWED_HOSTS });
+      const res = await fetch(url, { headers: this.headers(config) });
       if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
       return { ok: true };
     } catch (err: any) { return { ok: false, error: err.message }; }
@@ -24,7 +28,9 @@ export class GitHubIssuesIntegration implements ServiceIntegration {
     const labels = config.labels ? config.labels.split(',').map((l: string) => l.trim()) : ['security'];
     if (data.severity) labels.push(data.severity.toLowerCase());
 
-    const res = await fetch(`https://api.github.com/repos/${config.owner}/${config.repo}/issues`, {
+    const url = `https://${GH_API_HOST}/repos/${encodeURIComponent(config.owner)}/${encodeURIComponent(config.repo)}/issues`;
+    await assertSafeExternalUrl(url, { field: 'github.api', allowedHosts: GH_ALLOWED_HOSTS });
+    const res = await fetch(url, {
       method: 'POST',
       headers: this.headers(config),
       body: JSON.stringify({ title: data.title, body: data.description, labels }),
@@ -37,7 +43,9 @@ export class GitHubIssuesIntegration implements ServiceIntegration {
 
   async updateTicket(ticketId: string, updates: { comment?: string }, config: ServiceConfig): Promise<void> {
     if (updates.comment) {
-      await fetch(`https://api.github.com/repos/${config.owner}/${config.repo}/issues/${ticketId}/comments`, {
+      const url = `https://${GH_API_HOST}/repos/${encodeURIComponent(config.owner)}/${encodeURIComponent(config.repo)}/issues/${encodeURIComponent(ticketId)}/comments`;
+      await assertSafeExternalUrl(url, { field: 'github.api', allowedHosts: GH_ALLOWED_HOSTS });
+      await fetch(url, {
         method: 'POST',
         headers: this.headers(config),
         body: JSON.stringify({ body: updates.comment }),

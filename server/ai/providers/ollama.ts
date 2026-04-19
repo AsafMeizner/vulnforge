@@ -1,3 +1,5 @@
+import { assertSafeExternalUrl } from '../../lib/net.js';
+
 export interface OllamaMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -25,7 +27,16 @@ export async function ollamaChat(
   const baseUrl = options.baseUrl || 'http://localhost:11434';
   const model = options.model || 'llama3.2';
 
-  const response = await fetch(`${baseUrl}/api/chat`, {
+  // Ollama runs on loopback in desktop mode by default. The SSRF guard
+  // takes `allowLocalhost: undefined` which means "use whatever
+  // isDesktopMode() says" - desktop allows loopback, server mode
+  // refuses. Operators pointing at a remote Ollama server via
+  // ai_providers.base_url still go through the normal rejection
+  // rules (public IPs + https enforced).
+  const url = `${baseUrl}/api/chat`;
+  await assertSafeExternalUrl(url, { field: 'ollama.base_url' });
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

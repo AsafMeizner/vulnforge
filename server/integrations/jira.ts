@@ -2,6 +2,7 @@
  * Jira Cloud / Server integration via REST API v3.
  */
 import type { ServiceIntegration, ServiceConfig, TicketResult, ConfigField } from './types.js';
+import { assertSafeExternalUrl } from '../lib/net.js';
 
 const SEVERITY_TO_PRIORITY: Record<string, string> = {
   Critical: 'Highest',
@@ -23,7 +24,9 @@ export class JiraIntegration implements ServiceIntegration {
 
   async testConnection(config: ServiceConfig): Promise<{ ok: boolean; error?: string }> {
     try {
-      const res = await fetch(`${config.base_url}/rest/api/3/myself`, {
+      const url = `${config.base_url}/rest/api/3/myself`;
+      await assertSafeExternalUrl(url, { field: 'jira.base_url' });
+      const res = await fetch(url, {
         headers: this.headers(config),
       });
       if (!res.ok) return { ok: false, error: `HTTP ${res.status}: ${await res.text()}` };
@@ -48,7 +51,9 @@ export class JiraIntegration implements ServiceIntegration {
       },
     };
 
-    const res = await fetch(`${config.base_url}/rest/api/3/issue`, {
+    const url = `${config.base_url}/rest/api/3/issue`;
+    await assertSafeExternalUrl(url, { field: 'jira.base_url' });
+    const res = await fetch(url, {
       method: 'POST',
       headers: this.headers(config),
       body: JSON.stringify(body),
@@ -64,7 +69,9 @@ export class JiraIntegration implements ServiceIntegration {
 
   async updateTicket(ticketId: string, updates: { status?: string; comment?: string }, config: ServiceConfig): Promise<void> {
     if (updates.comment) {
-      await fetch(`${config.base_url}/rest/api/3/issue/${ticketId}/comment`, {
+      const url = `${config.base_url}/rest/api/3/issue/${encodeURIComponent(ticketId)}/comment`;
+      await assertSafeExternalUrl(url, { field: 'jira.base_url' });
+      await fetch(url, {
         method: 'POST',
         headers: this.headers(config),
         body: JSON.stringify({
