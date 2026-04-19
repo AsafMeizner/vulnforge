@@ -65,11 +65,17 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
-      - name: compute tag
+      - name: compute tag + lowercase owner
         id: tag
+        # GHCR (and the OCI distribution spec) reject uppercase in
+        # repository names. `github.repository_owner` preserves the
+        # user/org page casing (e.g. `AsafMeizner`), so we lowercase
+        # it once here and reuse in every tag below.
         run: |
           VER="${{ github.event.inputs.tag || github.ref_name }}"
           echo "version=${VER#v}" >> $GITHUB_OUTPUT
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "owner_lc=${OWNER_LC}" >> $GITHUB_OUTPUT
       - uses: docker/setup-qemu-action@v4
       - uses: docker/setup-buildx-action@v4
       - name: login GHCR
@@ -86,8 +92,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/vulnforge-server:${{ steps.tag.outputs.version }}
-            ghcr.io/${{ github.repository_owner }}/vulnforge-server:latest
+            ghcr.io/${{ steps.tag.outputs.owner_lc }}/vulnforge-server:${{ steps.tag.outputs.version }}
+            ghcr.io/${{ steps.tag.outputs.owner_lc }}/vulnforge-server:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -126,7 +132,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
-      - name: flatten artifacts
+      - name: flatten artifacts + compute checksums + lowercase owner
+        id: meta
         run: |
           mkdir -p release-assets
           find artifacts -type f \( \
@@ -134,7 +141,12 @@ jobs:
             -name '*.deb' -o -name '*.zip' -o -name '*.tar.gz' -o \
             -name 'latest*.yml' \
           \) -exec cp -v {} release-assets/ \;
+          # SHA-256 over every binary so the release page has integrity.
+          ( cd release-assets && sha256sum *.exe *.dmg *.AppImage *.deb *.zip *.tar.gz 2>/dev/null > SHA256SUMS.txt || true )
           ls -la release-assets/
+          # Lowercase owner for the GHCR reference in the release body.
+          OWNER_LC="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "owner_lc=${OWNER_LC}" >> $GITHUB_OUTPUT
       - name: create release
         uses: softprops/action-gh-release@v3
         with:
@@ -146,7 +158,8 @@ jobs:
             ## Downloads
 
             - **Desktop installer** - pick the file that matches your OS below.
-            - **Server Docker image:** `ghcr.io/${{ github.repository_owner }}/vulnforge-server:${{ github.event.inputs.tag || github.ref_name }}`
+            - **Server Docker image:** `ghcr.io/${{ steps.meta.outputs.owner_lc }}/vulnforge-server:${{ github.event.inputs.tag || github.ref_name }}`
             - **Server tarball:** `vulnforge-server-*.tar.gz` - extract and run `sudo ./scripts/install-server.sh`.
+            - **Checksums:** `SHA256SUMS.txt` (verify with `sha256sum -c SHA256SUMS.txt`).
 
             See [docs/](https://github.com/${{ github.repository }}/tree/main/docs) for install guides.
