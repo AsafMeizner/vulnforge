@@ -48,7 +48,7 @@ server/                 - Express backend
     net.ts              - SSRF guard for outbound URLs (CR-12)
   mcp/                  - MCP server (101 tools)
   pipeline/             - Autonomous pipeline + detectors (supply-chain, injection, dataflow)
-  routes/               - 29 REST route modules
+  routes/               - 30 REST route modules (incl. routes/ai.ts)
   scanner/              - Scan queue, tool runner, parser, filter
   sync/                 - Client-server sync protocol (private/shared/pool scopes)
   workers/              - Server-side job queue workers

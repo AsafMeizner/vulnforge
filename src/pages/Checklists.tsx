@@ -178,10 +178,23 @@ export default function Checklists() {
             </div>
           ) : (
             checklists.map(cl => (
-              <div key={cl.id} onClick={() => loadChecklist(cl.id)} style={{
-                padding: '14px 16px', borderBottom: '1px solid var(--border)',
-                background: selected?.id === cl.id ? 'var(--surface-2)' : 'transparent', cursor: 'pointer',
-              }}>
+              <div
+                key={cl.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selected?.id === cl.id}
+                aria-label={`Open checklist: ${cl.name}`}
+                onClick={() => loadChecklist(cl.id)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    loadChecklist(cl.id);
+                  }
+                }}
+                style={{
+                  padding: '14px 16px', borderBottom: '1px solid var(--border)',
+                  background: selected?.id === cl.id ? 'var(--surface-2)' : 'transparent', cursor: 'pointer',
+                }}>
                 <div style={{ color: 'var(--text)', fontSize: 14, fontWeight: 600, marginBottom: 6 }}>{cl.name}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{ flex: 1, height: 6, background: 'var(--bg)', borderRadius: 3, overflow: 'hidden' }}>

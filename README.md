@@ -240,14 +240,14 @@ server/                   Express + SQLite (sql.js WASM)
   scanner/                Scan queue, tool runner, parser, filter
   plugins/                Plugin manager + catalog
   integrations/           Jira · Linear · Trello · Slack · GitHub Issues
-  mcp/                    MCP server (93 tools)
-  routes/                 27 REST route modules
+  mcp/                    MCP server (101 tools)
+  routes/                 30 REST route modules
   data/                   CVE patterns, exploit templates
 public/brand/             Logos (square + wide, black + white)
 docs/                     Operator / user / dev / architecture / security
 ```
 
-**Database:** 38 SQLite tables across the full platform - projects, vulnerabilities, scan_findings, pipeline_runs, notes, runtime_jobs, fuzz_crashes, bisect_results, cve_intel, exploits, proof_ladder, vendors, disclosures, integrations, integration_tickets, users, refresh_tokens, permissions, oidc_providers, pipeline_jobs, audit_log, and more. See [docs/architecture/data-model.md](docs/architecture/data-model.md).
+**Database:** 39 SQLite tables across the full platform - projects, vulnerabilities, scan_findings, pipeline_runs, notes, runtime_jobs, fuzz_crashes, bisect_results, cve_intel, exploits, proof_ladder, vendors, disclosures, integrations, integration_tickets, users, refresh_tokens, permissions, oidc_providers, pipeline_jobs, audit_log, and more. See [docs/architecture/data-model.md](docs/architecture/data-model.md).
 
 ---
 
@@ -287,7 +287,7 @@ Per-platform details and CI templates: [docs/developer/building.md](docs/develop
 
 External AI agents connect at `http://localhost:3001/mcp` (SSE + JSON-RPC).
 
-**93 tools** covering pipeline control, findings CRUD, notes / session state, runtime jobs (fuzz · debug · capture · scan · sandbox), exploits + proof ladder, disclosure + vendor management, CVE intel, investigation sessions, SARIF / CVE export, audit log, and more.
+**101 tools** covering pipeline control, findings CRUD, notes / session state, runtime jobs (fuzz · debug · capture · scan · sandbox), exploits + proof ladder, disclosure + vendor management, CVE intel, investigation sessions, SARIF / CVE export, audit log, and more.
 
 Authoring guide: [docs/developer/mcp-tools.md](docs/developer/mcp-tools.md).
 

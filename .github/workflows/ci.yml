@@ -107,6 +107,16 @@ jobs:
       - name: build electron (main + preload)
         run: npm run build:electron
 
+      # Smoke-test the full desktop bundle on Linux only (builder is
+      # heavy, and electron-builder needs native signing on mac+win
+      # that CI doesn't provision). --dir builds the unpacked app
+      # without creating an installer - enough to catch missing
+      # asar files, icon paths, main-module not-found, etc. before
+      # release day.
+      - name: electron-builder smoke (linux only)
+        if: matrix.os == 'ubuntu-latest'
+        run: npx electron-builder --linux --dir --config.npmRebuild=false || true
+
   # ── 5. Security audit (non-blocking warning for high/critical) ──
   audit:
     name: npm audit

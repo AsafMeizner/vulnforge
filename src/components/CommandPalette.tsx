@@ -95,6 +95,7 @@ export function CommandPalette({ open, onClose, commands }: CommandPaletteProps)
         {/* Input */}
         <input
           ref={inputRef}
+          aria-label="Search commands"
           value={query}
           onChange={e => setQuery(e.target.value)}
           placeholder="Type a command..."

@@ -342,6 +342,7 @@ function QuickHunt({ onNavigate }: { onNavigate: (page: string, extra?: unknown)
       </div>
       <input
         ref={inputRef}
+        aria-label="Repository URL for quick hunt"
         value={url}
         onChange={e => setUrl(e.target.value)}
         placeholder="https://github.com/org/repo"

@@ -805,6 +805,45 @@ function createTables(): void {
   `);
   db.run(`CREATE INDEX IF NOT EXISTS idx_pipeline_jobs_status ON pipeline_jobs(status, priority)`);
 
+  // CR-audit-21 (MEDIUM): indexes on hot filter columns.
+  // Every row below was backing a full-table scan in list endpoints
+  // because the table held no index on the WHERE / ORDER BY columns.
+  // `IF NOT EXISTS` keeps this idempotent on upgrade; sql.js ignores
+  // duplicates silently.
+  const HOT_INDEXES: Array<[string, string, string]> = [
+    // vulnerabilities - filtered by status + severity + project_id,
+    // ordered by found_at
+    ['idx_vuln_status',       'vulnerabilities', 'status'],
+    ['idx_vuln_severity',     'vulnerabilities', 'severity'],
+    ['idx_vuln_project',      'vulnerabilities', 'project_id'],
+    ['idx_vuln_found_at',     'vulnerabilities', 'found_at'],
+    // scan_findings - filtered per pipeline, by status, by severity
+    ['idx_scan_findings_pipe',    'scan_findings', 'pipeline_id'],
+    ['idx_scan_findings_status',  'scan_findings', 'status'],
+    ['idx_scan_findings_sev',     'scan_findings', 'severity'],
+    ['idx_scan_findings_project', 'scan_findings', 'project_id'],
+    // audit_log - time-ordered reads, filtered by actor + entity
+    ['idx_audit_created_at',  'audit_log', 'created_at'],
+    ['idx_audit_actor',       'audit_log', 'actor'],
+    ['idx_audit_entity',      'audit_log', 'entity_type'],
+    // notes - filtered by project_id
+    ['idx_notes_project',     'notes', 'project_id'],
+    // scans - filtered per project, by status
+    ['idx_scans_project',     'scans', 'project_id'],
+    ['idx_scans_status',      'scans', 'status'],
+    // pipeline_runs - time ordered + per-project
+    ['idx_pipeline_runs_project', 'pipeline_runs', 'project_id'],
+    ['idx_pipeline_runs_status',  'pipeline_runs', 'status'],
+  ];
+  for (const [name, table, col] of HOT_INDEXES) {
+    try {
+      db.run(`CREATE INDEX IF NOT EXISTS ${name} ON ${table}(${col})`);
+    } catch {
+      // Table might not exist yet on very old DBs - migrateSchema() below
+      // backfills, and re-running this block on the next boot will catch up.
+    }
+  }
+
   // Teach Mode + Pattern Mining (Phase 15)
   db.run(`
     CREATE TABLE IF NOT EXISTS teach_examples (

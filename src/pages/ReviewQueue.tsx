@@ -366,15 +366,31 @@ export default function ReviewQueue({ pipelineId, onNavigate }: ReviewQueueProps
               Findings
             </div>
             {findings.map((f, idx) => (
-              <div key={f.id} onClick={() => setCurrentIndex(idx)} style={{
-                padding: '6px 8px', borderRadius: 4, cursor: 'pointer', marginBottom: 2,
-                background: idx === currentIndex ? 'var(--surface-2)' : 'transparent',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <span style={{
-                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                  background: f.severity === 'Critical' ? 'var(--red)' : f.severity === 'High' ? 'var(--orange)' : f.severity === 'Medium' ? 'var(--yellow)' : 'var(--muted)',
-                }} />
+              <div
+                key={f.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={idx === currentIndex}
+                aria-label={`Select finding: ${f.title} (severity ${f.severity})`}
+                onClick={() => setCurrentIndex(idx)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setCurrentIndex(idx);
+                  }
+                }}
+                style={{
+                  padding: '6px 8px', borderRadius: 4, cursor: 'pointer', marginBottom: 2,
+                  background: idx === currentIndex ? 'var(--surface-2)' : 'transparent',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                <span
+                  aria-label={`${f.severity} severity`}
+                  title={`${f.severity} severity`}
+                  style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                    background: f.severity === 'Critical' ? 'var(--red)' : f.severity === 'High' ? 'var(--orange)' : f.severity === 'Medium' ? 'var(--yellow)' : 'var(--muted)',
+                  }} />
                 <span style={{
                   fontSize: 11, color: idx === currentIndex ? 'var(--text)' : 'var(--muted)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

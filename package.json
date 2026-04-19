@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "AI-powered security research platform - find, triage, and fix vulnerabilities",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "main": "electron/main.js",
   "bin": {
     "vulnforge": "cli/vulnforge.mjs"

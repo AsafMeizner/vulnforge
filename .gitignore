@@ -69,6 +69,11 @@ tmp/
 # Runtime port discovery file written by server startup for vite to read
 /.vulnforge-port
 
+# External-AI audit output - gitignored because its line numbers
+# drift as we fix findings. The durable record is the commit
+# history (security: CR-audit-XX ... messages).
+/REVIEW_FINDINGS.md
+
 # Playwright MCP scratch dir + screenshots from local probing
 /.playwright-mcp/
 /dashboard-initial.png
