@@ -1,0 +1,22 @@
+{
+  "_comment": "Drop-in OpenClaw config for VulnForge. See README.md in this directory for the walkthrough. Pick EXACTLY ONE of the two entries under mcp.servers - delete the other one before saving.",
+  "mcp": {
+    "servers": {
+      "vulnforge": {
+        "_description": "Solo desktop, no auth. Delete this block and keep the one below if you're on a team server.",
+        "url": "http://localhost:3001/mcp",
+        "transport": "sse",
+        "connectionTimeoutMs": 10000
+      },
+      "vulnforge-team": {
+        "_description": "Team server with JWT auth. Replace vulnforge.acme.corp + vf_YOUR_TOKEN_HERE. Delete this block and keep the one above if you're on solo desktop.",
+        "url": "https://vulnforge.acme.corp/mcp",
+        "transport": "sse",
+        "headers": {
+          "Authorization": "Bearer vf_YOUR_TOKEN_HERE"
+        },
+        "connectionTimeoutMs": 15000
+      }
+    }
+  }
+}

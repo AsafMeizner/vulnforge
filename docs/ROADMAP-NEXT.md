@@ -49,7 +49,7 @@ All 9 original themes are shipped. This is the roadmap for what comes next.
 
 - VS Code extension (inline findings, note capture)
 - Cursor/Copilot MCP bridge
-- Open Claw integration
+- ~~Open Claw integration~~ — shipped v0.1.0, see [docs/integrations/openclaw/README.md](./integrations/openclaw/README.md)
 - Antigravity adapter
 - REST API client SDKs (Python, TypeScript)
 
