@@ -57,9 +57,9 @@ export interface DependencyInfo {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-// Cloned repos land here. Env-configurable so a packaged install on a
-// different drive/OS isn't forced onto the dev's X:/ drive. Default
-// follows the rest of the data dirs under the server's working dir.
+// Cloned repos land here. Env-configurable so a packaged install
+// lands somewhere sensible on any OS. Default follows the rest of
+// the data dirs under the server's working dir.
 const REPOS_DIR = process.env.VULNFORGE_REPOS_DIR || path.join(process.cwd(), 'data/repos');
 
 const LANG_EXT_MAP: Record<string, string> = {

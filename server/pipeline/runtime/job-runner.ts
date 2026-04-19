@@ -30,8 +30,8 @@ import type {
 } from './types.js';
 
 // Runtime job artifacts (fuzz corpus, pcap captures, gdb session state,
-// ad-hoc PoC runs) land here. Env-configurable so a packaged install
-// outside of the developer's X:/ drive works.
+// ad-hoc PoC runs) land here. Env-configurable so packaged installs
+// can redirect this to a persistent / larger volume.
 export const RUNTIME_DATA_ROOT =
   process.env.VULNFORGE_RUNTIME_DIR || path.join(process.cwd(), 'data/runtime');
 

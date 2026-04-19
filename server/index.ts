@@ -185,11 +185,10 @@ async function main(): Promise<void> {
     const existingTools = getAllTools();
     if (existingTools.length === 0) {
       const fs = await import('fs');
-      // Default to ./tools relative to the process cwd. The previous
-      // default ("X:/security-solver/tools") was the original
-      // developer's Windows path; on any other system it silently
-      // did nothing AND the empty-table hint pointed at a drive
-      // letter nobody else has.
+      // Default to ./tools relative to the process cwd. An earlier
+      // release had a drive-letter hardcoded here that only worked
+      // on the original dev's machine; the empty-table hint still
+      // referenced it. Replaced with a portable default.
       const pathMod = await import('path');
       const toolsDir =
         process.env.VULNFORGE_TOOLS_DIR || pathMod.join(process.cwd(), 'tools');

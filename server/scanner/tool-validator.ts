@@ -6,10 +6,8 @@
  *
  * This module is pure infrastructure: it does NOT modify the scanner
  * runner, and only reads the same on-disk layout that
- * `server/scanner/runner.ts` uses (`X:/security-solver/tools/*.py`).
- *
- * Integration wiring (call at startup, surface on pipeline record) is
- * the responsibility of the lead integrator.
+ * `server/scanner/runner.ts` uses (default: `./tools/*.py`,
+ * override with VULNFORGE_TOOLS_DIR).
  */
 import { execFile } from 'child_process';
 import { existsSync, readdirSync, statSync } from 'fs';
@@ -43,7 +41,7 @@ interface ValidationOptions {
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const DEFAULT_TOOLS_DIR = process.env.VULNFORGE_TOOLS_DIR || 'X:/security-solver/tools';
+const DEFAULT_TOOLS_DIR = process.env.VULNFORGE_TOOLS_DIR || path.join(process.cwd(), 'tools');
 const DEFAULT_PYTHON_BIN = process.platform === 'win32' ? 'python' : 'python3';
 const DEFAULT_TIMEOUT_MS = 5_000;
 const CACHE_TTL_MS = 5 * 60 * 1_000; // 5 minutes

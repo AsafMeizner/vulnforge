@@ -5,8 +5,9 @@ import { tmpdir } from 'os';
 import path from 'path';
 
 // TOOLS_DIR is env-configurable. Points at the directory containing
-// Python scanner .py files. Default retained for dev backward-compat.
-const TOOLS_DIR = process.env.VULNFORGE_TOOLS_DIR || 'X:/security-solver/tools';
+// Python scanner .py files. Defaults to `./tools` under the process
+// cwd - the original developer's Windows path is no longer baked in.
+const TOOLS_DIR = process.env.VULNFORGE_TOOLS_DIR || path.join(process.cwd(), 'tools');
 
 export interface RunOptions {
   language?: string;

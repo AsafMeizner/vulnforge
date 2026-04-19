@@ -69,7 +69,29 @@ writeFileSync(join(stageDir, 'package.json'), JSON.stringify(prodPkg, null, 2));
 
 // 3. Copy artifacts
 cpSync('dist-server', join(stageDir, 'dist-server'), { recursive: true });
-if (existsSync('plugins')) cpSync('plugins', join(stageDir, 'plugins'), { recursive: true });
+// Plugins: copy MANIFESTS ONLY. The plugin manager installs the
+// actual scanner binaries on demand (`gh extension install`,
+// `pip install`, etc.). Vendoring e.g. CodeQL would blow the
+// tarball up to 400MB+ and ships binaries the server admin hasn't
+// reviewed. Walk each plugin subdir and pull only manifest.json
+// plus any tiny README/LICENSE alongside it.
+if (existsSync('plugins')) {
+  const { readdirSync, statSync } = await import('fs');
+  const pluginNames = readdirSync('plugins').filter(n => {
+    try { return statSync(join('plugins', n)).isDirectory(); } catch { return false; }
+  });
+  const pluginsDest = join(stageDir, 'plugins');
+  mkdirSync(pluginsDest, { recursive: true });
+  for (const name of pluginNames) {
+    const src = join('plugins', name);
+    const dst = join(pluginsDest, name);
+    mkdirSync(dst, { recursive: true });
+    for (const basename of ['manifest.json', 'README.md', 'LICENSE']) {
+      const f = join(src, basename);
+      if (existsSync(f)) copyFileSync(f, join(dst, basename));
+    }
+  }
+}
 mkdirSync(join(stageDir, 'scripts'), { recursive: true });
 for (const f of ['install-server.sh', 'install-server.ps1', 'bootstrap.mjs', 'migrate.mjs']) {
   const src = join('scripts', f);

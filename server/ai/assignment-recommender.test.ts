@@ -5,15 +5,15 @@ const { parseAuthorLine, codeownerMatches, authorKey } = _internals;
 
 describe('parseAuthorLine', () => {
   it('parses standard Name <email> line', () => {
-    expect(parseAuthorLine('Asaf Meizner <asafmeizner@gmail.com>')).toEqual({
-      name: 'Asaf Meizner',
-      email: 'asafmeizner@gmail.com',
+    expect(parseAuthorLine('Alice Smith <alice@example.com>')).toEqual({
+      name: 'Alice Smith',
+      email: 'alice@example.com',
     });
   });
 
   it('trims whitespace', () => {
-    expect(parseAuthorLine('  Asaf   <a@b.com>  ')).toEqual({
-      name: 'Asaf',
+    expect(parseAuthorLine('  Alice   <a@b.com>  ')).toEqual({
+      name: 'Alice',
       email: 'a@b.com',
     });
   });
@@ -26,12 +26,12 @@ describe('parseAuthorLine', () => {
 
 describe('authorKey', () => {
   it('prefers email, case-insensitive', () => {
-    expect(authorKey({ name: 'Asaf', email: 'A@B.com' }))
-      .toBe(authorKey({ name: 'Asaf', email: 'a@b.com' }));
+    expect(authorKey({ name: 'Alice', email: 'A@B.com' }))
+      .toBe(authorKey({ name: 'Alice', email: 'a@b.com' }));
   });
 
   it('falls back to name when email is empty', () => {
-    expect(authorKey({ name: 'Asaf', email: '' })).toBe('asaf');
+    expect(authorKey({ name: 'Alice', email: '' })).toBe('alice');
   });
 
   it('returns empty string when both missing', () => {

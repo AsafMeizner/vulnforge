@@ -903,8 +903,8 @@ function seedDefaultNotesProvider(): void {
   const count = (rows[0]?.c as number) || 0;
   if (count === 0) {
     // Seed a portable notes path — env override first, then the
-    // server's cwd. Historical seeds used `X:/vulnforge/data/notes`
-    // which broke every install that wasn't on the developer's machine.
+    // server's cwd. Earlier seeds hardcoded a drive-letter path that
+    // broke every install that wasn't on the original dev's machine.
     const basePath =
       process.env.VULNFORGE_NOTES_DIR ||
       `${process.cwd().replace(/\\/g, '/')}/data/notes`;
