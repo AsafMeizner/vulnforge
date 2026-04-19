@@ -1,6 +1,6 @@
 # Connecting AI Agents to VulnForge
 
-VulnForge exposes 70+ tools via MCP (Model Context Protocol) for any AI agent to use.
+VulnForge exposes 101 tools via MCP (Model Context Protocol) for any AI agent to use.
 
 ## Connection
 
@@ -39,14 +39,27 @@ Key endpoints:
 - `POST /api/ai/chat` - chat with VulnForge's AI
 - `GET /api/runtime` - list runtime jobs
 
-## For Antigravity / Open Claw / Custom Agents
+## For OpenClaw
+
+OpenClaw is MCP-native. See the [dedicated OpenClaw guide](../openclaw/README.md)
+for a step-by-step walkthrough, the CLI one-liner
+(`vulnforge openclaw install`), and a ready-to-paste
+`openclaw.json` snippet. Short version:
+
+```bash
+vulnforge openclaw install          # solo desktop
+vulnforge openclaw install \        # team server
+  --url https://vulnforge.acme.corp --token vf_...
+```
+
+## For Antigravity / Custom Agents
 
 These agents typically support either MCP or HTTP tool calling:
 
 ### If MCP supported:
 
 Use the SSE endpoint: `http://localhost:3001/mcp`
-Call `tools/list` to discover all 70+ tools.
+Call `tools/list` to discover all 101 tools.
 
 ### If HTTP tool calling:
 

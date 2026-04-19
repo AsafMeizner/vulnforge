@@ -9,11 +9,17 @@ The Claude Code plugin is already set up in the project root at `.claude/plugin.
 
 **Setup**: Just open VulnForge's directory in Claude Code. The plugin auto-discovers.
 
+### OpenClaw
+See [`openclaw/README.md`](openclaw/README.md) for a one-command
+install (`vulnforge openclaw install`) that wires VulnForge's
+101 MCP tools into OpenClaw, plus solo / team / troubleshooting
+guidance.
+
 ### VS Code Extension (planned)
 See `vscode/README.md` for the roadmap of the VS Code extension that will show findings inline.
 
 ### Generic MCP Agents
-See `agents/README.md` for instructions on connecting any MCP-compatible AI agent (Copilot, Cursor, Antigravity, Open Claw, etc.).
+See `agents/README.md` for instructions on connecting any MCP-compatible AI agent (Copilot, Cursor, Antigravity, etc.).
 
 ## MCP Connection Details
 

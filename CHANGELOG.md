@@ -5,6 +5,26 @@ in UTC. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 loosely; semver-ish but the project is pre-1.0 so minor bumps can carry
 breaking changes.
 
+## [Unreleased]
+
+### Added
+
+- **OpenClaw integration.** First-class support for [OpenClaw](https://openclaw.ai),
+  the MCP-native AI agent. A new `vulnforge openclaw install` CLI
+  subcommand wires VulnForge's 101 MCP tools into OpenClaw in one
+  command, with auto-detection of the `openclaw` binary and a
+  paste-the-JSON fallback when it isn't on PATH. Supports both solo
+  desktop (no auth) and team server (JWT Bearer header) modes.
+  Includes a ready-to-paste `docs/integrations/openclaw/openclaw.mcp.json`
+  config snippet, a full guide at `docs/integrations/openclaw/README.md`,
+  and 12 unit tests guarding the config shape so CI fails loudly on
+  schema drift.
+
+### Fixed
+
+- `docs/integrations/agents/README.md` referenced "70+ tools" — stale
+  since before v0.1.0. Now correctly says 101.
+
 ## [0.1.0] — 2026-04-19
 
 First public release. Foundational functionality + a comprehensive
