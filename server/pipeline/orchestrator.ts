@@ -288,38 +288,54 @@ async function runPipelineAsync(
     progress: 30,
   });
 
-  // Run plugins in parallel (fire-and-forget style like existing plugin runs)
+  // Run plugins in parallel but AWAIT them before the pipeline moves
+  // on. Previously the .then() chain was fire-and-forget - a slow
+  // plugin (Trivy on a large repo, Nuclei against a target) would
+  // finish after the pipeline was already marked completed, inserting
+  // findings that bypassed the filter + AI verify stages and appeared
+  // in Review as orphans with no triage. Collect each plugin's promise
+  // and Promise.allSettled before returning from this helper.
+  const pluginPromises: Promise<void>[] = [];
   for (const pluginConfig of selection.plugins) {
     try {
       const { getIntegration } = await import('../plugins/integrations/index.js');
       const integration = getIntegration(pluginConfig.pluginName);
       if (integration) {
-        // Run plugin async, don't block the pipeline
-        integration.run(projectPath, pluginConfig.options || {}).then(async (result: any) => {
-          if (result && result.findings) {
-            const db = await import('../db.js');
-            for (const f of result.findings) {
-              db.createScanFinding({
-                project_id: projectId,
-                pipeline_id: pipelineId,
-                title: f.title || f.rule_id || 'Plugin finding',
-                severity: f.severity || 'Medium',
-                file: f.file || '',
-                line_start: f.line,
-                description: f.message || f.description || '',
-                tool_name: pluginConfig.pluginName,
-                confidence: 'Medium',
-                status: 'pending',
-              } as any);
+        pluginPromises.push(
+          integration.run(projectPath, pluginConfig.options || {}).then(async (result: any) => {
+            if (result && result.findings) {
+              const db = await import('../db.js');
+              for (const f of result.findings) {
+                db.createScanFinding({
+                  project_id: projectId,
+                  pipeline_id: pipelineId,
+                  title: f.title || f.rule_id || 'Plugin finding',
+                  severity: f.severity || 'Medium',
+                  file: f.file || '',
+                  line_start: f.line,
+                  description: f.message || f.description || '',
+                  tool_name: pluginConfig.pluginName,
+                  confidence: 'Medium',
+                  status: 'pending',
+                } as any);
+              }
             }
-          }
-        }).catch(err => {
-          console.warn(`[Pipeline] Plugin ${pluginConfig.pluginName} failed:`, err.message);
-        });
+          }).catch(err => {
+            console.warn(`[Pipeline] Plugin ${pluginConfig.pluginName} failed:`, err.message);
+          }),
+        );
       }
     } catch (err: any) {
       console.warn(`[Pipeline] Plugin ${pluginConfig.pluginName} not available:`, err.message);
     }
+  }
+  if (pluginPromises.length > 0) {
+    // allSettled: don't let one plugin's crash abort the whole pipeline,
+    // but don't move past the scan stage until each plugin is done
+    // inserting its findings either. That keeps subsequent stages
+    // (filter / chain detection / AI verify) on a stable view of
+    // scan_findings.
+    await Promise.allSettled(pluginPromises);
   }
 
   // Run CVE variant hunting in parallel with scans

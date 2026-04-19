@@ -40,8 +40,20 @@ export function verifyPassword(password: string, stored: string): Promise<boolea
     const [salt, hash] = stored.split(':');
     if (!salt || !hash) { resolve(false); return; }
     crypto.scrypt(password, salt, KEY_LEN, (err, derivedKey) => {
-      if (err) reject(err);
-      else resolve(derivedKey.toString('hex') === hash);
+      if (err) return reject(err);
+      // timingSafeEqual prevents timing-attack-driven hash recovery
+      // at the local-process level. The string `===` comparison that
+      // was here leaked byte position via short-circuit evaluation;
+      // scrypt's own running time dominates at the network layer but
+      // not for a colocated-tenant attacker.
+      let expected: Buffer;
+      try {
+        expected = Buffer.from(hash, 'hex');
+      } catch {
+        return resolve(false);
+      }
+      if (expected.length !== derivedKey.length) return resolve(false);
+      resolve(crypto.timingSafeEqual(derivedKey, expected));
     });
   });
 }

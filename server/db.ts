@@ -1164,7 +1164,17 @@ export function getAllVulnerabilities(filters: VulnFilters = {}): Vulnerability[
   const sortRaw = allowedSort.includes(filters.sort || '') ? filters.sort : 'found_at';
   const sort = `v.${sortRaw}`;
   const order = filters.order === 'asc' ? 'ASC' : 'DESC';
-  const limitClause = filters.limit ? `LIMIT ${Number(filters.limit)}` : '';
+  // Default to 100, hard-cap at 1000 regardless of caller input.
+  // Previously an omitted `limit` meant "every row", which OOMs the
+  // server once the table grows past a few thousand findings and is
+  // trivially DoS-able by any authenticated user.
+  const DEFAULT_LIMIT = 100;
+  const MAX_LIMIT = 1000;
+  const limitNum = Math.min(
+    MAX_LIMIT,
+    Math.max(1, Number(filters.limit) || DEFAULT_LIMIT),
+  );
+  const limitClause = `LIMIT ${limitNum}`;
   const offsetClause = filters.offset !== undefined ? `OFFSET ${Number(filters.offset)}` : '';
 
   return execQuery(

@@ -527,6 +527,34 @@ function gcCodes(): void {
   for (const [k, v] of codes) if (v.created_at < cutoff) codes.delete(k);
 }
 
+// Run GC on a 60s timer in addition to per-request. Previously GC
+// only fired inside buildAuthorizeUrl + handleCallback, so 10k pending
+// entries during a flood would stay resident for the full PENDING_TTL
+// if no further OIDC traffic arrived. Also cap map sizes so a single
+// attacker can't hold arbitrary RSS.
+const OIDC_GC_INTERVAL_MS = 60_000;
+const PENDING_CAP = 5000;
+const CODES_CAP = 2000;
+const _oidcGcTimer = setInterval(() => {
+  gcPending();
+  gcCodes();
+  // Defensive cap: if either map is still over limit after TTL-based
+  // GC, drop oldest until under cap.
+  dropOldestOver(pending, PENDING_CAP);
+  dropOldestOver(codes, CODES_CAP);
+}, OIDC_GC_INTERVAL_MS);
+_oidcGcTimer.unref?.(); // don't keep the event loop alive for this alone
+
+function dropOldestOver<V extends { created_at: number }>(
+  m: Map<string, V>,
+  cap: number,
+): void {
+  if (m.size <= cap) return;
+  const sorted = Array.from(m.entries()).sort((a, b) => a[1].created_at - b[1].created_at);
+  const toDrop = m.size - cap;
+  for (let i = 0; i < toDrop; i++) m.delete(sorted[i][0]);
+}
+
 // For tests
 export function __resetOidcStateForTests(): void {
   pending.clear();

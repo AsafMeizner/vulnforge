@@ -83,6 +83,30 @@ const PORT = process.env.VULNFORGE_PORT
   : 3001;
 const HEADLESS = process.env.VULNFORGE_HEADLESS === '1' || process.argv.includes('--headless');
 
+/**
+ * Redact sensitive query-string params from a URL before logging it.
+ * OIDC `code` + `state`, password-reset `token`, API-key-in-query
+ * `key` + `api_key` + `secret` are all known-secret names that
+ * callers sometimes put in the URL. Request bodies are never logged,
+ * but the URL travels through the error wrapper + any reverse proxy.
+ */
+function redactSensitiveQuery(url: string): string {
+  if (!url || !url.includes('?')) return url;
+  try {
+    const u = new URL(url, 'http://_unused');
+    const REDACT = new Set(['code', 'state', 'id_token', 'access_token', 'token', 'key', 'api_key', 'secret', 'password']);
+    for (const k of Array.from(u.searchParams.keys())) {
+      if (REDACT.has(k.toLowerCase())) {
+        u.searchParams.set(k, '[redacted]');
+      }
+    }
+    return u.pathname + (u.search || '');
+  } catch {
+    // Malformed URL - drop the query string entirely.
+    return url.split('?')[0] + '?[unparseable]';
+  }
+}
+
 async function main(): Promise<void> {
   // Init database
   console.log('[DB] Initializing SQLite database...');
@@ -161,8 +185,14 @@ async function main(): Promise<void> {
     const existingTools = getAllTools();
     if (existingTools.length === 0) {
       const fs = await import('fs');
+      // Default to ./tools relative to the process cwd. The previous
+      // default ("X:/security-solver/tools") was the original
+      // developer's Windows path; on any other system it silently
+      // did nothing AND the empty-table hint pointed at a drive
+      // letter nobody else has.
+      const pathMod = await import('path');
       const toolsDir =
-        process.env.VULNFORGE_TOOLS_DIR || 'X:/security-solver/tools';
+        process.env.VULNFORGE_TOOLS_DIR || pathMod.join(process.cwd(), 'tools');
       if (fs.existsSync(toolsDir)) {
         const files = fs
           .readdirSync(toolsDir)
@@ -354,7 +384,14 @@ async function main(): Promise<void> {
       ? Number(err.status)
       : 500;
     const isProd = process.env.NODE_ENV === 'production';
-    console.error(`[err ${requestId}]`, req.method, req.originalUrl, err?.stack || err);
+    // Redact known-secret query params before logging. OIDC callback
+    // URLs carry `code` + `state` which are single-use but still
+    // secret within the ~10-minute TTL; password-reset flows carry
+    // `token`; API-key-in-URL style endpoints carry `key`. Dropping
+    // those before the console.error keeps them out of logs,
+    // journalctl, and any log-aggregator pipeline behind the server.
+    const safeUrl = redactSensitiveQuery(req.originalUrl || req.url || '');
+    console.error(`[err ${requestId}]`, req.method, safeUrl, err?.stack || err);
     if (res.headersSent) return;
     if (isProd) {
       res.status(status).json({ error: 'Internal server error', request_id: requestId });
