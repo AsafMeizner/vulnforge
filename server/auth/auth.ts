@@ -104,10 +104,17 @@ const PUBLIC_PATH_PREFIXES = [
  * deployment accepted every anonymous request as admin, which is a
  * catastrophic default. Now that shortcut only applies when the
  * binding proves we're local.
+ *
+ * Delegates to the canonical helper in server/deployment/mode.ts -
+ * previously this file had its own host-based version that disagreed
+ * with the canonical one under Electron's forked-Node child (Electron
+ * forks with VULNFORGE_HOST=127.0.0.1 but without
+ * process.versions.electron), so auth.ts said "desktop" while
+ * lib/net.ts said "server" and Ollama silently stopped working.
  */
+import { isDesktopMode as modeIsDesktop } from '../deployment/mode.js';
 function isDesktopMode(): boolean {
-  const host = process.env.VULNFORGE_HOST || '127.0.0.1';
-  return host === '127.0.0.1' || host === 'localhost' || host === '::1';
+  return modeIsDesktop();
 }
 
 function isPublicPath(p: string): boolean {

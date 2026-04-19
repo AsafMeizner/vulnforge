@@ -1057,6 +1057,31 @@ function execQuery(sql: string, params: any[] = []): Record<string, any>[] {
   return stmtToArray(stmt);
 }
 
+// Column-name allowlist regex used by safeSetClause. `[a-z_]` start
+// then any `[a-z0-9_]` - identical to SQLite's unquoted-identifier
+// rules. Anything else throws before the UPDATE is built.
+const _SAFE_COLUMN_RE = /^[a-z_][a-z0-9_]*$/;
+
+/**
+ * Build `col1 = ?, col2 = ?` safely. Previously each update helper
+ * interpolated `${f} = ?` with no validation, so a key like
+ * `"name = 'pwn' --"` sneaking in from req.body could corrupt the
+ * UPDATE and silently drop the placeholder. Throws if any field
+ * is not a valid identifier.
+ *
+ * Callers should still filter their input to a per-table allowlist
+ * (picking named columns out of req.body) - this helper is
+ * defence-in-depth.
+ */
+function safeSetClause(fields: string[]): string {
+  for (const f of fields) {
+    if (typeof f !== 'string' || !_SAFE_COLUMN_RE.test(f)) {
+      throw new Error(`invalid column name in update: ${JSON.stringify(f)}`);
+    }
+  }
+  return fields.map(f => `${f} = ?`).join(', ');
+}
+
 function execRun(sql: string, params: any[] = []): number {
   db.run(sql, params);
   const result = db.exec('SELECT last_insert_rowid() as id');
@@ -1088,7 +1113,7 @@ export function createProject(p: Project): number {
 
 export function updateProject(id: number, p: Partial<Project>): void {
   const fields = Object.keys(p).filter(k => k !== 'id');
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (p as any)[f]);
   db.run(`UPDATE projects SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -1246,7 +1271,7 @@ export function updateVulnerability(id: number, v: Partial<Vulnerability>): void
 
   const fields = Object.keys(mut);
   if (fields.length === 0) return;
-  const setClause = fields.map((f) => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map((f) => mut[f]);
   db.run(
     `UPDATE vulnerabilities SET ${setClause}, updated_at = datetime('now') WHERE id = ?`,
@@ -1286,7 +1311,7 @@ export function updateScan(id: number, s: Partial<Scan>): void {
   const exclude = ['id'];
   const fields = Object.keys(s).filter(k => !exclude.includes(k));
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (s as any)[f]);
   db.run(`UPDATE scans SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -1312,7 +1337,7 @@ export function upsertTool(t: Tool): number {
   const existing = getToolByName(t.name);
   if (existing) {
     const fields = ['category', 'description', 'docs', 'track_record', 'file_path', 'config_schema', 'enabled'];
-    const setClause = fields.map(f => `${f} = ?`).join(', ');
+    const setClause = safeSetClause(fields);
     const values = fields.map(f => (t as any)[f] ?? null);
     db.run(`UPDATE tools SET ${setClause} WHERE name = ?`, [...values, t.name]);
     persistDb();
@@ -1331,7 +1356,7 @@ export function updateTool(id: number, t: Partial<Tool>): void {
   const allowed = new Set(['name', 'category', 'description', 'docs', 'track_record', 'file_path', 'config_schema', 'enabled']);
   const fields = Object.keys(t).filter((k) => allowed.has(k));
   if (fields.length === 0) return;
-  const setClause = fields.map((f) => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   // Coerce enabled to a 0/1 integer since SQLite doesn't have booleans
   // and the column is INTEGER.
   const values = fields.map((f) => {
@@ -1395,7 +1420,7 @@ export function updateChecklist(id: number, c: Partial<Checklist>): void {
   const allowed = new Set(['name', 'source_url', 'category', 'total_items']);
   const fields = Object.keys(c).filter((k) => allowed.has(k));
   if (fields.length === 0) return;
-  const setClause = fields.map((f) => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map((f) => (c as any)[f] ?? null);
   db.run(`UPDATE checklists SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -1435,7 +1460,7 @@ export function createPlugin(p: Plugin): number {
 export function updatePlugin(id: number, p: Partial<Plugin>): void {
   const fields = Object.keys(p).filter(k => k !== 'id');
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (p as any)[f]);
   db.run(`UPDATE plugins SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -1544,7 +1569,7 @@ export function updateReport(id: number, r: Partial<Report>): void {
   const allowed = new Set(['type', 'format', 'content', 'generated_by']);
   const fields = Object.keys(r).filter((k) => allowed.has(k));
   if (fields.length === 0) return;
-  const setClause = fields.map((f) => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map((f) => (r as any)[f] ?? null);
   db.run(`UPDATE reports SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -1605,7 +1630,7 @@ export function updateScanFinding(id: number, updates: Partial<ScanFinding>): vo
   const exclude = ['id', 'created_at'];
   const fields = Object.keys(updates).filter(k => !exclude.includes(k));
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE scan_findings SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -1714,7 +1739,7 @@ export function updatePipelineRun(id: string, updates: Partial<PipelineRun>): vo
   const exclude = ['id', 'started_at'];
   const fields = Object.keys(updates).filter(k => !exclude.includes(k));
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE pipeline_runs SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -2002,7 +2027,7 @@ export function createIntegration(i: IntegrationRow): number {
 export function updateIntegration(id: number, updates: Partial<IntegrationRow>): void {
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => {
     // Encrypt config on the way in so every caller doesn't have to
     // remember (and so the typed-integration code path doesn't need
@@ -2068,7 +2093,7 @@ export function createIntegrationTicket(t: IntegrationTicketRow): number {
 export function updateIntegrationTicket(id: number, updates: Partial<IntegrationTicketRow>): void {
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE integration_tickets SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -2184,7 +2209,7 @@ export function updateNote(id: number, updates: Partial<NoteRow>): void {
   const exclude = ['id', 'created_at'];
   const fields = Object.keys(updates).filter(k => !exclude.includes(k));
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(
     `UPDATE notes SET ${setClause}, updated_at = datetime('now') WHERE id = ?`,
@@ -2229,7 +2254,7 @@ export function createNotesProvider(p: NotesProviderRow): number {
 export function updateNotesProvider(id: number, updates: Partial<NotesProviderRow>): void {
   const fields = Object.keys(updates).filter(k => k !== 'id');
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE notes_providers SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -2321,7 +2346,7 @@ export function updateRuntimeJob(id: string, updates: Partial<RuntimeJobRow>): v
   const exclude = ['id', 'started_at'];
   const fields = Object.keys(updates).filter(k => !exclude.includes(k));
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE runtime_jobs SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -2371,7 +2396,7 @@ export function updateFuzzCrash(id: number, updates: Partial<FuzzCrashRow>): voi
   const exclude = ['id', 'discovered_at'];
   const fields = Object.keys(updates).filter(k => !exclude.includes(k));
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE fuzz_crashes SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -2401,7 +2426,7 @@ export function createCapture(c: CaptureRow): number {
 export function updateCapture(id: number, updates: Partial<CaptureRow>): void {
   const fields = Object.keys(updates).filter(k => k !== 'id');
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE captures SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -2509,7 +2534,7 @@ export function updateExploit(id: number, updates: Partial<ExploitRow>): void {
   const exclude = ['id', 'created_at'];
   const fields = Object.keys(updates).filter(k => !exclude.includes(k));
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(
     `UPDATE exploits SET ${setClause}, updated_at = datetime('now') WHERE id = ?`,
@@ -2577,7 +2602,7 @@ export function createVendor(v: VendorRow): number {
 export function updateVendor(id: number, updates: Partial<VendorRow>): void {
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE vendors SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -2624,7 +2649,7 @@ export function updateDisclosure(id: number, updates: Partial<DisclosureRow>): v
   const exclude = ['id', 'created_at'];
   const fields = Object.keys(updates).filter(k => !exclude.includes(k));
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(
     `UPDATE disclosures SET ${setClause}, updated_at = datetime('now') WHERE id = ?`,
@@ -2731,7 +2756,7 @@ export function updateUser(id: number, updates: Partial<UserRow>): void {
   const exclude = ['id', 'created_at', 'password_hash'];
   const fields = Object.keys(updates).filter(k => !exclude.includes(k));
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE users SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();
@@ -2817,7 +2842,7 @@ export function createLearnedPattern(p: LearnedPatternRow): number {
 export function updateLearnedPattern(id: number, updates: Partial<LearnedPatternRow>): void {
   const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'created_at');
   if (fields.length === 0) return;
-  const setClause = fields.map(f => `${f} = ?`).join(', ');
+  const setClause = safeSetClause(fields);
   const values = fields.map(f => (updates as any)[f]);
   db.run(`UPDATE learned_patterns SET ${setClause} WHERE id = ?`, [...values, id]);
   persistDb();

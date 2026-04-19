@@ -122,7 +122,7 @@ export async function runPipeline(opts: PipelineOptions): Promise<string> {
       detail: err.message,
       progress: 0,
       status: 'error',
-    });
+    }, { scope: 'job' });
   }).finally(() => {
     activePipelines.delete(pipelineId);
   });
@@ -139,7 +139,7 @@ async function runPipelineAsync(
 ): Promise<void> {
 
   const emit = (stage: string, detail: string, progress: number, status: 'running' | 'complete' | 'error' = 'running') => {
-    broadcastProgress('pipeline', pipelineId, { step: stage, detail, progress, status });
+    broadcastProgress("pipeline", pipelineId, { step: stage, detail, progress, status }, { scope: "job" });
   };
 
   /** Check if pipeline should stop. Returns true if we should exit. */
@@ -192,7 +192,7 @@ async function runPipelineAsync(
             detail: line.slice(0, 200),
             progress: stageProgress,
             status: 'running',
-          });
+          }, { scope: 'job' });
         },
       });
       projectPath = result.localPath;
@@ -625,7 +625,7 @@ function abortPipeline(pipelineId: string, state: 'run' | 'paused' | 'cancelled'
       detail: 'Pipeline paused. Resume anytime from Hunt page.',
       progress: getPipelineRun(pipelineId)?.progress || 0,
       status: 'running', // Not 'error' - it's still alive
-    });
+    }, { scope: 'job' });
   } else {
     updatePipelineRun(pipelineId, {
       status: 'cancelled',
@@ -637,7 +637,7 @@ function abortPipeline(pipelineId: string, state: 'run' | 'paused' | 'cancelled'
       detail: 'Cancelled by user',
       progress: 0,
       status: 'error',
-    });
+    }, { scope: 'job' });
   }
 }
 
@@ -813,7 +813,7 @@ export async function resumePipeline(pipelineId: string): Promise<boolean> {
     detail: `Resuming from "${stage}" stage (${progress}% complete)`,
     progress,
     status: 'running',
-  });
+  }, { scope: 'job' });
 
   // Run the remainder async
   resumePipelineAsync(pipelineId, pipeline.project_id, project.path, opts, stage, checkState).catch(err => {
@@ -843,7 +843,7 @@ async function resumePipelineAsync(
   checkState: () => 'run' | 'paused' | 'cancelled',
 ): Promise<void> {
   const emit = (stage: string, detail: string, progress: number, status: 'running' | 'complete' | 'error' = 'running') => {
-    broadcastProgress('pipeline', pipelineId, { step: stage, detail, progress, status });
+    broadcastProgress("pipeline", pipelineId, { step: stage, detail, progress, status }, { scope: "job" });
   };
 
   const shouldStop = (): boolean => {
