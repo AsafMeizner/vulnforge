@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   getPipelineRun,
   getActivePipelineRuns,
@@ -11,7 +11,7 @@ const router = Router();
 // ── POST /api/pipeline/start ─────────────────────────────────────────────
 // Start a new pipeline. Accepts: { url }, { path }, or { project_id }
 
-router.post('/start', async (req: Request, res: Response) => {
+router.post('/start', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { url, path, project_id, branch, depth, toolOverrides } = req.body;
 
@@ -44,7 +44,7 @@ router.post('/start', async (req: Request, res: Response) => {
 // ── POST /api/pipeline/batch ─────────────────────────────────────────────
 // Start multiple pipelines in parallel.
 
-router.post('/batch', async (req: Request, res: Response) => {
+router.post('/batch', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { targets } = req.body;
     if (!Array.isArray(targets) || targets.length === 0) {
@@ -78,13 +78,13 @@ router.post('/batch', async (req: Request, res: Response) => {
     res.status(202).json({ pipelines: results });
   } catch (err: any) {
     console.error('POST /pipeline/batch error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── GET /api/pipeline/:id ────────────────────────────────────────────────
 
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const pipeline = getPipelineRun(String(req.params.id));
     if (!pipeline) {
@@ -93,25 +93,25 @@ router.get('/:id', (req: Request, res: Response) => {
     }
     res.json(pipeline);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── GET /api/pipeline/active ─────────────────────────────────────────────
 
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const activeOnly = req.query.active === 'true';
     const pipelines = activeOnly ? getActivePipelineRuns() : getPipelineRuns();
     res.json({ data: pipelines, total: pipelines.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /api/pipeline/:id/pause ──────────────────────────────────────────
 
-router.post('/:id/pause', (req: Request, res: Response) => {
+router.post('/:id/pause', (req: Request, res: Response, next: NextFunction) => {
   try {
     const success = pausePipeline(String(req.params.id));
     if (success) {
@@ -120,13 +120,13 @@ router.post('/:id/pause', (req: Request, res: Response) => {
       res.status(404).json({ error: 'Pipeline not running or not found' });
     }
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /api/pipeline/:id/resume ────────────────────────────────────────
 
-router.post('/:id/resume', async (req: Request, res: Response) => {
+router.post('/:id/resume', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const success = await resumePipeline(String(req.params.id));
     if (success) {
@@ -140,13 +140,13 @@ router.post('/:id/resume', async (req: Request, res: Response) => {
       }
     }
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── DELETE /api/pipeline/:id ─────────────────────────────────────────────
 
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const success = cancelPipeline(String(req.params.id));
     if (success) {
@@ -155,7 +155,7 @@ router.delete('/:id', (req: Request, res: Response) => {
       res.status(404).json({ error: 'Pipeline not found or already completed' });
     }
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

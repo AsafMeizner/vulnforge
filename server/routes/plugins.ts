@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { pluginManager } from '../plugins/manager.js';
 import { PLUGIN_CATALOG } from '../plugins/registry.js';
 import { createVulnerability } from '../db.js';
@@ -8,7 +8,7 @@ const router = Router();
 // -- GET /api/plugins ---------------------------------------------------------
 // Returns installed plugins merged with the static catalog.
 
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const { installed, catalog } = pluginManager.listPlugins();
     const installedNames = new Set(
@@ -25,19 +25,19 @@ router.get('/', (_req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('[GET /plugins] error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // -- GET /api/plugins/catalog/all ---------------------------------------------
 
-router.get('/catalog/all', (_req: Request, res: Response) => {
+router.get('/catalog/all', (_req: Request, res: Response, next: NextFunction) => {
   res.json({ data: PLUGIN_CATALOG, total: PLUGIN_CATALOG.length });
 });
 
 // -- GET /api/plugins/:id -----------------------------------------------------
 
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
@@ -45,14 +45,14 @@ router.get('/:id', (req: Request, res: Response) => {
     if (!plugin) { res.status(404).json({ error: `Plugin ${id} not found` }); return; }
     res.json(plugin);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // -- GET /api/plugins/:id/status ----------------------------------------------
 // Returns live status (idle/installing/running/error/ready) + requirements check.
 
-router.get('/:id/status', async (req: Request, res: Response) => {
+router.get('/:id/status', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
@@ -70,14 +70,14 @@ router.get('/:id/status', async (req: Request, res: Response) => {
       plugin: { id: plugin.id, name: plugin.name, version: plugin.version },
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // -- GET /api/plugins/:id/modules ---------------------------------------------
 // Returns available modules/probes/templates for the plugin.
 
-router.get('/:id/modules', (req: Request, res: Response) => {
+router.get('/:id/modules', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
@@ -87,14 +87,14 @@ router.get('/:id/modules', (req: Request, res: Response) => {
     const modules = pluginManager.getPluginModules(plugin.name);
     res.json({ plugin: plugin.name, modules, total: modules.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // -- POST /api/plugins/install ------------------------------------------------
 // Body: { name?: string; source_url?: string; catalog_name?: string }
 
-router.post('/install', async (req: Request, res: Response) => {
+router.post('/install', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, source_url, catalog_name } = req.body as {
       name?: string;
@@ -133,7 +133,7 @@ router.post('/install', async (req: Request, res: Response) => {
         installCommands,
       });
     } else {
-      res.status(500).json({ error: err.message });
+      next(err);
     }
   }
 });
@@ -153,7 +153,7 @@ router.post('/install', async (req: Request, res: Response) => {
 // phases apart means a malformed URL fails fast without any filesystem
 // state change.
 
-router.post('/install-from-url', async (req: Request, res: Response) => {
+router.post('/install-from-url', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { url, name, description, type } = req.body as {
       url?: string;
@@ -206,28 +206,28 @@ router.post('/install-from-url', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('[POST /plugins/install-from-url] error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // -- POST /api/plugins/install-dep --------------------------------------------
 // Install a missing system dependency (go, gh, etc.)
 
-router.post('/install-dep', async (req: Request, res: Response) => {
+router.post('/install-dep', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { dependency } = req.body as { dependency?: string };
     if (!dependency) { res.status(400).json({ error: 'dependency name is required' }); return; }
     const result = await pluginManager.installDependency(dependency);
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // -- PUT /api/plugins/:id -----------------------------------------------------
 // Patch a plugin row. Primarily used by the Enable/Disable toggle.
 // Accepts any subset of { enabled, name, manifest }.
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
@@ -256,13 +256,13 @@ router.put('/:id', async (req: Request, res: Response) => {
     res.json(pluginManager.getPlugin(id));
   } catch (err: any) {
     console.error('PUT /plugins/:id error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // -- DELETE /api/plugins/:id --------------------------------------------------
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
@@ -273,7 +273,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await pluginManager.uninstallPlugin(id);
     res.status(204).send();
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -282,7 +282,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 //
 // Runs the plugin and persists each finding as a vulnerability record.
 
-router.post('/:id/run', async (req: Request, res: Response) => {
+router.post('/:id/run', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid plugin ID' }); return; }
@@ -335,7 +335,7 @@ router.post('/:id/run', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error(`[POST /plugins/${req.params.id}/run] error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

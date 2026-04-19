@@ -12,7 +12,7 @@
  * RBAC: `ai:use` or `integrations:use` per route.
  * Rate-limited at the express app level (operator installs it).
  */
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 
 import { assertPermission } from '../auth/permissions.js';
 import { getServerCapabilityManifest } from '../sync/capabilities.js';
@@ -20,14 +20,14 @@ import { getDb } from '../db.js';
 
 const router = Router();
 
-router.get('/capabilities', (req: Request, res: Response) => {
+router.get('/capabilities', (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) return res.status(401).json({ error: 'not authenticated' });
   res.json(getServerCapabilityManifest({ user_id: req.user.id, role: req.user.role }));
 });
 
 // ── AI proxy ───────────────────────────────────────────────────────────────
 
-router.post('/ai/invoke', async (req: Request, res: Response) => {
+router.post('/ai/invoke', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'not authenticated' });
     if (!assertPermission(req, 'ai', 'use', res)) return;
@@ -64,13 +64,13 @@ router.post('/ai/invoke', async (req: Request, res: Response) => {
     });
     res.json({ ok: true, result });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── Integration proxy ──────────────────────────────────────────────────────
 
-router.post('/integrations/:name/:action', async (req: Request, res: Response) => {
+router.post('/integrations/:name/:action', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'not authenticated' });
     if (!assertPermission(req, 'integrations', 'use', res)) return;
@@ -117,7 +117,7 @@ router.post('/integrations/:name/:action', async (req: Request, res: Response) =
     }
     res.json({ ok: true, result });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

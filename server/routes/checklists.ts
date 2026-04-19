@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   getAllChecklists,
   getChecklistById,
@@ -21,7 +21,7 @@ const router = Router();
 // ── GET /api/checklists ───────────────────────────────────────────────────────
 // Returns all checklists with progress statistics.
 
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const checklists = getAllChecklists();
 
@@ -41,14 +41,14 @@ router.get('/', (_req: Request, res: Response) => {
     res.json({ data: enriched, total: enriched.length });
   } catch (err: any) {
     console.error('[GET /checklists] error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── GET /api/checklists/:id ───────────────────────────────────────────────────
 // Returns a single checklist with all items and their verification status.
 
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -76,7 +76,7 @@ router.get('/:id', (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error(`[GET /checklists/${req.params.id}] error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -84,7 +84,7 @@ router.get('/:id', (req: Request, res: Response) => {
 // Run automated verification of all items against a project's findings.
 // Body: { project_id: number }
 
-router.post('/:id/verify', async (req: Request, res: Response) => {
+router.post('/:id/verify', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -108,14 +108,14 @@ router.post('/:id/verify', async (req: Request, res: Response) => {
     res.json(result);
   } catch (err: any) {
     console.error(`[POST /checklists/${req.params.id}/verify] error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── PUT /api/checklists/items/:id ─────────────────────────────────────────────
 // Manually update a checklist item's status (verified, notes, vuln_id).
 
-router.put('/items/:id', (req: Request, res: Response) => {
+router.put('/items/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -173,7 +173,7 @@ router.put('/items/:id', (req: Request, res: Response) => {
     res.json(item);
   } catch (err: any) {
     console.error(`[PUT /checklists/items/${req.params.id}] error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -181,7 +181,7 @@ router.put('/items/:id', (req: Request, res: Response) => {
 // Verify a single item against a project.
 // Body: { project_id: number }
 
-router.post('/items/:id/verify', async (req: Request, res: Response) => {
+router.post('/items/:id/verify', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -199,7 +199,7 @@ router.post('/items/:id/verify', async (req: Request, res: Response) => {
     res.json({ itemId: id, ...result });
   } catch (err: any) {
     console.error(`[POST /checklists/items/${req.params.id}/verify] error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -208,7 +208,7 @@ router.post('/items/:id/verify', async (req: Request, res: Response) => {
 // their own. These endpoints fill that gap.
 
 // POST /api/checklists  body: { name, source_url?, category? }
-router.post('/', (req: Request, res: Response) => {
+router.post('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, source_url, category } = (req.body || {}) as {
       name?: string; source_url?: string; category?: string;
@@ -224,11 +224,11 @@ router.post('/', (req: Request, res: Response) => {
       total_items: 0,
     } as any);
     res.status(201).json(getChecklistById(id));
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
 // PUT /api/checklists/:id
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -236,22 +236,22 @@ router.put('/:id', (req: Request, res: Response) => {
     if (!existing) { res.status(404).json({ error: 'not found' }); return; }
     updateChecklist(id, req.body || {});
     res.json(getChecklistById(id));
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
 // DELETE /api/checklists/:id  cascades to items
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
     if (!getChecklistById(id)) { res.status(404).json({ error: 'not found' }); return; }
     deleteChecklist(id);
     res.status(204).send();
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
 // POST /api/checklists/:id/items  body: { title, description?, category?, severity? }
-router.post('/:id/items', (req: Request, res: Response) => {
+router.post('/:id/items', (req: Request, res: Response, next: NextFunction) => {
   try {
     const checklist_id = Number(req.params.id);
     if (isNaN(checklist_id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -269,17 +269,17 @@ router.post('/:id/items', (req: Request, res: Response) => {
       verified: 0,
     } as any);
     res.status(201).json({ id, checklist_id, title });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
 // DELETE /api/checklists/items/:id
-router.delete('/items/:id', (req: Request, res: Response) => {
+router.delete('/items/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
     deleteChecklistItem(id);
     res.status(204).send();
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
 export default router;

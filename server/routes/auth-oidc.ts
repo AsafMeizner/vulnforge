@@ -9,7 +9,7 @@
  *   GET  /api/auth/oidc/:name/callback       IdP redirects here; renders paste page
  *   POST /api/auth/oidc/exchange             desktop trades one-time code for JWT pair
  */
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 
 import {
   isOidcEnabled,
@@ -52,7 +52,7 @@ function redirectUriFor(req: Request, name: string): string {
 
 // ── List providers ─────────────────────────────────────────────────────────
 
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', (_req: Request, res: Response, next: NextFunction) => {
   if (!isOidcEnabled()) return res.json({ providers: [], enabled: false });
   const providers = listOidcProviders().map(p => ({ name: p.name, enabled: !!p.enabled }));
   res.json({ providers, enabled: true });
@@ -60,7 +60,7 @@ router.get('/', (_req: Request, res: Response) => {
 
 // ── Start flow ─────────────────────────────────────────────────────────────
 
-router.get('/:name/start', async (req: Request, res: Response) => {
+router.get('/:name/start', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!guardEnabled(res)) return;
     const { name } = req.params;
@@ -69,13 +69,13 @@ router.get('/:name/start', async (req: Request, res: Response) => {
     const url = await buildAuthorizeUrl(provider, redirectUriFor(req, String(name)));
     res.redirect(302, url);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── Callback ───────────────────────────────────────────────────────────────
 
-router.get('/:name/callback', async (req: Request, res: Response) => {
+router.get('/:name/callback', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!guardEnabled(res)) return;
     const { name } = req.params;
@@ -103,7 +103,7 @@ router.get('/:name/callback', async (req: Request, res: Response) => {
 
 // ── Exchange ───────────────────────────────────────────────────────────────
 
-router.post('/exchange', async (req: Request, res: Response) => {
+router.post('/exchange', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!guardEnabled(res)) return;
     const { one_time_code, device_name } = req.body ?? {};
@@ -164,7 +164,7 @@ router.post('/exchange', async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

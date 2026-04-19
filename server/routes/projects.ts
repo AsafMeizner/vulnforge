@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { readdirSync, statSync, existsSync, readFileSync } from 'fs';
 import path from 'path';
 import {
@@ -77,13 +77,13 @@ function detectLanguage(dirPath: string): string {
 }
 
 // GET /api/projects
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const projects = getAllProjects();
     res.json({ data: projects, total: projects.length });
   } catch (err: any) {
     console.error('GET /projects error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -92,7 +92,7 @@ router.get('/', (_req: Request, res: Response) => {
 // Review / Finding detail UI to display the vulnerable file with the
 // flagged line highlighted. Paths are validated against the project's
 // root to block `../` escapes.
-router.get('/:id/file', (req: Request, res: Response) => {
+router.get('/:id/file', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -117,7 +117,7 @@ router.get('/:id/file', (req: Request, res: Response) => {
 
     let stats;
     try { stats = statSync(abs); } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      next(err);
       return;
     }
     if (!stats.isFile()) { res.status(400).json({ error: 'not a regular file' }); return; }
@@ -148,7 +148,7 @@ router.get('/:id/file', (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('GET /projects/:id/file error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -159,7 +159,7 @@ router.get('/:id/file', (req: Request, res: Response) => {
 // IMPORTANT: this route MUST be declared before `/:id` below or Express
 // matches `/:id` first and tries to parse the literal "export" as a
 // project ID (returns 400 "Invalid ID").
-router.get('/export', (_req: Request, res: Response) => {
+router.get('/export', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const projects = (getAllProjects() as any[]).map((p: any) => ({
       name: p.name,
@@ -176,12 +176,12 @@ router.get('/export', (_req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('GET /projects/export error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/projects/:id
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -196,12 +196,12 @@ router.get('/:id', (req: Request, res: Response) => {
     res.json(project);
   } catch (err: any) {
     console.error(`GET /projects/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/projects - import project by path
-router.post('/', (req: Request, res: Response) => {
+router.post('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { path: projectPath, name, repo_url, branch } = req.body;
 
@@ -226,7 +226,7 @@ router.post('/', (req: Request, res: Response) => {
     res.status(201).json(created);
   } catch (err: any) {
     console.error('POST /projects error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -236,7 +236,7 @@ router.post('/', (req: Request, res: Response) => {
 //
 // Used by the Projects page Import JSON flow (round-trip with /export).
 // Skips rows whose name already exists so re-importing is idempotent.
-router.post('/import-bulk', (req: Request, res: Response) => {
+router.post('/import-bulk', (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = req.body as { projects?: any };
     const projects = Array.isArray(body?.projects) ? body.projects : null;
@@ -276,12 +276,12 @@ router.post('/import-bulk', (req: Request, res: Response) => {
     res.json({ imported, skipped: skipped.length, skippedNames: skipped, errors });
   } catch (err: any) {
     console.error('POST /projects/import-bulk error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/projects/import-url - clone a git repo and import
-router.post('/import-url', async (req: Request, res: Response) => {
+router.post('/import-url', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { url, branch, depth } = req.body;
 
@@ -362,7 +362,7 @@ router.post('/import-url', async (req: Request, res: Response) => {
     }
   } catch (err: any) {
     console.error('POST /projects/import-url error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -370,7 +370,7 @@ router.post('/import-url', async (req: Request, res: Response) => {
 // Accepts any subset of { name, path, repo_url, branch, language }.
 // Empty strings are normalised to null so the user can intentionally
 // clear a field.
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -393,12 +393,12 @@ router.put('/:id', (req: Request, res: Response) => {
     res.json(getProjectById(id));
   } catch (err: any) {
     console.error('PUT /projects/:id error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE /api/projects/:id
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -414,7 +414,7 @@ router.delete('/:id', (req: Request, res: Response) => {
     res.status(204).send();
   } catch (err: any) {
     console.error(`DELETE /projects/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

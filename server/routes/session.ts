@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   SessionStateRow,
   getSessionState,
@@ -60,7 +60,7 @@ function rowToResponse(row: SessionStateRow): Record<string, unknown> {
 // ── GET /api/session ───────────────────────────────────────────────────────
 // Query params: scope (required), scope_id (required unless scope=global), key (optional)
 
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const scope = parseScope(req.query.scope);
     if (!scope) {
@@ -81,14 +81,14 @@ router.get('/', (req: Request, res: Response) => {
     res.json({ data, total: data.length });
   } catch (err: any) {
     console.error('GET /session error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /api/session ──────────────────────────────────────────────────────
 // Body: { scope, scope_id?, key, value } - upsert a single key
 
-router.post('/', (req: Request, res: Response) => {
+router.post('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { scope: rawScope, scope_id: rawScopeId, key, value } = req.body || {};
 
@@ -126,14 +126,14 @@ router.post('/', (req: Request, res: Response) => {
     res.status(201).json(rowToResponse(rows[0]));
   } catch (err: any) {
     console.error('POST /session error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── DELETE /api/session ────────────────────────────────────────────────────
 // Query params: scope (required), scope_id (required unless scope=global), key (required)
 
-router.delete('/', (req: Request, res: Response) => {
+router.delete('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const scope = parseScope(req.query.scope);
     if (!scope) {
@@ -157,14 +157,14 @@ router.delete('/', (req: Request, res: Response) => {
     res.status(204).send();
   } catch (err: any) {
     console.error('DELETE /session error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /api/session/clear ────────────────────────────────────────────────
 // Body: { scope, scope_id? } - remove all keys for the given scope
 
-router.post('/clear', (req: Request, res: Response) => {
+router.post('/clear', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { scope: rawScope, scope_id: rawScopeId } = req.body || {};
 
@@ -184,7 +184,7 @@ router.post('/clear', (req: Request, res: Response) => {
     res.status(204).send();
   } catch (err: any) {
     console.error('POST /session/clear error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

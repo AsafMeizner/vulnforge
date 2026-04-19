@@ -13,7 +13,7 @@
  * Verifies existing scrypt password hashes transparently and upgrades
  * them to bcrypt on successful login (see verifyPasswordAny).
  */
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 
 import {
   getUserByUsername,
@@ -83,7 +83,7 @@ async function issueTokenPair(user: UserRow, device_id: string, device_name: str
 
 // ── POST /login ────────────────────────────────────────────────────────────
 
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { username, password, device_name } = req.body ?? {};
     if (typeof username !== 'string' || typeof password !== 'string') {
@@ -114,13 +114,13 @@ router.post('/login', async (req: Request, res: Response) => {
     updateUser(user.id, { last_login: new Date().toISOString() });
     res.json({ ...pair, device_id });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /refresh ──────────────────────────────────────────────────────────
 
-router.post('/refresh', async (req: Request, res: Response) => {
+router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { refresh_token, device_id } = req.body ?? {};
     if (typeof refresh_token !== 'string' || typeof device_id !== 'string') {
@@ -152,13 +152,13 @@ router.post('/refresh', async (req: Request, res: Response) => {
     const pair = await issueTokenPair(user, matched.device_id, matched.device_name);
     res.json({ ...pair, device_id: matched.device_id });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /logout ───────────────────────────────────────────────────────────
 
-router.post('/logout', (req: Request, res: Response) => {
+router.post('/logout', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { device_id } = req.body ?? {};
     if (typeof device_id !== 'string' || device_id.length === 0) {
@@ -167,7 +167,7 @@ router.post('/logout', (req: Request, res: Response) => {
     revokeAllRefreshTokensForDevice(device_id);
     res.json({ ok: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -175,7 +175,7 @@ router.post('/logout', (req: Request, res: Response) => {
 // First-admin setup on a fresh server install. Gated by a one-time token
 // the installer prints to stdout and sets in process.env. Cleared on use.
 
-router.post('/bootstrap', async (req: Request, res: Response) => {
+router.post('/bootstrap', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (countUsers() > 0) {
       return res.status(409).json({ error: 'bootstrap already complete', code: 'ALREADY_BOOTSTRAPPED' });
@@ -209,7 +209,7 @@ router.post('/bootstrap', async (req: Request, res: Response) => {
     const pair = await issueTokenPair(user, device_id, 'bootstrap');
     res.json({ ...pair, device_id });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

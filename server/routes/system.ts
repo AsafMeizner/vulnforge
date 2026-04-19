@@ -7,7 +7,7 @@
  * diagnostics here (CPU arch, disk free, GPU presence) as the UI
  * needs them.
  */
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 import os from 'os';
 
 const router = Router();
@@ -19,7 +19,7 @@ const router = Router();
  * de-duplicated by interface name. `any` and `lo`/`loopback` are
  * appended last so the dropdown has a sensible order for capture tools.
  */
-router.get('/network-interfaces', (_req: Request, res: Response) => {
+router.get('/network-interfaces', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const raw = os.networkInterfaces();
     const out: Array<{
@@ -53,7 +53,7 @@ router.get('/network-interfaces', (_req: Request, res: Response) => {
     res.json({ data: out, total: out.length });
   } catch (err: any) {
     console.error('GET /system/network-interfaces error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

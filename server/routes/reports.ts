@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   getAllReports,
   getReportById,
@@ -12,7 +12,7 @@ const router = Router();
 
 // POST /api/reports/generate
 // Body: { vuln_id, type: 'disclosure'|'email'|'advisory'|'summary', provider?: string }
-router.post('/generate', async (req: Request, res: Response) => {
+router.post('/generate', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { vuln_id, type = 'disclosure' } = req.body;
 
@@ -54,23 +54,23 @@ router.post('/generate', async (req: Request, res: Response) => {
     res.status(201).json(report);
   } catch (err: any) {
     console.error('[Reports] Generate error:', err.message);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/reports
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const reports = getAllReports();
     res.json({ data: reports, total: reports.length });
   } catch (err: any) {
     console.error('[Reports] List error:', err.message);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/reports/:id
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -85,7 +85,7 @@ router.get('/:id', (req: Request, res: Response) => {
     res.json(report);
   } catch (err: any) {
     console.error('[Reports] Get error:', err.message);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -94,7 +94,7 @@ router.get('/:id', (req: Request, res: Response) => {
 // from scratch without calling a provider. AI-generated reports go
 // through /reports/generate which does both the AI call and the DB
 // insert in one step.
-router.post('/', (req: Request, res: Response) => {
+router.post('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { vuln_id, type, format, content } = (req.body || {}) as {
       vuln_id?: number; type?: string; format?: string; content?: string;
@@ -117,14 +117,14 @@ router.post('/', (req: Request, res: Response) => {
     res.status(201).json(getReportById(id));
   } catch (err: any) {
     console.error('[Reports] Manual create error:', err.message);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT /api/reports/:id - edit the content (or type/format) of a report.
 // Main use case: user refines the AI-generated disclosure before sending
 // it to the vendor.
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -134,13 +134,13 @@ router.put('/:id', (req: Request, res: Response) => {
     res.json(getReportById(id));
   } catch (err: any) {
     console.error('[Reports] Update error:', err.message);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE /api/reports/:id - throw away a report the user doesn't want
 // to keep (wrong template, bad AI output, etc.).
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -149,7 +149,7 @@ router.delete('/:id', (req: Request, res: Response) => {
     deleteReport(id);
     res.status(204).send();
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

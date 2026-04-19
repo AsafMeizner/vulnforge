@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   getAllVulnerabilities,
   countVulnerabilities,
@@ -13,7 +13,7 @@ import {
 const router = Router();
 
 // GET /api/vulnerabilities
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const filters: VulnFilters = {};
 
@@ -39,12 +39,12 @@ router.get('/', (req: Request, res: Response) => {
     res.json({ data, total });
   } catch (err: any) {
     console.error('GET /vulnerabilities error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/vulnerabilities/:id
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -59,7 +59,7 @@ router.get('/:id', (req: Request, res: Response) => {
     res.json(vuln);
   } catch (err: any) {
     console.error(`GET /vulnerabilities/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -69,7 +69,7 @@ router.get('/:id', (req: Request, res: Response) => {
 // request instead of N serial DELETEs. Must be declared BEFORE the
 // `/:id` param routes below, otherwise Express tries to parse
 // "bulk-delete" as a numeric id and returns "Invalid ID".
-router.post('/bulk-delete', (req: Request, res: Response) => {
+router.post('/bulk-delete', (req: Request, res: Response, next: NextFunction) => {
   try {
     const rawIds = (req.body || {}).ids;
     if (!Array.isArray(rawIds)) {
@@ -87,12 +87,12 @@ router.post('/bulk-delete', (req: Request, res: Response) => {
     res.json({ deleted });
   } catch (err: any) {
     console.error('POST /vulnerabilities/bulk-delete error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/vulnerabilities
-router.post('/', (req: Request, res: Response) => {
+router.post('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = req.body;
     if (!body.title) {
@@ -104,12 +104,12 @@ router.post('/', (req: Request, res: Response) => {
     res.status(201).json(created);
   } catch (err: any) {
     console.error('POST /vulnerabilities error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT /api/vulnerabilities/:id
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -126,12 +126,12 @@ router.put('/:id', (req: Request, res: Response) => {
     res.json(updated);
   } catch (err: any) {
     console.error(`PUT /vulnerabilities/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT /api/vulnerabilities/:id/verify  - toggle verified flag
-router.put('/:id/verify', (req: Request, res: Response) => {
+router.put('/:id/verify', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -141,12 +141,12 @@ router.put('/:id/verify', (req: Request, res: Response) => {
     updateVulnerability(id, { verified: newVal } as any);
     res.json(getVulnerabilityById(id));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT /api/vulnerabilities/:id/false-positive  - mark as false positive
-router.put('/:id/false-positive', (req: Request, res: Response) => {
+router.put('/:id/false-positive', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -155,12 +155,12 @@ router.put('/:id/false-positive', (req: Request, res: Response) => {
     updateVulnerability(id, { false_positive: 1, status: 'Wont Fix' } as any);
     res.json(getVulnerabilityById(id));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE /api/vulnerabilities/:id
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -176,7 +176,7 @@ router.delete('/:id', (req: Request, res: Response) => {
     res.status(204).send();
   } catch (err: any) {
     console.error(`DELETE /vulnerabilities/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

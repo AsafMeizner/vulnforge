@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 import { promises as fs } from 'fs';
 import cp from 'child_process';
 import { promisify } from 'util';
@@ -33,7 +33,7 @@ function safeJson(s?: string): any {
 }
 
 // GET /api/runtime - list jobs
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const filters: RuntimeJobFilters = {};
     if (req.query.status) filters.status = String(req.query.status);
@@ -45,12 +45,12 @@ router.get('/', (req: Request, res: Response) => {
     const rows = getRuntimeJobs(filters);
     res.json({ data: rows.map(hydrate), total: rows.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/runtime/crashes - list crashes (top-level shortcut)
-router.get('/crashes', (req: Request, res: Response) => {
+router.get('/crashes', (req: Request, res: Response, next: NextFunction) => {
   try {
     const filters: { job_id?: string; linked_finding_id?: number } = {};
     if (req.query.job_id) filters.job_id = String(req.query.job_id);
@@ -58,12 +58,12 @@ router.get('/crashes', (req: Request, res: Response) => {
     const crashes = getFuzzCrashes(filters);
     res.json({ data: crashes, total: crashes.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/runtime/crashes/:id/link - link a crash to a finding
-router.post('/crashes/:id/link', async (req: Request, res: Response) => {
+router.post('/crashes/:id/link', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(String(req.params.id));
     const { finding_id } = req.body;
@@ -73,12 +73,12 @@ router.post('/crashes/:id/link', async (req: Request, res: Response) => {
     updateFuzzCrash(id, { linked_finding_id: Number(finding_id) });
     res.json(getFuzzCrashById(id));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/runtime/harness-gen - generate a libFuzzer harness
-router.post('/harness-gen', async (req: Request, res: Response) => {
+router.post('/harness-gen', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { function_signature, language } = req.body;
     if (!function_signature) { res.status(400).json({ error: 'function_signature required' }); return; }
@@ -86,12 +86,12 @@ router.post('/harness-gen', async (req: Request, res: Response) => {
     const result = generateHarness(function_signature, language || 'c');
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/runtime - start a job
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { type, tool, config, project_id, finding_id } = req.body;
     if (!type || !tool) { res.status(400).json({ error: 'type and tool required' }); return; }
@@ -109,29 +109,29 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // GET /api/runtime/:id - job details
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job) { res.status(404).json({ error: 'job not found' }); return; }
     res.json(hydrate(job));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/runtime/:id/stop
-router.post('/:id/stop', async (req: Request, res: Response) => {
+router.post('/:id/stop', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { runtimeJobRunner } = await import('../pipeline/runtime/job-runner.js');
     const ok = await runtimeJobRunner.stop(String(req.params.id));
     res.json({ stopped: ok });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE /api/runtime/:id - delete job + output dir
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job) { res.status(404).json({ error: 'job not found' }); return; }
@@ -141,12 +141,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
     }
     res.json({ deleted: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/runtime/:id/output - tail output log
-router.get('/:id/output', async (req: Request, res: Response) => {
+router.get('/:id/output', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job) { res.status(404).json({ error: 'job not found' }); return; }
@@ -163,22 +163,22 @@ router.get('/:id/output', async (req: Request, res: Response) => {
       res.type('text/plain').send('');
     }
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/runtime/:id/crashes - per-job crashes
-router.get('/:id/crashes', (req: Request, res: Response) => {
+router.get('/:id/crashes', (req: Request, res: Response, next: NextFunction) => {
   try {
     const crashes = getFuzzCrashes({ job_id: String(req.params.id) });
     res.json({ data: crashes, total: crashes.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/runtime/:id/pcap - download raw pcap
-router.get('/:id/pcap', async (req: Request, res: Response) => {
+router.get('/:id/pcap', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job?.output_dir) { res.status(404).json({ error: 'not found' }); return; }
@@ -191,7 +191,7 @@ router.get('/:id/pcap', async (req: Request, res: Response) => {
 });
 
 // GET /api/runtime/:id/packets - parse pcap with tshark
-router.get('/:id/packets', async (req: Request, res: Response) => {
+router.get('/:id/packets', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job?.output_dir) { res.status(404).json({ error: 'not found' }); return; }
@@ -240,14 +240,14 @@ router.get('/:id/packets', async (req: Request, res: Response) => {
       error: `tshark unavailable. Install Wireshark or set VULNFORGE_TSHARK. Last error: ${lastError?.message || 'unknown'}`,
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── Sandbox-specific endpoints ────────────────────────────────────────────
 
 // POST /api/runtime/:id/pause - pause a sandbox container
-router.post('/:id/pause', async (req: Request, res: Response) => {
+router.post('/:id/pause', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job) { res.status(404).json({ error: 'job not found' }); return; }
@@ -258,12 +258,12 @@ router.post('/:id/pause', async (req: Request, res: Response) => {
     // The executor polling loop will detect the status change and call docker pause
     res.json({ paused: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/runtime/:id/resume - resume a paused sandbox
-router.post('/:id/resume', async (req: Request, res: Response) => {
+router.post('/:id/resume', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job) { res.status(404).json({ error: 'job not found' }); return; }
@@ -272,12 +272,12 @@ router.post('/:id/resume', async (req: Request, res: Response) => {
     updateRuntimeJob(String(req.params.id), { status: 'running' });
     res.json({ resumed: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/runtime/:id/snapshot - create a named snapshot
-router.post('/:id/snapshot', async (req: Request, res: Response) => {
+router.post('/:id/snapshot', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
@@ -301,12 +301,12 @@ router.post('/:id/snapshot', async (req: Request, res: Response) => {
 
     res.json({ id: snapId, name, tag });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/runtime/:id/snapshots
-router.get('/:id/snapshots', (req: Request, res: Response) => {
+router.get('/:id/snapshots', (req: Request, res: Response, next: NextFunction) => {
   try {
     // getSandboxSnapshots is imported at the top of this file — the old
     // `require(...)` call here threw "require is not defined" in strict
@@ -314,12 +314,12 @@ router.get('/:id/snapshots', (req: Request, res: Response) => {
     const snaps = getSandboxSnapshots(String(req.params.id));
     res.json({ data: snaps, total: snaps.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/runtime/:id/processes - list running processes
-router.get('/:id/processes', async (req: Request, res: Response) => {
+router.get('/:id/processes', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
@@ -331,12 +331,12 @@ router.get('/:id/processes', async (req: Request, res: Response) => {
     const processes = await dockerTop(stats.container_id);
     res.json({ data: processes, total: processes.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/runtime/:id/resources - live resource stats
-router.get('/:id/resources', async (req: Request, res: Response) => {
+router.get('/:id/resources', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
@@ -348,12 +348,12 @@ router.get('/:id/resources', async (req: Request, res: Response) => {
     const live = await getStats(stats.container_id);
     res.json(live);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/runtime/:id/upload - upload file into sandbox
-router.post('/:id/upload', async (req: Request, res: Response) => {
+router.post('/:id/upload', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
@@ -368,12 +368,12 @@ router.post('/:id/upload', async (req: Request, res: Response) => {
     await dockerCopyIn(stats.container_id, host_path, container_path);
     res.json({ uploaded: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/runtime/:id/download/:path - download file from sandbox
-router.get('/:id/download/*', async (req: Request, res: Response) => {
+router.get('/:id/download/*', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const job = getRuntimeJobById(String(req.params.id));
     if (!job || job.type !== 'sandbox') { res.status(400).json({ error: 'sandbox job required' }); return; }
@@ -390,7 +390,7 @@ router.get('/:id/download/*', async (req: Request, res: Response) => {
       fs.unlink(tmpPath).catch(() => {});
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

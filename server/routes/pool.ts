@@ -12,7 +12,7 @@
  * Pool tables are separate per syncable table (pool_projects,
  * pool_vulnerabilities, pool_scan_findings, pool_notes). Created lazily.
  */
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 
 import { assertPermission } from '../auth/permissions.js';
 import { getDb, persistDb } from '../db.js';
@@ -51,7 +51,7 @@ function ensurePoolTable(table: string): void {
 const snapshotCache = new Map<string, { at: number; rows: any[] }>();
 const SNAPSHOT_TTL_MS = 60 * 60 * 1000;
 
-router.post('/push', (req: Request, res: Response) => {
+router.post('/push', (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'not authenticated' });
     if (!assertPermission(req, 'findings', 'write', res)) return;
@@ -86,11 +86,11 @@ router.post('/push', (req: Request, res: Response) => {
     }
     res.json({ accepted, skipped });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.get('/snapshot', (req: Request, res: Response) => {
+router.get('/snapshot', (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) return res.status(401).json({ error: 'not authenticated' });
     if (!assertPermission(req, 'findings', 'read', res)) return;
@@ -118,7 +118,7 @@ router.get('/snapshot', (req: Request, res: Response) => {
     snapshotCache.set(table, { at: Date.now(), rows });
     res.json({ rows, cached_at: Date.now() });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

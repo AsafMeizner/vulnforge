@@ -3,7 +3,7 @@
  * triage memory, root-cause clustering, autonomous remediation, change impact.
  */
 
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 import {
   listTriagePatterns,
   applyTriageMemory,
@@ -48,7 +48,7 @@ const readLimiter = rateLimit({
 //  Triage memory
 // ──────────────────────────────────────────────────────────────────────────
 
-router.get('/triage-memory/patterns', readLimiter, (req: Request, res: Response) => {
+router.get('/triage-memory/patterns', readLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const decision = req.query.decision as 'accept' | 'reject' | 'ignore' | undefined;
     const minTotal = req.query.min ? Number(req.query.min) : 1;
@@ -56,22 +56,22 @@ router.get('/triage-memory/patterns', readLimiter, (req: Request, res: Response)
     const rows = listTriagePatterns({ decision, minTotal, limit });
     res.json({ data: rows, total: rows.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.get('/triage-memory/suggest/:findingId', readLimiter, (req: Request, res: Response) => {
+router.get('/triage-memory/suggest/:findingId', readLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.findingId);
     const f = getScanFindingById(id);
     if (!f) { res.status(404).json({ error: 'finding not found' }); return; }
     res.json(applyTriageMemory(f));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/triage-memory/apply-batch', readLimiter, (req: Request, res: Response) => {
+router.post('/triage-memory/apply-batch', readLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const { pipeline_id, project_id, threshold } = req.body as {
       pipeline_id?: string;
@@ -86,11 +86,11 @@ router.post('/triage-memory/apply-batch', readLimiter, (req: Request, res: Respo
     const result = applyTriageMemoryToBatch(findings, threshold ?? 0.7);
     res.json({ ...result, total: findings.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/triage-memory/record', readLimiter, (req: Request, res: Response) => {
+router.post('/triage-memory/record', readLimiter, (req: Request, res: Response, next: NextFunction) => {
   try {
     const { finding_id, decision } = req.body as {
       finding_id: number;
@@ -105,7 +105,7 @@ router.post('/triage-memory/record', readLimiter, (req: Request, res: Response) 
     recordTriageDecision(f, decision);
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -113,7 +113,7 @@ router.post('/triage-memory/record', readLimiter, (req: Request, res: Response) 
 //  Root-cause clustering
 // ──────────────────────────────────────────────────────────────────────────
 
-router.post('/root-cause/cluster', aiCallLimiter, async (req: Request, res: Response) => {
+router.post('/root-cause/cluster', aiCallLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { pipeline_id, project_id, semantic = false, maxSemanticInput } = req.body as {
       pipeline_id?: string;
@@ -129,7 +129,7 @@ router.post('/root-cause/cluster', aiCallLimiter, async (req: Request, res: Resp
     const clusters = await clusterByRootCause(findings, { semantic, maxSemanticInput });
     res.json({ clusters, total_findings: findings.length, total_clusters: clusters.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -137,7 +137,7 @@ router.post('/root-cause/cluster', aiCallLimiter, async (req: Request, res: Resp
 //  Autonomous remediation
 // ──────────────────────────────────────────────────────────────────────────
 
-router.post('/remediation/generate-fix', aiCallLimiter, async (req: Request, res: Response) => {
+router.post('/remediation/generate-fix', aiCallLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { finding_id } = req.body as { finding_id: number };
     const f = getScanFindingById(finding_id);
@@ -147,11 +147,11 @@ router.post('/remediation/generate-fix', aiCallLimiter, async (req: Request, res
     const fix = await generateFix(f, project.path);
     res.json(fix);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/remediation/autonomous', writeLimiter, async (req: Request, res: Response) => {
+router.post('/remediation/autonomous', writeLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { finding_id, mode = 'dry-run', branch, draft, requireClean } = req.body as {
       finding_id: number;
@@ -167,7 +167,7 @@ router.post('/remediation/autonomous', writeLimiter, async (req: Request, res: R
     const result = await autonomousRemediate(finding_id, { mode, branch, draft, requireClean });
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -175,7 +175,7 @@ router.post('/remediation/autonomous', writeLimiter, async (req: Request, res: R
 //  Change impact analysis
 // ──────────────────────────────────────────────────────────────────────────
 
-router.post('/change-impact/analyze', readLimiter, async (req: Request, res: Response) => {
+router.post('/change-impact/analyze', readLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { project_id, since_ref, head_ref, statuses } = req.body as {
       project_id: number;
@@ -190,7 +190,7 @@ router.post('/change-impact/analyze', readLimiter, async (req: Request, res: Res
     const result = await analyzeChangeImpact(project_id, since_ref, { headRef: head_ref, statuses });
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -198,7 +198,7 @@ router.post('/change-impact/analyze', readLimiter, async (req: Request, res: Res
 //  CVE match probability
 // ──────────────────────────────────────────────────────────────────────────
 
-router.post('/cve-match/score', readLimiter, async (req: Request, res: Response) => {
+router.post('/cve-match/score', readLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { finding_id, topK, minScore, candidatePool } = req.body as {
       finding_id: number;
@@ -211,11 +211,11 @@ router.post('/cve-match/score', readLimiter, async (req: Request, res: Response)
     const result = await cveMatchProbability(f, { topK, minScore, candidatePool });
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/cve-match/score-batch', aiCallLimiter, async (req: Request, res: Response) => {
+router.post('/cve-match/score-batch', aiCallLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { pipeline_id, project_id, topK, minScore } = req.body as {
       pipeline_id?: string;
@@ -236,7 +236,7 @@ router.post('/cve-match/score-batch', aiCallLimiter, async (req: Request, res: R
     results.sort((a, b) => b.probability - a.probability);
     res.json({ data: results, total: results.length, total_findings_checked: findings.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -244,7 +244,7 @@ router.post('/cve-match/score-batch', aiCallLimiter, async (req: Request, res: R
 //  Assignment recommendation
 // ──────────────────────────────────────────────────────────────────────────
 
-router.post('/assignment/recommend', readLimiter, async (req: Request, res: Response) => {
+router.post('/assignment/recommend', readLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { finding_id, topK, perSignalLimit } = req.body as {
       finding_id: number;
@@ -259,7 +259,7 @@ router.post('/assignment/recommend', readLimiter, async (req: Request, res: Resp
     const result = await recommendAssignees(f, project.path, { topK, perSignalLimit });
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

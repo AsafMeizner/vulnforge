@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   getAllScans,
   getScanById,
@@ -78,20 +78,20 @@ scanQueue.on('triage:error', (vulnId: number, err: Error) => {
 
 // ── GET /api/scans ─────────────────────────────────────────────────────────
 
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = req.query.limit ? Number(req.query.limit) : 50;
     const scans = getAllScans(limit);
     res.json({ data: scans, total: scans.length });
   } catch (err: any) {
     console.error('GET /scans error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── GET /api/scans/queue ───────────────────────────────────────────────────
 
-router.get('/queue', (_req: Request, res: Response) => {
+router.get('/queue', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const status = scanQueue.getStatus();
     const jobs = scanQueue.getJobs().map(j => ({
@@ -107,19 +107,19 @@ router.get('/queue', (_req: Request, res: Response) => {
     }));
     res.json({ status, jobs });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── GET /api/scans/profiles ────────────────────────────────────────────────
 
-router.get('/profiles', (_req: Request, res: Response) => {
+router.get('/profiles', (_req: Request, res: Response, next: NextFunction) => {
   res.json({ data: listProfiles() });
 });
 
 // ── GET /api/scans/:id ─────────────────────────────────────────────────────
 
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -134,7 +134,7 @@ router.get('/:id', (req: Request, res: Response) => {
     res.json(scan);
   } catch (err: any) {
     console.error(`GET /scans/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -143,7 +143,7 @@ router.get('/:id', (req: Request, res: Response) => {
 // Body: { project_id, tools: string[], auto_triage?: boolean }
 // Returns 202 with the array of ScanJob objects immediately.
 
-router.post('/', (req: Request, res: Response) => {
+router.post('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { project_id, tools, auto_triage = false } = req.body;
 
@@ -185,7 +185,7 @@ router.post('/', (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('POST /scans error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -194,7 +194,7 @@ router.post('/', (req: Request, res: Response) => {
 // Body: { project_id, profile: string, auto_triage?: boolean }
 // Expands the profile's tool list and enqueues.
 
-router.post('/profile', (req: Request, res: Response) => {
+router.post('/profile', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { project_id, profile: profileKey, auto_triage = false } = req.body;
 
@@ -253,7 +253,7 @@ router.post('/profile', (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('POST /scans/profile error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -262,7 +262,7 @@ router.post('/profile', (req: Request, res: Response) => {
 // Cancels a queued job identified by its UUID job id.
 // Note: the :id here is the in-memory ScanJob UUID, not the DB scan row id.
 
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = String(req.params['id']);
     const job = scanQueue.getJob(id);
@@ -281,7 +281,7 @@ router.delete('/:id', (req: Request, res: Response) => {
     res.json({ message: 'Job cancelled', jobId: id });
   } catch (err: any) {
     console.error(`DELETE /scans/${req.params['id']} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

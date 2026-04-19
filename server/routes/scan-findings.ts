@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   getScanFindings,
   getScanFindingById,
@@ -26,7 +26,7 @@ function rememberTriage(findingId: number, decision: 'accept' | 'reject' | 'igno
 
 // ── GET /api/scan-findings?scan_id=X ──────────────────────────────────────
 
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const filters: { scan_id?: number; project_id?: number; pipeline_id?: string; status?: string } = {};
 
@@ -40,14 +40,14 @@ router.get('/', (req: Request, res: Response) => {
     res.json({ data: findings, counts, total: findings.length });
   } catch (err: any) {
     console.error('GET /scan-findings error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── PUT /api/scan-findings/:id/accept ─────────────────────────────────────
 // Promotes a staged finding into the vulnerabilities table.
 
-router.put('/:id/accept', (req: Request, res: Response) => {
+router.put('/:id/accept', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -81,13 +81,13 @@ router.put('/:id/accept', (req: Request, res: Response) => {
     res.json({ success: true, vuln_id: vulnId, vuln });
   } catch (err: any) {
     console.error(`PUT /scan-findings/${req.params.id}/accept error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── PUT /api/scan-findings/:id/reject ─────────────────────────────────────
 
-router.put('/:id/reject', (req: Request, res: Response) => {
+router.put('/:id/reject', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -100,13 +100,13 @@ router.put('/:id/reject', (req: Request, res: Response) => {
     rememberTriage(id, 'reject');
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /api/scan-findings/bulk-accept ───────────────────────────────────
 
-router.post('/bulk-accept', (req: Request, res: Response) => {
+router.post('/bulk-accept', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { ids } = req.body as { ids: number[] };
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -149,13 +149,13 @@ router.post('/bulk-accept', (req: Request, res: Response) => {
 
     res.json({ accepted: vulnIds.length, vuln_ids: vulnIds, errors });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /api/scan-findings/bulk-reject ───────────────────────────────────
 
-router.post('/bulk-reject', (req: Request, res: Response) => {
+router.post('/bulk-reject', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { ids, reason } = req.body as { ids: number[]; reason?: string };
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -174,13 +174,13 @@ router.post('/bulk-reject', (req: Request, res: Response) => {
 
     res.json({ rejected: count });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /api/scan-findings/accept-all?scan_id=X ─────────────────────────
 
-router.post('/accept-all', (req: Request, res: Response) => {
+router.post('/accept-all', (req: Request, res: Response, next: NextFunction) => {
   try {
     const scan_id = req.query.scan_id ? Number(req.query.scan_id) : undefined;
     const pending = getScanFindings({ scan_id, status: 'pending' });
@@ -212,14 +212,14 @@ router.post('/accept-all', (req: Request, res: Response) => {
 
     res.json({ accepted: vulnIds.length, vuln_ids: vulnIds });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /api/scan-findings/ai-review?scan_id=X ───────────────────────────
 // Sends pending findings to AI for batch triage recommendation.
 
-router.post('/ai-review', async (req: Request, res: Response) => {
+router.post('/ai-review', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const scan_id = req.query.scan_id ? Number(req.query.scan_id) : undefined;
     const pending = getScanFindings({ scan_id, status: 'pending' });
@@ -300,7 +300,7 @@ No markdown fences. Just the JSON array.`;
     res.json({ accepted, rejected, reviews });
   } catch (err: any) {
     console.error('POST /scan-findings/ai-review error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -308,7 +308,7 @@ No markdown fences. Just the JSON array.`;
 // Run the 4-stage AI chain on a single finding. Returns the result
 // (which also gets persisted on scan_findings.ai_verification).
 // Slow - each call makes 4 LLM round-trips.
-router.post('/:id/deep-triage', async (req: Request, res: Response) => {
+router.post('/:id/deep-triage', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) { res.status(400).json({ error: 'Invalid ID' }); return; }
@@ -321,7 +321,7 @@ router.post('/:id/deep-triage', async (req: Request, res: Response) => {
     res.json({ id, result });
   } catch (err: any) {
     console.error('POST /scan-findings/:id/deep-triage error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
@@ -332,7 +332,7 @@ router.post('/:id/deep-triage', async (req: Request, res: Response) => {
 // broadcasts progress over the WebSocket (category='deep-triage'). If
 // none of ids/pipeline_id/project_id is supplied, batches all
 // status='pending' findings.
-router.post('/deep-triage-batch', (req: Request, res: Response) => {
+router.post('/deep-triage-batch', (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = req.body as {
       ids?: number[];
@@ -425,7 +425,7 @@ router.post('/deep-triage-batch', (req: Request, res: Response) => {
     })().catch((err) => console.error('[deep-triage] batch worker crashed:', err));
   } catch (err: any) {
     console.error('POST /scan-findings/deep-triage-batch error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

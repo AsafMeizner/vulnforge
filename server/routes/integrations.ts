@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 import {
   getIntegrations,
   getIntegrationById,
@@ -15,7 +15,7 @@ import { getServiceIntegration, listAvailableIntegrations } from '../integration
 const router = Router();
 
 // GET /api/integrations - list configured + available
-router.get('/', (_req: Request, res: Response) => {
+router.get('/', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const configured = getIntegrations();
     const available = listAvailableIntegrations();
@@ -35,12 +35,12 @@ router.get('/', (_req: Request, res: Response) => {
 
     res.json({ configured: safe, available, total: configured.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/integrations - add a new integration
-router.post('/', (req: Request, res: Response) => {
+router.post('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, type, config, enabled } = req.body;
     if (!name || !type) { res.status(400).json({ error: 'name and type required' }); return; }
@@ -56,12 +56,12 @@ router.post('/', (req: Request, res: Response) => {
     });
     res.status(201).json(getIntegrationById(id));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT /api/integrations/:id
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     const updates: any = {};
@@ -70,22 +70,22 @@ router.put('/:id', (req: Request, res: Response) => {
     updateIntegration(id, updates);
     res.json(getIntegrationById(id));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE /api/integrations/:id
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     deleteIntegration(Number(req.params.id));
     res.json({ deleted: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/integrations/:id/test - test connection
-router.post('/:id/test', async (req: Request, res: Response) => {
+router.post('/:id/test', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const integration = getIntegrationById(Number(req.params.id));
     if (!integration) { res.status(404).json({ error: 'not found' }); return; }
@@ -97,12 +97,12 @@ router.post('/:id/test', async (req: Request, res: Response) => {
     const result = await service.testConnection(config);
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/integrations/:id/create-ticket - create ticket from finding or disclosure
-router.post('/:id/create-ticket', async (req: Request, res: Response) => {
+router.post('/:id/create-ticket', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const integration = getIntegrationById(Number(req.params.id));
     if (!integration) { res.status(404).json({ error: 'not found' }); return; }
@@ -153,12 +153,12 @@ router.post('/:id/create-ticket', async (req: Request, res: Response) => {
 
     res.json({ ...result, db_id: ticketRowId });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/integrations/tickets - list all linked tickets
-router.get('/tickets', (req: Request, res: Response) => {
+router.get('/tickets', (req: Request, res: Response, next: NextFunction) => {
   try {
     const filters: any = {};
     if (req.query.finding_id) filters.finding_id = Number(req.query.finding_id);
@@ -167,12 +167,12 @@ router.get('/tickets', (req: Request, res: Response) => {
     const tickets = getIntegrationTickets(filters);
     res.json({ data: tickets, total: tickets.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/integrations/:id/notify - send notification (Slack etc.)
-router.post('/:id/notify', async (req: Request, res: Response) => {
+router.post('/:id/notify', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const integration = getIntegrationById(Number(req.params.id));
     if (!integration) { res.status(404).json({ error: 'not found' }); return; }
@@ -184,7 +184,7 @@ router.post('/:id/notify', async (req: Request, res: Response) => {
     await service.sendNotification(req.body.message || 'VulnForge notification', config);
     res.json({ sent: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

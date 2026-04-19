@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 import {
   getVendors,
   getVendorById,
@@ -18,47 +18,47 @@ const router = Router();
 
 // ── Vendors ──────────────────────────────────────────────────────────────
 
-router.get('/vendors', (_req: Request, res: Response) => {
+router.get('/vendors', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const data = getVendors();
     res.json({ data, total: data.length });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
-router.get('/vendors/:id', (req: Request, res: Response) => {
+router.get('/vendors/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const v = getVendorById(Number(req.params.id));
     if (!v) { res.status(404).json({ error: 'vendor not found' }); return; }
     res.json(v);
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
-router.post('/vendors', (req: Request, res: Response) => {
+router.post('/vendors', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.body;
     if (!name) { res.status(400).json({ error: 'name required' }); return; }
     const id = createVendor(req.body);
     res.status(201).json(getVendorById(id));
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
-router.put('/vendors/:id', (req: Request, res: Response) => {
+router.put('/vendors/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     updateVendor(Number(req.params.id), req.body);
     res.json(getVendorById(Number(req.params.id)));
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
-router.delete('/vendors/:id', (req: Request, res: Response) => {
+router.delete('/vendors/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     deleteVendor(Number(req.params.id));
     res.json({ deleted: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
 // ── Disclosures ──────────────────────────────────────────────────────────
 
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const filters: any = {};
     if (req.query.status) filters.status = String(req.query.status);
@@ -86,29 +86,29 @@ router.get('/', (req: Request, res: Response) => {
     });
 
     res.json({ data: enriched, total: enriched.length });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const d = getDisclosureById(Number(req.params.id));
     if (!d) { res.status(404).json({ error: 'disclosure not found' }); return; }
     const events = getDisclosureEvents(Number(req.params.id));
     const vendor = d.vendor_id ? getVendorById(d.vendor_id) : null;
     res.json({ ...d, events, vendor });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
-router.post('/', (req: Request, res: Response) => {
+router.post('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { title } = req.body;
     if (!title) { res.status(400).json({ error: 'title required' }); return; }
     const id = createDisclosure(req.body);
     res.status(201).json(getDisclosureById(id));
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
-router.put('/:id', (req: Request, res: Response) => {
+router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     const existing = getDisclosureById(id);
@@ -125,17 +125,17 @@ router.put('/:id', (req: Request, res: Response) => {
     }
     updateDisclosure(id, req.body);
     res.json(getDisclosureById(id));
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
-router.delete('/:id', (req: Request, res: Response) => {
+router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     deleteDisclosure(Number(req.params.id));
     res.json({ deleted: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
-router.post('/:id/events', (req: Request, res: Response) => {
+router.post('/:id/events', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = createDisclosureEvent({
       disclosure_id: Number(req.params.id),
@@ -144,12 +144,12 @@ router.post('/:id/events', (req: Request, res: Response) => {
       description: req.body.description,
     });
     res.status(201).json({ id });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
 // ── Analytics ────────────────────────────────────────────────────────────
 
-router.get('/analytics/summary', (_req: Request, res: Response) => {
+router.get('/analytics/summary', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const all = getDisclosures();
     const byStatus: Record<string, number> = {};
@@ -171,7 +171,7 @@ router.get('/analytics/summary', (_req: Request, res: Response) => {
       bounty_count: bountyCount,
       average_bounty_usd: bountyCount > 0 ? Math.round(totalBounty / bountyCount) : 0,
     });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { next(err); }
 });
 
 export default router;

@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import {
   NoteRow,
   NotesProviderRow,
@@ -103,7 +103,7 @@ async function hydrateNote(row: NoteRow): Promise<Record<string, unknown>> {
 // ── Providers sub-routes (MUST come before /:id) ──────────────────────────
 
 // GET /api/notes/providers
-router.get('/providers', (_req: Request, res: Response) => {
+router.get('/providers', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const rows = getNotesProviders().map((p) => ({
       id: p.id,
@@ -116,12 +116,12 @@ router.get('/providers', (_req: Request, res: Response) => {
     res.json({ data: rows, total: rows.length });
   } catch (err: any) {
     console.error('GET /notes/providers error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/notes/providers
-router.post('/providers', (req: Request, res: Response) => {
+router.post('/providers', (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name, type, config, enabled, is_default } = req.body || {};
     if (!name || typeof name !== 'string') {
@@ -159,12 +159,12 @@ router.post('/providers', (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('POST /notes/providers error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT /api/notes/providers/:id
-router.put('/providers/:id', (req: Request, res: Response) => {
+router.put('/providers/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -199,12 +199,12 @@ router.put('/providers/:id', (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error(`PUT /notes/providers/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE /api/notes/providers/:id
-router.delete('/providers/:id', (req: Request, res: Response) => {
+router.delete('/providers/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -220,12 +220,12 @@ router.delete('/providers/:id', (req: Request, res: Response) => {
     res.status(204).send();
   } catch (err: any) {
     console.error(`DELETE /notes/providers/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/notes/providers/:id/test
-router.post('/providers/:id/test', async (req: Request, res: Response) => {
+router.post('/providers/:id/test', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -264,14 +264,14 @@ router.post('/providers/:id/test', async (req: Request, res: Response) => {
     }
   } catch (err: any) {
     console.error(`POST /notes/providers/${req.params.id}/test error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── Notes search (MUST come before /:id) ──────────────────────────────────
 
 // POST /api/notes/search
-router.post('/search', async (req: Request, res: Response) => {
+router.post('/search', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { query, project_id } = req.body || {};
     if (!query || typeof query !== 'string') {
@@ -320,14 +320,14 @@ router.post('/search', async (req: Request, res: Response) => {
     res.json({ data: hits, total: hits.length });
   } catch (err: any) {
     console.error('POST /notes/search error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── Notes CRUD ─────────────────────────────────────────────────────────────
 
 // GET /api/notes
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (req: Request, res: Response, next: NextFunction) => {
   try {
     const filters: NoteFilters = {};
     if (req.query.project_id !== undefined) filters.project_id = Number(req.query.project_id);
@@ -357,12 +357,12 @@ router.get('/', (req: Request, res: Response) => {
     res.json({ data: rows, total: rows.length });
   } catch (err: any) {
     console.error('GET /notes error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/notes
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const {
       title,
@@ -454,12 +454,12 @@ router.post('/', async (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error('POST /notes error:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/notes/:id
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -475,12 +475,12 @@ router.get('/:id', async (req: Request, res: Response) => {
     res.json(hydrated);
   } catch (err: any) {
     console.error(`GET /notes/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // PUT /api/notes/:id
-router.put('/:id', async (req: Request, res: Response) => {
+router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -574,12 +574,12 @@ router.put('/:id', async (req: Request, res: Response) => {
     res.json(hydrated);
   } catch (err: any) {
     console.error(`PUT /notes/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // DELETE /api/notes/:id
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -607,12 +607,12 @@ router.delete('/:id', async (req: Request, res: Response) => {
     res.status(204).send();
   } catch (err: any) {
     console.error(`DELETE /notes/${req.params.id} error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/notes/:id/link
-router.post('/:id/link', (req: Request, res: Response) => {
+router.post('/:id/link', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -679,7 +679,7 @@ router.post('/:id/link', (req: Request, res: Response) => {
     });
   } catch (err: any) {
     console.error(`POST /notes/${req.params.id}/link error:`, err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

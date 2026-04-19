@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 import {
   getProjectById,
   getCveIntel,
@@ -10,7 +10,7 @@ import {
 const router = Router();
 
 // GET /api/history/cves - list recent CVE intel
-router.get('/cves', (req: Request, res: Response) => {
+router.get('/cves', (req: Request, res: Response, next: NextFunction) => {
   try {
     const cves = getCveIntel({
       severity: req.query.severity as string | undefined,
@@ -25,12 +25,12 @@ router.get('/cves', (req: Request, res: Response) => {
     }));
     res.json({ data: hydrated, total: hydrated.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/history/cves/:id - single CVE
-router.get('/cves/:id', (req: Request, res: Response) => {
+router.get('/cves/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const cve = getCveIntelById(String(req.params.id));
     if (!cve) { res.status(404).json({ error: 'CVE not found' }); return; }
@@ -40,24 +40,24 @@ router.get('/cves/:id', (req: Request, res: Response) => {
       cve_references: (() => { try { return JSON.parse(cve.cve_references || '[]'); } catch { return []; } })(),
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/history/cves/sync - trigger NVD sync
-router.post('/cves/sync', async (req: Request, res: Response) => {
+router.post('/cves/sync', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const days = req.body?.days || 30;
     const { fullSync } = await import('../pipeline/history/nvd-sync.js');
     const result = await fullSync(days);
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/history/matches - CVE project matches
-router.get('/matches', (req: Request, res: Response) => {
+router.get('/matches', (req: Request, res: Response, next: NextFunction) => {
   try {
     const matches = getCveProjectMatches({
       project_id: req.query.project_id ? Number(req.query.project_id) : undefined,
@@ -65,24 +65,24 @@ router.get('/matches', (req: Request, res: Response) => {
     });
     res.json({ data: matches, total: matches.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/history/bisect - list bisect results
-router.get('/bisect', (req: Request, res: Response) => {
+router.get('/bisect', (req: Request, res: Response, next: NextFunction) => {
   try {
     const results = getBisectResults({
       job_id: req.query.job_id as string | undefined,
     });
     res.json({ data: results, total: results.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // POST /api/history/analyze-commit - analyze a commit by SHA
-router.post('/analyze-commit', async (req: Request, res: Response) => {
+router.post('/analyze-commit', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { project_id, sha } = req.body;
     if (!project_id || !sha) { res.status(400).json({ error: 'project_id and sha required' }); return; }
@@ -94,12 +94,12 @@ router.post('/analyze-commit', async (req: Request, res: Response) => {
     const result = await analyzeCommit(project.path, sha);
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // GET /api/history/project/:id - full history for a project
-router.get('/project/:id', async (req: Request, res: Response) => {
+router.get('/project/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(String(req.params.id));
     const project = getProjectById(id);
@@ -122,7 +122,7 @@ router.get('/project/:id', async (req: Request, res: Response) => {
       git_analysis: gitAnalysis,
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

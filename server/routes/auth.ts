@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 import {
   getUsers,
   getUserById,
@@ -23,7 +23,7 @@ const router = Router();
 
 // ── POST /api/auth/setup - initial admin user creation ───────────────────
 
-router.post('/setup', async (req: Request, res: Response) => {
+router.post('/setup', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userCount = countUsers();
     if (userCount > 0) {
@@ -52,13 +52,13 @@ router.post('/setup', async (req: Request, res: Response) => {
       message: 'Admin user created. Save your API token.',
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── POST /api/auth/login - authenticate and get token ────────────────────
 
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -81,19 +81,19 @@ router.post('/login', async (req: Request, res: Response) => {
       token,
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── GET /api/auth/me - current user info ─────────────────────────────────
 
-router.get('/me', (req: AuthenticatedRequest, res: Response) => {
+router.get('/me', (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   res.json({ user: req.user || null, multi_user: countUsers() > 0 });
 });
 
 // ── GET /api/auth/status - auth system status ────────────────────────────
 
-router.get('/status', (_req: Request, res: Response) => {
+router.get('/status', (_req: Request, res: Response, next: NextFunction) => {
   try {
     const userCount = countUsers();
     res.json({
@@ -102,22 +102,22 @@ router.get('/status', (_req: Request, res: Response) => {
       user_count: userCount,
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── User management (admin only) ─────────────────────────────────────────
 
-router.get('/users', requireRole('admin'), (_req: Request, res: Response) => {
+router.get('/users', requireRole('admin'), (_req: Request, res: Response, next: NextFunction) => {
   try {
     const users = getUsers();
     res.json({ data: users, total: users.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/users', requireRole('admin'), async (req: Request, res: Response) => {
+router.post('/users', requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { username, password, role, display_name, email } = req.body;
     if (!username || !password) { res.status(400).json({ error: 'username and password required' }); return; }
@@ -131,32 +131,32 @@ router.post('/users', requireRole('admin'), async (req: Request, res: Response) 
     });
     res.status(201).json(getUserById(id));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.put('/users/:id', requireRole('admin'), (req: Request, res: Response) => {
+router.put('/users/:id', requireRole('admin'), (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = Number(req.params.id);
     updateUser(id, req.body);
     res.json(getUserById(id));
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.delete('/users/:id', requireRole('admin'), (req: Request, res: Response) => {
+router.delete('/users/:id', requireRole('admin'), (req: Request, res: Response, next: NextFunction) => {
   try {
     deleteUser(Number(req.params.id));
     res.json({ deleted: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
 // ── Token management ─────────────────────────────────────────────────────
 
-router.get('/tokens', (req: AuthenticatedRequest, res: Response) => {
+router.get('/tokens', (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user?.id) { res.json({ data: [] }); return; }
     const tokens = getApiTokensByUser(req.user.id);
@@ -167,11 +167,11 @@ router.get('/tokens', (req: AuthenticatedRequest, res: Response) => {
     }));
     res.json({ data: masked, total: masked.length });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/tokens', (req: AuthenticatedRequest, res: Response) => {
+router.post('/tokens', (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.user?.id) { res.status(401).json({ error: 'Not authenticated' }); return; }
     const token = generateToken();
@@ -183,16 +183,16 @@ router.post('/tokens', (req: AuthenticatedRequest, res: Response) => {
     });
     res.status(201).json({ id, token, message: 'Save this token - it will not be shown again.' });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.delete('/tokens/:id', (req: AuthenticatedRequest, res: Response) => {
+router.delete('/tokens/:id', (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     deleteApiToken(Number(req.params.id));
     res.json({ deleted: true });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 

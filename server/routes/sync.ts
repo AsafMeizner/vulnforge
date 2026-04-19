@@ -8,7 +8,7 @@
  *   GET  /api/sync/cursors                         - current per-table cursors
  *   POST /api/sync/gc                              - admin tombstone sweep
  */
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, NextFunction } from 'express';
 
 import { assertPermission } from '../auth/permissions.js';
 import {
@@ -29,17 +29,17 @@ function requireUser(req: Request, res: Response): { user_id: number; role: stri
   return { user_id: req.user.id, role: req.user.role };
 }
 
-router.get('/tables', (_req: Request, res: Response) => {
+router.get('/tables', (_req: Request, res: Response, next: NextFunction) => {
   res.json({ tables: SYNCABLE_TABLES });
 });
 
-router.get('/cursors', (req: Request, res: Response) => {
+router.get('/cursors', (req: Request, res: Response, next: NextFunction) => {
   const user = requireUser(req, res);
   if (!user) return;
   res.json({ cursors: allCursors(0, user) });
 });
 
-router.get('/pull', (req: Request, res: Response) => {
+router.get('/pull', (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = requireUser(req, res);
     if (!user) return;
@@ -53,11 +53,11 @@ router.get('/pull', (req: Request, res: Response) => {
     const result = pullTable({ table: table as SyncableTable, since, limit, user });
     res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
-router.post('/push', (req: Request, res: Response) => {
+router.post('/push', (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = requireUser(req, res);
     if (!user) return;
@@ -78,7 +78,7 @@ router.post('/push', (req: Request, res: Response) => {
     const outcome = pushRows({ table: table as SyncableTable, rows, user });
     res.json(outcome);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 });
 
