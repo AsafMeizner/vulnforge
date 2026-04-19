@@ -167,12 +167,19 @@ function startServer(): void {
       // 0.0.0.0 (LAN-reachable), which is wrong for a desktop app - any
       // other device on the Wi-Fi could hit /api/*.
       VULNFORGE_HOST: process.env.VULNFORGE_HOST || '127.0.0.1',
-      // Electron loads the renderer from file:// (origin is "null" or
-      // "file://" depending on platform/version). The server's default
-      // CORS allowlist is localhost:5173 etc.; without this, the
-      // renderer's fetch() to /api/* is blocked. Since the server is
-      // bound to 127.0.0.1 above, the * here is not externally exposed.
-      VULNFORGE_CORS_ORIGIN: process.env.VULNFORGE_CORS_ORIGIN || '*',
+      // Tell the server it's a desktop deployment so isDesktopMode()
+      // returns true even inside the forked Node child (where
+      // process.versions.electron is absent).
+      VULNFORGE_MODE: process.env.VULNFORGE_MODE || 'desktop',
+      // CORS allowlist for the renderer + the dev vite server. Previously
+      // this defaulted to "*" which, combined with `credentials: true`
+      // in the server, let ANY web page the user visited issue
+      // credentialed requests at 127.0.0.1:3001 (drive-by CSRF). The
+      // server now REFUSES "*" with credentials; set a minimal explicit
+      // list that covers the two real renderer origins instead.
+      VULNFORGE_CORS_ORIGIN:
+        process.env.VULNFORGE_CORS_ORIGIN ||
+        'app://vulnforge,http://localhost:5173,http://127.0.0.1:5173',
     },
     stdio: 'pipe',
   });

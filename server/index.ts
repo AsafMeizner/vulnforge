@@ -68,6 +68,9 @@ import disclosureRouter from './routes/disclosure.js';
 import exportRouter from './routes/export.js';
 import systemRouter from './routes/system.js';
 
+// AI routes (moved out of server/index.ts inline definitions)
+import aiRouter from './routes/ai.js';
+
 // MCP
 import { setupMcpServer } from './mcp/index.js';
 
@@ -204,10 +207,41 @@ async function main(): Promise<void> {
   const app = express();
 
   // ── Middleware ────────────────────────────────────────────────────────
-  // CORS: configurable via VULNFORGE_CORS_ORIGIN env var (comma-separated) or defaults to localhost
-  const corsOrigins = process.env.VULNFORGE_CORS_ORIGIN
-    ? process.env.VULNFORGE_CORS_ORIGIN === '*' ? true : process.env.VULNFORGE_CORS_ORIGIN.split(',').map(s => s.trim())
-    : ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'];
+  // CORS: explicit allowlist required. Wildcard `*` is REFUSED when
+  // `credentials: true` because that combination echoes back whatever
+  // Origin the client sends AND carries cookies/auth - which is a CSRF
+  // vector (any malicious page can talk to the API with the user's
+  // credentials). We take the strict-secure-default approach:
+  //
+  //   - no env set         -> DEFAULT_ORIGINS below (loopback dev only)
+  //   - env is a comma list -> that list wins
+  //   - env is literal `*`  -> refuse in any mode; log and clamp to defaults
+  //
+  // If you truly need a wildcard (e.g. a local proxy), drop
+  // `credentials: true` explicitly and add a separate allowlist.
+  const DEFAULT_ORIGINS = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+    // Electron renderer. Desktop-mode callers only; server mode binds
+    // to 0.0.0.0 so there is no `app://` renderer hitting it.
+    'app://vulnforge',
+  ];
+  let corsOrigins: string[];
+  const envCors = process.env.VULNFORGE_CORS_ORIGIN?.trim();
+  if (!envCors) {
+    corsOrigins = DEFAULT_ORIGINS;
+  } else if (envCors === '*') {
+    console.warn(
+      '[cors] refusing VULNFORGE_CORS_ORIGIN=* with credentials: true ' +
+      '(CSRF risk). Falling back to default loopback allowlist. ' +
+      'Set an explicit comma-separated origin list instead.',
+    );
+    corsOrigins = DEFAULT_ORIGINS;
+  } else {
+    corsOrigins = envCors.split(',').map(s => s.trim()).filter(Boolean);
+  }
   app.use(cors({
     origin: corsOrigins,
     credentials: true,
@@ -295,405 +329,14 @@ async function main(): Promise<void> {
     console.warn('[Runtime] Failed to init runner:', err.message);
   }
 
-  // AI chat endpoint
-  app.post('/api/ai/chat', async (req, res) => {
-    try {
-      const { routeAI } = await import('./ai/router.js');
-      const { messages, systemPrompt, temperature, maxTokens } = req.body;
-      if (!messages || !Array.isArray(messages)) {
-        res.status(400).json({ error: 'messages array required' });
-        return;
-      }
-      const response = await routeAI({ messages, systemPrompt, temperature, maxTokens, task: 'chat' as any });
-      res.json({ response: response.content, model: response.model, provider: response.provider });
-    } catch (err: any) {
-      console.error('[AI] Chat error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
+  // /api/ai/* routes - moved out of this file in the post-CR-14 cleanup.
+  // The new router applies: permission gates (viewer can't write),
+  // CR-14 prompt-injection fences on every system prompt + interpolated
+  // field, mass-assignment allowlist on provider CRUD, agent max_steps
+  // clamp, and the CR-11 error wrapper via next(err).
+  // (Former inline block removed - see server/routes/ai.ts)
+  app.use('/api/ai', aiRouter);
 
-  // AI triage endpoint - single vuln by DB id
-  app.post('/api/ai/triage/:id', async (req, res) => {
-    try {
-      const { triageFinding } = await import('./ai/pipeline.js');
-      const { getVulnerabilityById } = await import('./db.js');
-      const id = Number(req.params.id);
-      if (isNaN(id)) {
-        res.status(400).json({ error: 'Invalid ID' });
-        return;
-      }
-      const vuln = getVulnerabilityById(id);
-      if (!vuln) {
-        res.status(404).json({ error: 'Vulnerability not found' });
-        return;
-      }
-      // Fire-and-forget: return 202 immediately, then run triage in a
-      // detached promise with its own error handler. The previous
-      // `await` after the response was sent leaked any post-response
-      // rejection as an unhandled-promise warning.
-      res.status(202).json({ id, message: 'Triage started' });
-      void triageFinding(id).catch((e) =>
-        console.error('[AI] Triage error (detached):', e?.message || e),
-      );
-    } catch (err: any) {
-      console.error('[AI] Triage error:', err.message);
-      // Response may already be sent; swallow any write-after-end errors
-    }
-  });
-
-  // Legacy triage endpoint used by existing callers (kept for compatibility)
-  app.post('/api/ai/triage-legacy/:id', async (req, res) => {
-    try {
-      const { triageFinding: legacyTriage } = await import('./ai/router.js');
-      const { getVulnerabilityById, updateVulnerability } = await import('./db.js');
-      const id = Number(req.params.id);
-      const vuln = getVulnerabilityById(id);
-      if (!vuln) {
-        res.status(404).json({ error: 'Vulnerability not found' });
-        return;
-      }
-      const triage = await legacyTriage(vuln as Record<string, any>);
-      updateVulnerability(id, { ai_triage: triage });
-      res.json({ id, triage });
-    } catch (err: any) {
-      console.error('[AI] Legacy triage error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // POST /api/ai/suggest-fix - AI-generated fix for a vulnerability
-  app.post('/api/ai/suggest-fix', async (req, res) => {
-    try {
-      const { routeAI } = await import('./ai/router.js');
-      const { getVulnerabilityById, updateVulnerability } = await import('./db.js');
-      const { vuln_id } = req.body;
-      if (!vuln_id) { res.status(400).json({ error: 'vuln_id required' }); return; }
-      const vuln = getVulnerabilityById(Number(vuln_id));
-      if (!vuln) { res.status(404).json({ error: 'Vulnerability not found' }); return; }
-
-      const prompt = `You are an expert security engineer. Generate a concrete fix for this vulnerability.
-
-Title: ${vuln.title}
-Severity: ${vuln.severity}
-File: ${vuln.file || 'N/A'}
-CWE: ${vuln.cwe || 'N/A'}
-Description: ${vuln.description || 'N/A'}
-Impact: ${vuln.impact || 'N/A'}
-
-Code with the vulnerability:
-\`\`\`
-${vuln.code_snippet || 'Not provided'}
-\`\`\`
-
-Respond with ONLY a JSON object in this exact format (no markdown fences):
-{
-  "suggested_fix": "A plain English explanation of the fix, 2-4 sentences.",
-  "fix_diff": "A unified diff showing the code change. Use + for additions and - for removals."
-}`;
-
-      const response = await routeAI({
-        messages: [{ role: 'user', content: prompt }],
-        systemPrompt: 'You are an expert security engineer. Output only valid JSON, no markdown.',
-        temperature: 0.1,
-        maxTokens: 2048,
-      });
-
-      let suggested_fix = '';
-      let fix_diff = '';
-      try {
-        // Strip any markdown fences the model may have added
-        const cleaned = response.content.replace(/^```[a-z]*\n?/m, '').replace(/```$/m, '').trim();
-        const parsed = JSON.parse(cleaned);
-        suggested_fix = parsed.suggested_fix || response.content;
-        fix_diff = parsed.fix_diff || '';
-      } catch {
-        suggested_fix = response.content;
-      }
-
-      // Persist the fix back to the DB if one wasn't already there
-      if (!vuln.suggested_fix) {
-        updateVulnerability(Number(vuln_id), { suggested_fix, fix_diff } as any);
-      }
-
-      res.json({ suggested_fix, fix_diff });
-    } catch (err: any) {
-      console.error('[AI] suggest-fix error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // POST /api/ai/deep-analyze - thorough analysis with full context
-  app.post('/api/ai/deep-analyze', async (req, res) => {
-    try {
-      const { routeAI } = await import('./ai/router.js');
-      const { getVulnerabilityById, getProjectById } = await import('./db.js');
-      const { vuln_id } = req.body;
-      if (!vuln_id) { res.status(400).json({ error: 'vuln_id required' }); return; }
-      const vuln = getVulnerabilityById(Number(vuln_id));
-      if (!vuln) { res.status(404).json({ error: 'Vulnerability not found' }); return; }
-
-      let projectContext = '';
-      if (vuln.project_id) {
-        try {
-          const proj = getProjectById(vuln.project_id);
-          if (proj) projectContext = `Project: ${proj.name} (${proj.language || 'unknown language'})`;
-        } catch { /* non-fatal */ }
-      }
-
-      const prompt = `You are a senior security researcher performing a thorough vulnerability analysis.
-
-${projectContext}
-Title: ${vuln.title}
-Severity: ${vuln.severity} | CVSS: ${vuln.cvss || 'N/A'} | CWE: ${vuln.cwe || 'N/A'}
-File: ${vuln.file || 'N/A'}${vuln.line_start ? ` (line ${vuln.line_start})` : ''}
-Tool: ${vuln.tool_name || 'N/A'} | Method: ${vuln.method || 'N/A'}
-Confidence: ${vuln.confidence != null ? vuln.confidence : 'N/A'}
-
-Description:
-${vuln.description || 'N/A'}
-
-Impact:
-${vuln.impact || 'N/A'}
-
-Code snippet:
-\`\`\`
-${vuln.code_snippet || 'Not provided'}
-\`\`\`
-
-Reproduction steps:
-${vuln.reproduction_steps || 'Not provided'}
-
-Existing AI triage:
-${vuln.ai_triage || 'None'}
-
-Provide a DEEP, THOROUGH analysis covering:
-1. Exploitability - exact conditions, prerequisites, trigger path
-2. Real-world impact - what an attacker can actually achieve, affected deployments
-3. Root cause - the precise programming error and why it exists
-4. Verification methodology - how to definitively confirm this is a real vulnerability
-5. Fix strategy - specific code changes needed, including edge cases
-6. Similar CVEs or known variants of this bug class
-7. Disclosure strategy - recommended approach (private, coordinated, public)
-8. Final verdict - Tier A (private disclosure), B (open PR), or C (internal note) with reasoning
-
-Be technical, precise, and actionable.`;
-
-      const response = await routeAI({
-        messages: [{ role: 'user', content: prompt }],
-        systemPrompt: 'You are a senior security researcher. Be thorough, technical, and precise.',
-        temperature: 0.2,
-        maxTokens: 4096,
-      });
-
-      res.json({ analysis: response.content });
-    } catch (err: any) {
-      console.error('[AI] deep-analyze error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // AI agent endpoint
-  app.post('/api/ai/agent', async (req, res) => {
-    try {
-      const { runAgent } = await import('./ai/agent.js');
-      const { goal, max_steps } = req.body;
-      if (!goal || typeof goal !== 'string') {
-        res.status(400).json({ error: 'goal (string) is required' });
-        return;
-      }
-      const steps = await runAgent(goal, max_steps ? Number(max_steps) : 10);
-      res.json({ goal, steps });
-    } catch (err: any) {
-      console.error('[AI] Agent error:', err.message);
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // GET /api/ai/models - full model registry
-  app.get('/api/ai/models', async (_req, res) => {
-    try {
-      const { MODEL_REGISTRY } = await import('./ai/models.js');
-      res.json(MODEL_REGISTRY);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // GET /api/ai/routing - current routing rules
-  app.get('/api/ai/routing', async (_req, res) => {
-    try {
-      const { getRoutingRules } = await import('./ai/routing.js');
-      res.json(getRoutingRules());
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // PUT /api/ai/routing - replace routing rules (persisted to DB)
-  app.put('/api/ai/routing', async (req, res) => {
-    try {
-      const { persistRules } = await import('./ai/routing.js');
-      const rules = req.body;
-      if (!Array.isArray(rules)) {
-        res.status(400).json({ error: 'Body must be an array of routing rules' });
-        return;
-      }
-      await persistRules(rules);
-      res.json({ success: true, count: rules.length });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // GET /api/ai/routing/presets - list available presets
-  app.get('/api/ai/routing/presets', async (_req, res) => {
-    try {
-      const { ROUTING_PRESETS } = await import('./ai/routing.js');
-      const presets = Object.values(ROUTING_PRESETS).map(p => ({
-        name: p.name,
-        label: p.label,
-        description: p.description,
-        ruleCount: p.rules.length,
-      }));
-      res.json(presets);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // POST /api/ai/routing/presets/:name - apply a preset
-  app.post('/api/ai/routing/presets/:name', async (req, res) => {
-    try {
-      const { ROUTING_PRESETS, persistRules } = await import('./ai/routing.js');
-      const preset = ROUTING_PRESETS[req.params.name];
-      if (!preset) {
-        res.status(404).json({ error: `Preset "${req.params.name}" not found`, available: Object.keys(ROUTING_PRESETS) });
-        return;
-      }
-      await persistRules(preset.rules);
-      res.json({ success: true, preset: preset.name, count: preset.rules.length });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // AI providers CRUD
-  app.get('/api/ai/providers', async (_req, res) => {
-    try {
-      const { getAllAIProviders } = await import('./db.js');
-      const providers = getAllAIProviders();
-      // Mask API keys
-      const masked = providers.map(p => ({ ...p, api_key: p.api_key ? '***' : '' }));
-      res.json({ data: masked });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  app.put('/api/ai/providers/:id', async (req, res) => {
-    try {
-      const { getAIProviderById, upsertAIProvider } = await import('./db.js');
-      const { assertSafeExternalUrl, SsrfError } = await import('./lib/net.js');
-      const id = Number(req.params.id);
-      const existing = getAIProviderById(id);
-      if (!existing) {
-        res.status(404).json({ error: 'Provider not found' });
-        return;
-      }
-      // Don't overwrite key with masked value
-      const updates = { ...req.body };
-      if (updates.api_key === '***') delete updates.api_key;
-
-      // CR-12: validate base_url against SSRF before persisting. Only
-      // validate if the caller actually touched base_url - null/empty is
-      // allowed (providers like anthropic/openai use the SDK default).
-      if (typeof updates.base_url === 'string' && updates.base_url.trim()) {
-        try {
-          await assertSafeExternalUrl(updates.base_url, { field: 'base_url' });
-        } catch (err: any) {
-          res.status(err instanceof SsrfError ? 400 : 500).json({
-            error: err?.message || 'base_url validation failed',
-            code: err?.code || 'VALIDATION_FAILED',
-          });
-          return;
-        }
-      }
-
-      upsertAIProvider({ ...existing, ...updates });
-      res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // POST /api/ai/providers - create (or upsert-by-name) a provider. Without
-  // this, the UI has no way to add a provider from an empty database -
-  // PUT /:id requires an existing row.
-  app.post('/api/ai/providers', async (req, res) => {
-    try {
-      const { upsertAIProvider, getAllAIProviders } = await import('./db.js');
-      const { assertSafeExternalUrl, SsrfError } = await import('./lib/net.js');
-      const body = req.body || {};
-      if (!body.name || typeof body.name !== 'string') {
-        res.status(400).json({ error: 'name is required' });
-        return;
-      }
-
-      // CR-12: validate base_url against SSRF before persisting.
-      if (typeof body.base_url === 'string' && body.base_url.trim()) {
-        try {
-          await assertSafeExternalUrl(body.base_url, { field: 'base_url' });
-        } catch (err: any) {
-          res.status(err instanceof SsrfError ? 400 : 500).json({
-            error: err?.message || 'base_url validation failed',
-            code: err?.code || 'VALIDATION_FAILED',
-          });
-          return;
-        }
-      }
-
-      upsertAIProvider({
-        name: body.name,
-        model: body.model || null,
-        api_key: body.api_key || null,
-        base_url: body.base_url || null,
-        enabled: body.enabled ? 1 : 0,
-        config: body.config || null,
-      } as any);
-      const all = getAllAIProviders();
-      const created = all.find((p) => p.name === body.name);
-      res.status(201).json({
-        success: true,
-        provider: created ? { ...created, api_key: created.api_key ? '***' : '' } : null,
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // DELETE /api/ai/providers/:id - also missing from the original CRUD.
-  app.delete('/api/ai/providers/:id', async (req, res) => {
-    try {
-      const { getAIProviderById, getDb, persistDb } = await import('./db.js');
-      const id = Number(req.params.id);
-      const existing = getAIProviderById(id);
-      if (!existing) {
-        res.status(404).json({ error: 'Provider not found' });
-        return;
-      }
-      const db = getDb();
-      db.run('DELETE FROM ai_providers WHERE id = ?', [id]);
-      persistDb();
-      res.json({ success: true });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // Health check
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', ts: new Date().toISOString() });
-  });
 
   // CR-11: global error-wrapper. Handlers that either throw or call
   // `next(err)` now funnel through here instead of each one calling
