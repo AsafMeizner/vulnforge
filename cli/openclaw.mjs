@@ -19,12 +19,21 @@ import { join } from 'node:path';
 const LOOPBACK_HOST_RE = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/;
 
 /**
+ * True when the URL points at localhost / 127.0.0.1 / [::1]. Used by
+ * the CLI to decide when a token is REQUIRED (remote installs need
+ * one; loopback desktop mode runs without auth).
+ */
+export function isLoopbackUrl(baseUrl) {
+  return LOOPBACK_HOST_RE.test(String(baseUrl || ''));
+}
+
+/**
  * Return a reasonable connectionTimeoutMs for a given base URL.
  * Loopback targets get 10s; everything else gets 15s so cross-net
  * TLS + keep-alive setup has room before OpenClaw gives up.
  */
 export function computeTimeoutMs(baseUrl) {
-  return LOOPBACK_HOST_RE.test(baseUrl) ? 10000 : 15000;
+  return isLoopbackUrl(baseUrl) ? 10000 : 15000;
 }
 
 /**

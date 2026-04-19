@@ -31,6 +31,7 @@ import {
   computeTimeoutMs,
   discoverVulnforgeOrigin,
   pingVulnforgeBackend,
+  isLoopbackUrl,
 } from '../../cli/openclaw.mjs';
 
 const REPO_ROOT = join(__dirname, '..', '..');
@@ -164,6 +165,55 @@ describe('computeTimeoutMs', () => {
   });
   it('returns 15000 for a remote host', () => {
     expect(computeTimeoutMs('https://vulnforge.acme.corp/mcp')).toBe(15_000);
+  });
+});
+
+// ── isLoopbackUrl ────────────────────────────────────────────────────────
+//
+// The CLI uses this to decide whether a token is REQUIRED for install:
+// loopback URLs can run without auth (desktop mode), non-loopback URLs
+// MUST have a token or the MCP entry will 401 on every call.
+//
+// These tests guard the boundary — a regression that accidentally
+// classifies localhost.evil.com or vulnforge.acme.corp as loopback
+// would break the remote-install fail-fast safety net.
+
+describe('isLoopbackUrl', () => {
+  it('accepts localhost with port', () => {
+    expect(isLoopbackUrl('http://localhost:3001/mcp')).toBe(true);
+  });
+  it('accepts localhost without port', () => {
+    expect(isLoopbackUrl('http://localhost/mcp')).toBe(true);
+  });
+  it('accepts 127.0.0.1', () => {
+    expect(isLoopbackUrl('http://127.0.0.1:3001')).toBe(true);
+  });
+  it('accepts [::1] IPv6 loopback', () => {
+    expect(isLoopbackUrl('http://[::1]:3001')).toBe(true);
+  });
+  it('rejects a plain remote hostname', () => {
+    expect(isLoopbackUrl('https://vulnforge.acme.corp/mcp')).toBe(false);
+  });
+  it('rejects subdomain spoof (localhost.evil.com)', () => {
+    expect(isLoopbackUrl('http://localhost.evil.com/mcp')).toBe(false);
+  });
+  it('rejects subdomain spoof (127.0.0.1.evil.com)', () => {
+    expect(isLoopbackUrl('http://127.0.0.1.evil.com/mcp')).toBe(false);
+  });
+  it('rejects prefix spoof (mylocalhost)', () => {
+    expect(isLoopbackUrl('http://mylocalhost:3001')).toBe(false);
+  });
+  it('rejects an RFC1918 private address', () => {
+    // Not strictly "loopback" even though it's unroutable — the
+    // fail-fast predicate is about auth-required, and a 10.x host
+    // could be an actual team server on a private network.
+    expect(isLoopbackUrl('http://10.0.0.5:3001')).toBe(false);
+  });
+  it('tolerates empty / garbage input', () => {
+    expect(isLoopbackUrl('')).toBe(false);
+    expect(isLoopbackUrl(undefined)).toBe(false);
+    expect(isLoopbackUrl(null as unknown as string)).toBe(false);
+    expect(isLoopbackUrl('not a url')).toBe(false);
   });
 });
 

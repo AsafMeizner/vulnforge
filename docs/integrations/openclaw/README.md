@@ -189,6 +189,32 @@ inventory.
   VulnForge's at-rest encryption keeps the DB-leak surface narrow,
   secrets read into conversation context can land in whatever model
   transcript OpenClaw logs locally.
+- **Token handling trade-offs.** `vulnforge openclaw install` runs
+  `openclaw mcp set <name> <json>`, which passes the full entry
+  (including the Bearer token) as a command-line argument. On
+  multi-user systems the token is briefly visible via `ps` /
+  `/proc/<pid>/cmdline` to same-UID processes for the duration of
+  the spawn. OpenClaw's CLI doesn't offer a stdin or file-based
+  alternative. If argv exposure is a concern:
+
+  ```bash
+  # 1. Generate the config to a chmod-600 file instead of calling openclaw
+  umask 077
+  vulnforge openclaw show-config \
+    --url https://vulnforge.acme.corp \
+    --token vf_... \
+    > vulnforge-openclaw.json
+
+  # 2. Merge it into ~/.config/openclaw/openclaw.json by hand.
+  ```
+
+  The CLI also prints a `⚠ the output below contains your VulnForge
+  API token in cleartext` warning when stdout would include a real
+  token, so you don't forget to treat the scrollback as sensitive.
+- Remote (non-loopback) installs **require** `--token`. The CLI
+  fails fast if you try `vulnforge openclaw install --url
+  https://…` without one, rather than silently registering an
+  entry that would 401 on every tool call.
 
 ## Troubleshooting
 

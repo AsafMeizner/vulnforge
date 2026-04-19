@@ -47,9 +47,13 @@ for a step-by-step walkthrough, the CLI one-liner
 `openclaw.json` snippet. Short version:
 
 ```bash
-vulnforge openclaw install          # solo desktop
-vulnforge openclaw install \        # team server
-  --url https://vulnforge.acme.corp --token vf_...
+# solo desktop
+vulnforge openclaw install
+
+# team server
+vulnforge openclaw install \
+  --url https://vulnforge.acme.corp \
+  --token vf_...
 ```
 
 ## For Antigravity / Custom Agents

@@ -33,6 +33,7 @@ import {
   openclawAvailable,
   discoverVulnforgeOrigin,
   pingVulnforgeBackend,
+  isLoopbackUrl,
 } from './openclaw.mjs';
 
 // ── Tiny ANSI colour helpers (no chalk dep) ───────────────────────────────
@@ -394,11 +395,24 @@ function cmdConfig(args) {
 //                    discovery — trust the operator's explicit value.
 //                    Use this in team mode to point at a remote server.
 //   --token <value>  attach as Authorization: Bearer <token>. Required
-//                    in team mode.
+//                    when --url is non-loopback (team mode). This is
+//                    a VulnForge API token (vf_…), not a JWT — mint
+//                    one from Settings → API tokens.
 //   --name <name>    entry name in openclaw.json (default: "vulnforge").
 //                    Useful if you have multiple VulnForge instances.
 //   --show-config    print the JSON we WOULD pass to openclaw, don't
 //                    actually call it. Safe preview.
+//
+// Security notes:
+// - When a token is present, the fallback "paste this" path and
+//   `show-config` print the token in cleartext to stdout. That's
+//   intentional (the user needs to paste it) but means the token
+//   lands in terminal scrollback + any tee'd logs. On shared
+//   systems, redirect stdout to a chmod-600 file instead of eyeballing.
+// - `openclaw mcp set <name> <json>` puts the token in argv, which
+//   is readable via `ps` / `/proc/<pid>/cmdline` to same-UID (and
+//   sometimes root) processes for the duration of the spawn. If this
+//   is a concern, use `--show-config` + manual paste instead.
 
 /**
  * Pick the base URL for the install. Precedence:
@@ -419,6 +433,20 @@ async function resolveOpenclawBaseUrl(cfg, urlFlag) {
   return cfg.api_base || 'http://localhost:3001/api';
 }
 
+/**
+ * Print a prominent warning when the config we're about to dump to
+ * stdout contains a real API token. We can't redact it (the user has
+ * to paste the real value) but we can make the blast radius obvious
+ * so they redirect to a chmod-600 file instead of just scrolling.
+ */
+function warnIfTokenInStdout(token) {
+  if (!token) return;
+  console.log(yellow('⚠ the output below contains your VulnForge API token in cleartext.'));
+  console.log(gray('  treat terminal scrollback as equivalent to the token itself.'));
+  console.log(gray('  if you are piping this to disk, use `... > openclaw.json && chmod 600 openclaw.json`.'));
+  console.log();
+}
+
 async function cmdOpenclaw(sub, args) {
   if (sub === 'install') {
     const cfg = resolveConfig();
@@ -432,6 +460,20 @@ async function cmdOpenclaw(sub, args) {
     // configured, reuse it. That makes `vulnforge openclaw install`
     // just work right after a `vulnforge config set token ...`.
     const token = tokenFlag || cfg.token || '';
+
+    // Fail fast when a remote install is missing a token — a no-auth
+    // MCP entry pointing at a team server will 401 on every tool call,
+    // which is a much worse UX than a clear error up front. Loopback
+    // stays permissive because desktop mode genuinely runs without
+    // auth.
+    if (!isLoopbackUrl(baseUrl) && !String(token).trim()) {
+      throw new Error(
+        `remote openclaw installs require an API token. Pass --token <vf_...> ` +
+        `or run "vulnforge config set token <vf_...>" before retrying. ` +
+        `Mint a token in Settings → API tokens.`,
+      );
+    }
+
     // buildOpenclawMcpEntry picks the right connectionTimeoutMs itself
     // based on whether the normalised URL is loopback or remote.
     const entry = buildOpenclawMcpEntry({ url: baseUrl, token });
@@ -439,6 +481,7 @@ async function cmdOpenclaw(sub, args) {
     if (showOnly) {
       console.log(bold('Would write this entry to openclaw.json → mcp.servers.' + name + ':'));
       console.log();
+      warnIfTokenInStdout(token);
       console.log(JSON.stringify(entry, null, 2));
       return;
     }
@@ -446,6 +489,7 @@ async function cmdOpenclaw(sub, args) {
     if (!openclawAvailable()) {
       console.log(yellow('openclaw CLI not found on PATH.'));
       console.log();
+      warnIfTokenInStdout(token);
       console.log('To connect manually, paste this into your openclaw.json under "mcp.servers.' + name + '":');
       console.log();
       console.log(JSON.stringify(entry, null, 2));
@@ -454,6 +498,13 @@ async function cmdOpenclaw(sub, args) {
       return;
     }
 
+    // Note: when a token is set, `openclaw mcp set <name> <json>` exposes
+    // it via argv for the duration of the spawn (visible to same-UID
+    // processes via `ps` / `/proc/<pid>/cmdline`). OpenClaw's CLI doesn't
+    // offer a stdin or file-based alternative. Security-sensitive users
+    // should prefer `--show-config` and write the output to a chmod-600
+    // file by hand. This is documented in
+    // docs/integrations/openclaw/README.md § Security notes.
     const payload = JSON.stringify(entry);
     const r = spawnSync('openclaw', ['mcp', 'set', name, payload], {
       shell: false,
@@ -487,12 +538,13 @@ async function cmdOpenclaw(sub, args) {
     const token = args.flags.token || cfg.token || '';
     const name = String(args.flags.name || 'vulnforge');
     const entry = buildOpenclawMcpEntry({ url: baseUrl, token });
+    warnIfTokenInStdout(token);
     console.log(JSON.stringify({ mcp: { servers: { [name]: entry } } }, null, 2));
     return;
   }
 
   console.error(red('usage:'));
-  console.error('  vulnforge openclaw install [--url <base>] [--token <jwt>] [--name <entry>]');
+  console.error('  vulnforge openclaw install [--url <base>] [--token <api-token>] [--name <entry>]');
   console.error('  vulnforge openclaw install --show-config   # print without calling openclaw');
   console.error('  vulnforge openclaw show-config [--name <entry>]  # print openclaw.json fragment');
   return 1;
