@@ -317,6 +317,31 @@ async function main(): Promise<void> {
   // Apply auth middleware to ALL /api/* routes EXCEPT /api/auth
   app.use('/api', authMiddleware as any);
 
+  // Global default: viewers are read-only across the whole API surface.
+  // Individual routers can still call assertPermission() for finer
+  // rules (editor vs admin on specific resources), but this catch-all
+  // closes the audit finding that ~21 write routers never checked
+  // RBAC at all. Safe methods pass; anything else for viewer-role
+  // returns 403 immediately.
+  //
+  // Desktop mode (solo user = admin) is unaffected because the
+  // synthetic `local` user is already 'admin'.
+  app.use('/api', (req: any, res: any, next: any) => {
+    if (!req.user) return next();
+    const safeMethod = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
+    if (safeMethod) return next();
+    if (req.user.role === 'viewer') {
+      res.status(403).json({
+        error: 'forbidden',
+        reason: 'viewer role has read-only access',
+        method: req.method,
+        path: req.path,
+      });
+      return;
+    }
+    return next();
+  });
+
   // ── API Routes (all protected by auth middleware above) ──────────────
   app.use('/api/vulnerabilities', vulnerabilitiesRouter);
   app.use('/api/projects', projectsRouter);
