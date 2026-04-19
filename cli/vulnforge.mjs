@@ -28,6 +28,12 @@ import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import process from 'node:process';
+import {
+  buildOpenclawMcpEntry,
+  openclawAvailable,
+  discoverVulnforgeOrigin,
+  pingVulnforgeBackend,
+} from './openclaw.mjs';
 
 // ── Tiny ANSI colour helpers (no chalk dep) ───────────────────────────────
 const ANSI = process.stdout.isTTY ? {
@@ -378,10 +384,15 @@ function cmdConfig(args) {
 // Falls back to printing the JSON snippet if the openclaw CLI
 // isn't on PATH - same file contents, operator pastes it manually.
 //
+// The actual helpers (URL normalisation, timeout choice, openclaw
+// probing, port discovery, health ping) live in cli/openclaw.mjs so
+// the unit tests can import them directly instead of re-deriving
+// them from a replica that drifts over time.
+//
 // Flags:
-//   --url <base>     override the MCP endpoint base (default: api_base
-//                    resolved through the usual precedence). Use this
-//                    in team mode to point at a remote server.
+//   --url <base>     override the MCP endpoint base. Skips port
+//                    discovery — trust the operator's explicit value.
+//                    Use this in team mode to point at a remote server.
 //   --token <value>  attach as Authorization: Bearer <token>. Required
 //                    in team mode.
 //   --name <name>    entry name in openclaw.json (default: "vulnforge").
@@ -389,35 +400,23 @@ function cmdConfig(args) {
 //   --show-config    print the JSON we WOULD pass to openclaw, don't
 //                    actually call it. Safe preview.
 
-function buildOpenclawMcpEntry({ url, token, timeoutMs = 10000 }) {
-  // Base URL normalisation - OpenClaw expects the /mcp endpoint
-  // directly, not the api base. We accept either.
-  let mcpUrl = url.replace(/\/$/, '');
-  if (mcpUrl.endsWith('/api')) mcpUrl = mcpUrl.slice(0, -4);
-  if (!mcpUrl.endsWith('/mcp')) mcpUrl = `${mcpUrl}/mcp`;
-
-  const entry = {
-    url: mcpUrl,
-    transport: 'sse',
-    connectionTimeoutMs: timeoutMs,
-  };
-  if (token) {
-    entry.headers = { Authorization: `Bearer ${token}` };
-  }
-  return entry;
-}
-
-function openclawAvailable() {
-  try {
-    const r = spawnSync('openclaw', ['--version'], {
-      shell: false,
-      encoding: 'utf8',
-      timeout: 5000,
-    });
-    return r.status === 0;
-  } catch {
-    return false;
-  }
+/**
+ * Pick the base URL for the install. Precedence:
+ *
+ *   1. Explicit --url flag (operator knows best; skip discovery).
+ *   2. discoverVulnforgeOrigin() — resolves VULNFORGE_PORT env, then
+ *      the .vulnforge-port file written by a running server, then
+ *      probes the 3001-3010 range. Critical for dev mode where the
+ *      server hops ports on EADDRINUSE.
+ *   3. cfg.api_base as a last-resort fallback (may be stale, but the
+ *      operator at least set it intentionally at some point).
+ *   4. Hardcoded http://localhost:3001/api default.
+ */
+async function resolveOpenclawBaseUrl(cfg, urlFlag) {
+  if (urlFlag) return urlFlag;
+  const discovered = await discoverVulnforgeOrigin({ forceBase: cfg.api_base });
+  if (discovered) return discovered;
+  return cfg.api_base || 'http://localhost:3001/api';
 }
 
 async function cmdOpenclaw(sub, args) {
@@ -428,19 +427,14 @@ async function cmdOpenclaw(sub, args) {
     const name = String(args.flags.name || 'vulnforge');
     const showOnly = Boolean(args.flags['show-config']);
 
-    // Precedence: explicit --url > configured api_base > default.
-    // Team users pass --url https://vulnforge.acme.corp; solo users
-    // let it inherit from config (which defaults to localhost:3001/api).
-    const baseUrl = urlFlag || cfg.api_base || 'http://localhost:3001/api';
+    const baseUrl = await resolveOpenclawBaseUrl(cfg, urlFlag);
     // If the caller didn't pass --token but the CLI already has one
     // configured, reuse it. That makes `vulnforge openclaw install`
     // just work right after a `vulnforge config set token ...`.
     const token = tokenFlag || cfg.token || '';
-    // Team installs (remote URL) need longer timeouts for cross-net
-    // handshakes; solo localhost can be tight.
-    const isRemote = !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/.test(baseUrl);
-    const timeoutMs = isRemote ? 15000 : 10000;
-    const entry = buildOpenclawMcpEntry({ url: baseUrl, token, timeoutMs });
+    // buildOpenclawMcpEntry picks the right connectionTimeoutMs itself
+    // based on whether the normalised URL is loopback or remote.
+    const entry = buildOpenclawMcpEntry({ url: baseUrl, token });
 
     if (showOnly) {
       console.log(bold('Would write this entry to openclaw.json → mcp.servers.' + name + ':'));
@@ -449,8 +443,7 @@ async function cmdOpenclaw(sub, args) {
       return;
     }
 
-    const available = openclawAvailable();
-    if (!available) {
+    if (!openclawAvailable()) {
       console.log(yellow('openclaw CLI not found on PATH.'));
       console.log();
       console.log('To connect manually, paste this into your openclaw.json under "mcp.servers.' + name + '":');
@@ -472,15 +465,16 @@ async function cmdOpenclaw(sub, args) {
     }
     console.log(green(`registered "${name}" with openclaw`));
 
-    // Smoke the new entry with a tools/list via the REST health
-    // endpoint - faster than spawning openclaw again, and it catches
-    // the common "wrong URL / server down" case before the user
-    // opens a conversation and sees a mysterious failure.
-    try {
-      await api('/health', { timeout: 5000 });
-      console.log(green('✓ vulnforge backend reachable at ') + gray(baseUrl));
-    } catch (err) {
-      console.log(yellow('⚠ vulnforge backend unreachable: ') + err.message);
+    // Smoke the new entry via /api/health on the EXACT URL we just
+    // wrote into the config (not the CLI's own cfg.api_base — that
+    // would miss the common team-install case where --url points at
+    // a remote host while the CLI is still configured for localhost).
+    const ping = await pingVulnforgeBackend(baseUrl, { timeoutMs: 5000 });
+    if (ping.ok) {
+      const uptime = ping.uptime !== undefined ? ` (uptime ${Math.round(ping.uptime)}s)` : '';
+      console.log(green('✓ vulnforge backend reachable at ') + gray(baseUrl) + gray(uptime));
+    } else {
+      console.log(yellow('⚠ vulnforge backend unreachable: ') + ping.error);
       console.log(gray('  the openclaw entry is written but calls will fail'));
       console.log(gray('  until the backend is running at ' + baseUrl));
     }
@@ -489,22 +483,18 @@ async function cmdOpenclaw(sub, args) {
 
   if (sub === 'show-config') {
     const cfg = resolveConfig();
-    const baseUrl = args.flags.url || cfg.api_base || 'http://localhost:3001/api';
+    const baseUrl = await resolveOpenclawBaseUrl(cfg, args.flags.url);
     const token = args.flags.token || cfg.token || '';
-    const isRemote = !/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/.test(baseUrl);
-    const entry = buildOpenclawMcpEntry({
-      url: baseUrl,
-      token,
-      timeoutMs: isRemote ? 15000 : 10000,
-    });
-    console.log(JSON.stringify({ mcp: { servers: { vulnforge: entry } } }, null, 2));
+    const name = String(args.flags.name || 'vulnforge');
+    const entry = buildOpenclawMcpEntry({ url: baseUrl, token });
+    console.log(JSON.stringify({ mcp: { servers: { [name]: entry } } }, null, 2));
     return;
   }
 
   console.error(red('usage:'));
   console.error('  vulnforge openclaw install [--url <base>] [--token <jwt>] [--name <entry>]');
   console.error('  vulnforge openclaw install --show-config   # print without calling openclaw');
-  console.error('  vulnforge openclaw show-config             # print full openclaw.json fragment');
+  console.error('  vulnforge openclaw show-config [--name <entry>]  # print openclaw.json fragment');
   return 1;
 }
 

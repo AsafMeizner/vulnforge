@@ -36,15 +36,27 @@ vulnforge openclaw install \
 The command:
 
 1. Detects OpenClaw via `openclaw --version`.
-2. Generates the MCP server entry with the right URL, transport, and
+2. Finds the live VulnForge backend — checks `$VULNFORGE_PORT`, then
+   the `.vulnforge-port` file written by a running server, then falls
+   back to probing `localhost:3001`..`localhost:3010`. This matters
+   in dev mode where VulnForge hops ports on `EADDRINUSE`.
+3. Generates the MCP server entry with the right URL, transport, and
    auth header for your mode.
-3. Calls `openclaw mcp set vulnforge '<json>'` to register it.
-4. Runs a quick `tools/list` handshake so you know the connection is
-   live before you open a conversation.
+4. Calls `openclaw mcp set vulnforge '<json>'` to register it.
+5. Hits `/api/health` on the exact URL it just wrote into the config,
+   so a stale URL or a down backend surfaces immediately instead of
+   only when you open a conversation.
 
 If OpenClaw isn't on `PATH` the command falls back to printing the
 JSON snippet for you to paste manually — same file, same contents,
 no guessing.
+
+> **Note on ports:** the snippets below use `localhost:3001`, which
+> is VulnForge's default. If the port was taken and the server hopped
+> forward, check the `.vulnforge-port` file (cwd of the server) or
+> the `VULNFORGE_READY_PORT=<port>` line it prints on startup, and
+> substitute that port in the URL. The `vulnforge openclaw install`
+> CLI does this discovery automatically.
 
 ## Option B — paste the config yourself
 
@@ -155,7 +167,7 @@ capability for the save.
 ### 4 — Cross-reference a CVE
 
 ```
-Check vulnforge's historical intel — does CVE-2026-32875 match any
+Check VulnForge's historical intel — does CVE-2026-32875 match any
 of the dependencies in my current project?
 ```
 
@@ -187,8 +199,17 @@ openclaw mcp show vulnforge
 ```
 
 If the output is empty, the `openclaw mcp set vulnforge ...`
-command didn't take. Re-run `vulnforge openclaw install --verbose`
-and read the exit status.
+command didn't take. Re-run `vulnforge openclaw install` — it
+will print the exit status and the `✓ vulnforge backend reachable`
+line (or a `⚠ unreachable` warning with the underlying error) so
+you can tell which step failed.
+
+If you want to inspect exactly what the CLI will write without
+calling `openclaw`, use the preview flag:
+
+```bash
+vulnforge openclaw install --show-config
+```
 
 ### "Connection refused" on tools/list
 
