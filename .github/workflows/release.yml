@@ -96,6 +96,16 @@ jobs:
             ghcr.io/${{ steps.tag.outputs.owner_lc }}/vulnforge-server:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Disable SLSA provenance + SBOM attestations. The default
+          # behaviour of docker/build-push-action@v7 is to auto-upload
+          # a *.dockerbuild provenance artifact to the workflow run,
+          # which actions/download-artifact@v4 cannot extract (blob
+          # format mismatch) and fails the downstream release job with
+          # "Artifact download failed after 5 retries". We'd need to
+          # either turn these off or teach the release job to filter
+          # them; turning them off is simpler for an alpha release.
+          provenance: false
+          sbom: false
 
   # ── 3. Bare-metal server tarball ──
   tarball:
@@ -129,9 +139,22 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      # Only pull the artifacts the release actually consumes. Any
+      # extra artifact produced as a side effect (e.g.
+      # docker/build-push-action@v7's *.dockerbuild provenance blob,
+      # which is disabled above but kept out of the download path as
+      # defence-in-depth) is ignored. Two explicit steps are clearer
+      # than a glob pattern here.
+      - name: download desktop installers
+        uses: actions/download-artifact@v4
         with:
+          pattern: desktop-*
           path: artifacts/
+      - name: download server tarball
+        uses: actions/download-artifact@v4
+        with:
+          name: server-tarball
+          path: artifacts/server-tarball/
       - name: flatten artifacts + compute checksums + lowercase owner
         id: meta
         run: |
