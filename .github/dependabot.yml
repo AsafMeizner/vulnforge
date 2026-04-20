@@ -36,6 +36,20 @@ updates:
         update-types:
           - "minor"
           - "patch"
+      # i18n packages are peer-coupled. react-i18next v17 requires
+      # i18next >= 26, v16 requires >= 25, v15 requires >= 23.4. Grouping
+      # them on ALL update-types (including majors) prevents the split-PR
+      # trap where react-i18next alone fails npm install with ERESOLVE.
+      i18n:
+        patterns:
+          - "i18next"
+          - "react-i18next"
+          - "i18next-browser-languagedetector"
+          - "i18next-*"
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
     # Ignore major bumps for packages that need coordinated migrations.
     # Dependabot will still flag them via security advisories - these ignores
     # only suppress noisy drive-by majors.
